@@ -1,0 +1,35 @@
+## Build artifacts
+/build/
+/CMakeFiles/
+/CMakeCache.txt
+/cmake_install.cmake
+/compile_commands.json
+/Makefile
+/dev/
+/ext/
+/tmp/
+
+## CTest / coverage
+/Testing/
+/tests/Testing/
+*.gcno
+*.gcda
+*.gcov
+
+## IDE / editor
+.vscode/
+.idea/
+*.code-workspace
+
+## Python (for dev scripts)
+__pycache__/
+*.pyc
+.venv/
+venv/
+.mypy_cache/
+.pytest_cache/
+
+## OS / misc
+.DS_Store
+Thumbs.db
+

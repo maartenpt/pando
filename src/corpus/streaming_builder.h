@@ -1,0 +1,116 @@
+#pragma once
+
+#include "core/types.h"
+#include "core/mmap_file.h"
+#include <string>
+#include <vector>
+#include <unordered_map>
+#include <unordered_set>
+#include <memory>
+#include <cstdio>
+
+namespace manatree {
+
+// Streaming corpus builder: writes index files incrementally as tokens
+// arrive, then sorts lexicons and builds reverse indexes at finalize.
+//
+// Memory usage: only the unique strings per attribute (vocabulary) are
+// held in memory — typically ~1M entries.  Token data streams directly
+// to .dat files on disk.  Dependency data is flushed per sentence.
+//
+// Usage:
+//   StreamingBuilder builder("./output");
+//   builder.add_token({{"form","The"}, {"lemma","the"}, ...}, /*head=*/2);
+//   builder.add_token({{"form","cat"}, ...}, /*head=*/0);
+//   builder.end_sentence();
+//   builder.finalize();  // sort lexicons, remap .dat, build .rev
+class StreamingBuilder {
+public:
+    explicit StreamingBuilder(const std::string& output_dir);
+    ~StreamingBuilder();
+
+    StreamingBuilder(const StreamingBuilder&) = delete;
+    StreamingBuilder& operator=(const StreamingBuilder&) = delete;
+
+    // Feed a token.  `attrs` maps attribute names to values.
+    // `sentence_head_id`: 1-based head within sentence (0 = root, -1 = no dep info).
+    void add_token(const std::unordered_map<std::string, std::string>& attrs,
+                   int sentence_head_id = -1);
+
+    void end_sentence();
+
+    // Add a non-sentence structural region (e.g. "text", "p").
+    void add_region(const std::string& type, CorpusPos start, CorpusPos end);
+
+    // Add a region with one value (stored as attr "id"; backward compat).
+    void add_region(const std::string& type, CorpusPos start, CorpusPos end,
+                    const std::string& value);
+
+    // Add a region with multiple named attributes (#8): e.g. {{"id","doc.xml"}, {"year","2020"}}.
+    void add_region(const std::string& type, CorpusPos start, CorpusPos end,
+                    const std::vector<std::pair<std::string, std::string>>& attrs);
+
+    // Sort lexicons, remap .dat IDs, build reverse indexes.
+    void finalize();
+
+    // #9: Set default within-structure (e.g. "text"); written to corpus.info.
+    void set_default_within(const std::string& structure) { default_within_ = structure; }
+
+    CorpusPos corpus_size() const { return corpus_size_; }
+
+private:
+    struct AttrState {
+        std::unordered_map<std::string, int32_t> str_to_id;
+        std::vector<std::string> id_to_str;
+        FILE* dat_file = nullptr;
+        CorpusPos written = 0;
+        int32_t placeholder_id = -1;  // cached ID for "_"
+
+        int32_t get_or_assign(const std::string& value);
+        int32_t get_placeholder();     // fast path for "_"
+        ~AttrState();
+    };
+
+    void ensure_attr(const std::string& name);
+    void backfill_attr(AttrState& state);
+    void open_dep_files();
+
+    void finalize_attribute(const std::string& name, AttrState& state);
+    void remap_dat(const std::string& dat_path, const std::vector<int32_t>& remap,
+                   int target_width);
+    void build_reverse_index(const std::string& base, int32_t lex_size,
+                             int rev_width);
+
+    std::string output_dir_;
+    CorpusPos corpus_size_ = 0;
+    bool finalized_ = false;
+    bool has_deps_ = false;
+
+    std::unordered_map<std::string, std::unique_ptr<AttrState>> attrs_;
+    std::vector<std::string> attr_order_;
+    std::unordered_set<std::string> attr_set_;
+
+    // Current sentence
+    struct SentToken { int sentence_head_id; };
+    std::vector<SentToken> sent_buf_;
+    CorpusPos sent_start_ = 0;
+
+    // Dep files (streamed per sentence)
+    FILE* dep_head_file_ = nullptr;
+    FILE* dep_euler_in_file_ = nullptr;
+    FILE* dep_euler_out_file_ = nullptr;
+    CorpusPos dep_written_ = 0;
+
+    // Sentence region file (streamed)
+    FILE* sent_rgn_file_ = nullptr;
+
+    // Other structural regions (buffered — typically few)
+    std::unordered_map<std::string, std::vector<Region>> regions_;
+    std::unordered_map<std::string, std::vector<std::string>> region_values_;  // legacy: one value per region
+    // #8: multiple named attrs per region type: region_attr_values_[type][attr_name] = values per region
+    std::unordered_map<std::string, std::unordered_map<std::string, std::vector<std::string>>> region_attr_values_;
+    std::unordered_set<std::string> struct_set_;
+    std::string default_within_;  // #9: e.g. "text"
+};
+
+} // namespace manatree

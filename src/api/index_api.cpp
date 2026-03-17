@@ -1,0 +1,38 @@
+#include "api/index_api.h"
+
+namespace manatree {
+
+PandoIndexBuilder::PandoIndexBuilder(const std::string& output_dir)
+    : builder_(output_dir) {}
+
+void PandoIndexBuilder::add_token(
+        const std::unordered_map<std::string, std::string>& attrs,
+        int sentence_head_id) {
+    builder_.add_token(attrs, sentence_head_id);
+}
+
+void PandoIndexBuilder::end_sentence() {
+    builder_.end_sentence();
+}
+
+void PandoIndexBuilder::add_region(const std::string& type,
+                                   CorpusPos start,
+                                   CorpusPos end,
+                                   const std::vector<std::pair<std::string, std::string>>& attrs) {
+    builder_.add_region(type, start, end, attrs);
+}
+
+void PandoIndexBuilder::set_default_within(const std::string& structure) {
+    builder_.set_default_within(structure);
+}
+
+void PandoIndexBuilder::finalize() {
+    builder_.finalize();
+}
+
+CorpusPos PandoIndexBuilder::corpus_size() const {
+    return builder_.corpus_size();
+}
+
+} // namespace manatree
+

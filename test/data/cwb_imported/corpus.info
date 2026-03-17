@@ -1,0 +1,3 @@
+size=40
+positional=form,lemma,upos,xpos,deprel
+structural=s

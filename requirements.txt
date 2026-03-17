@@ -1,0 +1,11 @@
+# Python dependencies for Pando development tooling and benchmarks.
+#
+# The core Pando engine is C++ only and does not require Python to build or run.
+# This file is intentionally minimal; at the moment the dev scripts under `dev/`
+# use only the Python standard library.
+#
+# If you add non-stdlib Python dependencies for benchmarks or tooling, list
+# pinned versions here, for example:
+#   click==8.1.8
+#   requests==2.32.3
+
