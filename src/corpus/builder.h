@@ -2,8 +2,10 @@
 
 #include "core/types.h"
 #include "corpus/streaming_builder.h"
-#include <string>
 #include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace manatree {
 
@@ -31,19 +33,34 @@ public:
 private:
     void parse_feats(const std::string& feats_str,
                      std::unordered_map<std::string, std::string>& attrs);
+    /// CoNLL-U MISC column: only whitelisted keys (tuid, Translit, Vform, LTranslt, Root, CorrectForm, Gloss).
+    void parse_misc(const std::string& misc_str,
+                    std::unordered_map<std::string, std::string>& attrs);
+
+    void close_text_region_if_open();
+    void close_doc_region_if_open();
 
     StreamingBuilder builder_;
     bool split_feats_ = false;
 
     // Region tracking for CoNLL-U input (3b/4c):
-    // create text/doc and par regions with IDs from comment lines.
     bool        in_sentence_ = false;
+    bool        has_text_region_ = false;
     bool        has_doc_region_ = false;
     bool        has_par_region_ = false;
-    CorpusPos   doc_start_ = 0;
+    CorpusPos   text_region_start_ = 0;
+    CorpusPos   doc_region_start_ = 0;
     CorpusPos   par_start_ = 0;
     std::string doc_id_;
     std::string par_id_;
+    /// Current # newregion text span + CQP # text_* = …
+    std::vector<std::pair<std::string, std::string>> text_region_attrs_;
+    /// Current # newdoc id span (corpus structural region "doc", not "text").
+    std::vector<std::pair<std::string, std::string>> doc_region_attrs_;
+    /// Sentence-level attrs for the current CoNLL-U sentence (e.g. # tuid = ...).
+    std::vector<std::pair<std::string, std::string>> sent_region_attrs_;
+    /// Copied onto each token until the sentence ends (TEITOK-style alignment id).
+    std::string pending_sent_tuid_;
 
     // Region tracking for vertical/VRT input: stack of open regions
     // (<text ...>, <p ...>, <s ...>, <bla ...>), each with attributes.
@@ -52,6 +69,8 @@ private:
         CorpusPos   start = 0;
         std::vector<std::pair<std::string, std::string>> attrs;
     };
+    // Region stack for CoNLL-U comment extensions: # newregion X / # endregion X.
+    std::vector<OpenRegion> conllu_region_stack_;
     std::vector<OpenRegion> vrt_region_stack_;
 };
 

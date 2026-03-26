@@ -31,12 +31,28 @@ enum class CompOp {
     REGEX,    // = /pattern/
 };
 
+// ── Structural relation types for nested conditions ───────────────────────
+
+enum class StructRelType {
+    CHILD,       // direct child (head→dependent)
+    PARENT,      // direct parent (dependent→head)
+    SIBLING,     // same head
+    DESCENDANT,  // transitive child
+    ANCESTOR,    // transitive parent
+};
+
 // ── A single attribute condition inside [] ──────────────────────────────
 
 struct AttrCondition {
     std::string attr;        // e.g. "upos", "lemma", "feats.Number"
     CompOp op = CompOp::EQ;
     std::string value;       // string/regex value
+    bool case_insensitive = false;       // %c flag
+    bool diacritics_insensitive = false; // %d flag
+
+    // #25: Pre-resolved lexicon ID for EQ comparisons (populated by compile_conditions).
+    // When >= 0, check_leaf uses integer comparison instead of string comparison.
+    int32_t resolved_id = -1;  // -1 = UNKNOWN_LEX = not resolved
 };
 
 // ── Boolean combination of conditions ───────────────────────────────────
@@ -49,6 +65,7 @@ using ConditionPtr = std::shared_ptr<ConditionNode>;
 struct ConditionNode {
     // Leaf: single attribute condition
     // Branch: boolean combination
+    // Structural: nested condition on related positions
     bool is_leaf = true;
 
     // Leaf fields
@@ -58,6 +75,13 @@ struct ConditionNode {
     BoolOp       bool_op = BoolOp::AND;
     ConditionPtr left;
     ConditionPtr right;
+
+    // Structural relation condition fields (is_leaf=false, left=nullptr, right=nullptr)
+    bool is_structural = false;
+    bool struct_negated = false;      // true for [not child [...]]
+    StructRelType struct_rel;
+    ConditionPtr  nested_conditions;  // conditions that the related token must satisfy
+    std::string   nested_name;        // optional name for the nested token (for :: constraints)
 
     static ConditionPtr make_leaf(AttrCondition c) {
         auto n = std::make_shared<ConditionNode>();
@@ -73,6 +97,16 @@ struct ConditionNode {
         n->right = std::move(r);
         return n;
     }
+    static ConditionPtr make_structural(StructRelType rel, ConditionPtr nested, const std::string& name = "", bool negated = false) {
+        auto n = std::make_shared<ConditionNode>();
+        n->is_leaf = false;
+        n->is_structural = true;
+        n->struct_negated = negated;
+        n->struct_rel = rel;
+        n->nested_conditions = std::move(nested);
+        n->nested_name = name;
+        return n;
+    }
 };
 
 // ── Repetition constants ────────────────────────────────────────────────
@@ -81,14 +115,27 @@ static constexpr int REPEAT_UNBOUNDED = 100;  // practical cap for {n,} and +
 
 // ── A single query token ────────────────────────────────────────────────
 
+// ── Region anchor types ──────────────────────────────────────────────────
+
+enum class RegionAnchorType {
+    NONE,          // normal token — occupies a position
+    REGION_START,  // <s> — zero-width, binds to next token's position
+    REGION_END,    // </s> — zero-width, binds to previous token's position
+};
+
 struct QueryToken {
     std::string    name;              // optional label (e.g. "verb:")
-    bool           is_target = false; // @[] marker
     ConditionPtr   conditions;        // may be null (empty token [])
     int            min_repeat = 1;    // {min,max} repetition; default 1,1 = exact single token
     int            max_repeat = 1;    // REPEAT_UNBOUNDED for {n,} and +
 
+    // Region boundary anchor (zero-width, does not consume a position)
+    RegionAnchorType anchor = RegionAnchorType::NONE;
+    std::string      anchor_region;   // region name, e.g. "s", "text", "np"
+    std::vector<std::pair<std::string, std::string>> anchor_attrs;  // <text genre="book"> → {{"genre","book"}}
+
     bool has_repetition() const { return min_repeat != 1 || max_repeat != 1; }
+    bool is_anchor() const { return anchor != RegionAnchorType::NONE; }
 };
 
 // ── A relation edge between two tokens in the query chain ───────────────
@@ -100,6 +147,7 @@ struct QueryRelation {
 // ── Global filter (#12): :: match.region_attr op value, or a.attr = b.attr ───
 
 struct GlobalRegionFilter {
+    std::string anchor_name;   // token name to resolve position (empty → match.first_pos)
     std::string region_attr;   // e.g. "text_year" (region type + attr)
     CompOp      op = CompOp::EQ;
     std::string value;
@@ -110,14 +158,33 @@ struct GlobalAlignmentFilter {
     std::string name2, attr2;
 };
 
+// ── Structural containment operators ──────────────────────────────────────
+
+struct ContainingClause {
+    std::string region;          // structural region name (e.g. "s", "np") — empty if subtree mode
+    bool is_subtree = false;     // "containing subtree [cond]" — dependency subtree containment
+    ConditionPtr subtree_cond;   // condition for subtree root token
+    bool negated = false;        // "not containing ..."
+};
+
 // ── The full token query ────────────────────────────────────────────────
 
 struct TokenQuery {
     std::vector<QueryToken>    tokens;
     std::vector<QueryRelation> relations;  // relations[i] is between tokens[i] and tokens[i+1]
     std::string                within;     // "s", "p", "text" or empty
+    bool                       not_within = false;  // "not within s"
+    ConditionPtr               within_having;  // "within s having [cond]": existential check on region
+    std::vector<ContainingClause>     containing_clauses;  // "containing s", "containing subtree [cond]"
     std::vector<GlobalRegionFilter>   global_region_filters;    // :: match.text_year > 2000
     std::vector<GlobalAlignmentFilter> global_alignment_filters; // :: a.tuid = b.tuid
+
+    // Global position ordering constraints: :: a < b
+    struct PositionOrder {
+        std::string name1, name2;
+        CompOp op;  // LT or GT
+    };
+    std::vector<PositionOrder> position_orders;
 };
 
 // ── Display / grouping commands ─────────────────────────────────────────
@@ -136,18 +203,36 @@ enum class CommandType {
     SHOW_ATTRS,
     SHOW_REGIONS,
     SHOW_NAMED,
+    SHOW_INFO,
+    SHOW_VALUES,   // show values <attr> — unique values + counts
     TABULATE,
+    KEYNESS,       // keyness by <attr> — subcorpus keyword extraction (#40)
+    SET,           // set <name> <value> — change runtime option (#41)
+    SHOW_SETTINGS, // show settings — display all runtime options (#41)
+    DROP,          // drop <name> or drop all
 };
 
 struct GroupCommand {
     CommandType type;
     std::string query_name;          // which named query to operate on
-    std::vector<std::string> fields; // fields to group/sort by
-    // coll/dcoll parameters
-    int window = 5;
-    int min_freq = 5;
-    std::string deprel;
-    std::vector<std::string> measures;
+    std::vector<std::string> fields; // fields to group/sort/coll by
+
+    // dcoll-specific: unified relation list
+    // Special names: "head" (go up), "descendants" (full subtree)
+    // Any other name is a deprel filter on children (e.g. "amod", "nsubj")
+    // Empty = all children (default)
+    std::vector<std::string> relations;
+
+    // dcoll anchor: named token to start from (empty = first_pos)
+    std::string dcoll_anchor;
+
+    // keyness: optional reference query name for "keyness M vs N by attr"
+    // When empty, reference = rest of corpus (default).
+    std::string ref_query_name;
+
+    // set: setting name and value for "set <name> <value>"
+    std::string set_name;
+    std::string set_value;
 };
 
 // ── Top-level statement ─────────────────────────────────────────────────

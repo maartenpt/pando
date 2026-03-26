@@ -3,6 +3,13 @@
 #include "query/parser.h"
 #include <sstream>
 #include <chrono>
+#include <algorithm>
+#include <map>
+#include <iostream>
+#include <set>
+#include <cmath>
+#include <unordered_map>
+#include <iomanip>
 
 namespace manatree {
 
@@ -115,6 +122,116 @@ std::string to_info_json(const Corpus& corpus) {
         out << jstr(names[i]);
     }
     out << "]\n  }\n}\n";
+    return out.str();
+}
+
+std::string to_values_json(const Corpus& corpus, const std::string& attr_name, size_t limit) {
+    std::ostringstream out;
+
+    // Try positional attribute first
+    if (corpus.has_attr(attr_name)) {
+        const auto& pa = corpus.attr(attr_name);
+        const auto& lex = pa.lexicon();
+        LexiconId n = lex.size();
+
+        std::vector<std::pair<std::string, size_t>> entries;
+        entries.reserve(static_cast<size_t>(n));
+        for (LexiconId id = 0; id < n; ++id) {
+            size_t cnt = pa.count_of_id(id);
+            if (cnt > 0)
+                entries.emplace_back(std::string(lex.get(id)), cnt);
+        }
+        std::sort(entries.begin(), entries.end(),
+                  [](const auto& a, const auto& b) { return a.second > b.second; });
+
+        size_t cap = (limit > 0) ? std::min(entries.size(), limit) : entries.size();
+        out << "{\n  \"ok\": true,\n  \"operation\": \"values\",\n";
+        out << "  \"result\": {\n";
+        out << "    \"attr\": " << jstr(attr_name) << ",\n";
+        out << "    \"type\": \"positional\",\n";
+        out << "    \"unique\": " << entries.size() << ",\n";
+        out << "    \"returned\": " << cap << ",\n";
+        out << "    \"values\": [\n";
+        for (size_t i = 0; i < cap; ++i) {
+            if (i > 0) out << ",\n";
+            out << "      {\"value\": " << jstr(entries[i].first)
+                << ", \"count\": " << entries[i].second << "}";
+        }
+        out << "\n    ]\n  }\n}\n";
+        return out.str();
+    }
+
+    // Try region attribute: split text_genre → struct "text", attr "genre"
+    auto us = attr_name.find('_');
+    if (us != std::string::npos) {
+        std::string struct_name = attr_name.substr(0, us);
+        std::string region_attr = attr_name.substr(us + 1);
+        if (corpus.has_structure(struct_name)) {
+            const auto& sa = corpus.structure(struct_name);
+            if (sa.has_region_attr(region_attr)) {
+                size_t n = sa.region_count();
+                std::map<std::string, size_t> counts;
+                for (size_t i = 0; i < n; ++i) {
+                    std::string v(sa.region_value(region_attr, i));
+                    counts[v]++;
+                }
+                std::vector<std::pair<std::string, size_t>> entries(counts.begin(), counts.end());
+                std::sort(entries.begin(), entries.end(),
+                          [](const auto& a, const auto& b) { return a.second > b.second; });
+
+                size_t cap = (limit > 0) ? std::min(entries.size(), limit) : entries.size();
+                out << "{\n  \"ok\": true,\n  \"operation\": \"values\",\n";
+                out << "  \"result\": {\n";
+                out << "    \"attr\": " << jstr(attr_name) << ",\n";
+                out << "    \"type\": \"region\",\n";
+                out << "    \"structure\": " << jstr(struct_name) << ",\n";
+                out << "    \"region_attr\": " << jstr(region_attr) << ",\n";
+                out << "    \"unique\": " << entries.size() << ",\n";
+                out << "    \"returned\": " << cap << ",\n";
+                out << "    \"values\": [\n";
+                for (size_t i = 0; i < cap; ++i) {
+                    if (i > 0) out << ",\n";
+                    out << "      {\"value\": " << jstr(entries[i].first)
+                        << ", \"count\": " << entries[i].second << "}";
+                }
+                out << "\n    ]\n  }\n}\n";
+                return out.str();
+            }
+        }
+    }
+
+    return {};  // not found
+}
+
+std::string to_regions_json(const Corpus& corpus, const std::string& type_name, size_t limit) {
+    if (!corpus.has_structure(type_name)) return {};
+
+    const auto& sa = corpus.structure(type_name);
+    const auto& ra_names = sa.region_attr_names();
+    size_t n = sa.region_count();
+    size_t cap = (limit > 0) ? std::min(n, limit) : n;
+
+    std::ostringstream out;
+    out << "{\n  \"ok\": true,\n  \"operation\": \"regions\",\n";
+    out << "  \"result\": {\n";
+    out << "    \"type\": " << jstr(type_name) << ",\n";
+    out << "    \"total\": " << n << ",\n";
+    out << "    \"returned\": " << cap << ",\n";
+    out << "    \"regions\": [\n";
+    for (size_t i = 0; i < cap; ++i) {
+        Region rgn = sa.get(i);
+        if (i > 0) out << ",\n";
+        out << "      {\"index\": " << i
+            << ", \"start\": " << rgn.start
+            << ", \"end\": " << rgn.end
+            << ", \"tokens\": " << (rgn.end - rgn.start + 1);
+        for (const auto& attr : ra_names) {
+            std::string_view v = sa.region_value(attr, i);
+            out << ", " << jstr(type_name + "_" + attr) << ": " << jstr(std::string(v));
+        }
+        out << "}";
+    }
+    out << "\n    ]\n  }\n}\n";
     return out.str();
 }
 

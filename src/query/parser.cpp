@@ -20,7 +20,7 @@ Program Parser::parse() {
 bool Parser::is_command_keyword(const std::string& text) const {
     static const std::vector<std::string> cmds = {
         "count", "group", "sort", "freq", "coll", "dcoll",
-        "cat", "size", "raw", "show", "tabulate"
+        "cat", "size", "raw", "show", "tabulate", "keyness", "set", "drop"
     };
     std::string lower = text;
     std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
@@ -38,34 +38,6 @@ Statement Parser::parse_statement() {
         return stmt;
     }
 
-    // #16: Source : query | Target : query [:: filters]
-    if (t.type == TokType::IDENT) {
-        std::string lower = t.text;
-        std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
-        if (lower == "source") {
-            lexer_.consume();
-            lexer_.expect(TokType::COLON);
-            stmt.has_query = true;
-            stmt.is_parallel = true;
-            stmt.query = parse_token_query();
-            if (lexer_.peek().type != TokType::PIPE)
-                throw std::runtime_error("Expected '|' after Source query");
-            lexer_.consume();
-            Token target_kw = lexer_.next();
-            if (target_kw.type != TokType::IDENT) throw std::runtime_error("Expected 'Target'");
-            std::string target_lower = target_kw.text;
-            std::transform(target_lower.begin(), target_lower.end(), target_lower.begin(), ::tolower);
-            if (target_lower != "target") throw std::runtime_error("Expected 'Target'");
-            lexer_.expect(TokType::COLON);
-            stmt.target_query = parse_token_query();
-            if (lexer_.peek().type == TokType::DCOLON) {
-                lexer_.consume();
-                parse_global_filters(stmt.query);
-            }
-            return stmt;
-        }
-    }
-
     // Check for named query: IDENT "=" query
     // We need to look ahead: IDENT followed by "=" (not "==" which doesn't exist,
     // but "=" when not inside brackets is assignment)
@@ -75,12 +47,12 @@ Statement Parser::parse_statement() {
         Token t2 = lexer_.peek();
         if (t2.type == TokType::EQ) {
             // Check it's not an attribute condition by looking if next-next is
-            // "[" or "@" or '"' or IDENT:  — these start a token expression.
+            // "[" or '"' or IDENT:  — these start a token expression.
             // Actually, named query is: IDENT = <token_query>
-            // A token query starts with [, @, ", or IDENT (label)
+            // A token query starts with [, ", or IDENT (label)
             lexer_.consume(); // consume =
             Token t3 = lexer_.peek();
-            if (t3.type == TokType::LBRACKET || t3.type == TokType::AT ||
+            if (t3.type == TokType::LBRACKET ||
                 t3.type == TokType::STRING || t3.type == TokType::IDENT) {
                 stmt.name = t1.text;
                 stmt.has_query = true;
@@ -126,10 +98,31 @@ Statement Parser::parse_statement() {
             stmt.query.tokens.push_back(parse_token_expr());
         }
 
-        // Within clause
-        if (lexer_.peek().type == TokType::IDENT && lexer_.peek().text == "within") {
-            lexer_.consume();
-            stmt.query.within = lexer_.expect(TokType::IDENT).text;
+        // Structural clauses: within, not within, containing, not containing
+        while (lexer_.peek().type == TokType::IDENT) {
+            const std::string& kw = lexer_.peek().text;
+            if (kw == "within") {
+                lexer_.consume();
+                parse_within_clause(stmt.query);
+            } else if (kw == "not") {
+                Token not_tok = lexer_.next();
+                Token next = lexer_.peek();
+                if (next.type == TokType::IDENT && next.text == "within") {
+                    lexer_.consume();
+                    stmt.query.not_within = true;
+                    parse_within_clause(stmt.query);
+                } else if (next.type == TokType::IDENT && next.text == "containing") {
+                    lexer_.consume();
+                    parse_containing_clause(stmt.query, true);
+                } else {
+                    throw std::runtime_error("Expected 'within' or 'containing' after 'not'");
+                }
+            } else if (kw == "containing") {
+                lexer_.consume();
+                parse_containing_clause(stmt.query, false);
+            } else {
+                break;
+            }
         }
 
         // #12: Global filters
@@ -138,12 +131,36 @@ Statement Parser::parse_statement() {
             parse_global_filters(stmt.query);
         }
 
+        // Check for parallel query: query1 with query2
+        if (lexer_.peek().type == TokType::IDENT && lexer_.peek().text == "with") {
+            lexer_.consume();
+            stmt.is_parallel = true;
+            stmt.target_query = parse_token_query();
+            if (lexer_.peek().type == TokType::DCOLON) {
+                lexer_.consume();
+                parse_global_filters(stmt.query);
+            }
+        }
+
         return stmt;
     }
 
     // Regular token query
     stmt.has_query = true;
     stmt.query = parse_token_query();
+
+    // Check for parallel query: query1 with query2 [:: filters]
+    if (lexer_.peek().type == TokType::IDENT && lexer_.peek().text == "with") {
+        lexer_.consume();
+        stmt.is_parallel = true;
+        stmt.target_query = parse_token_query();
+        // Global filters (:: a.attr = b.attr) after `with` apply to source query
+        if (lexer_.peek().type == TokType::DCOLON) {
+            lexer_.consume();
+            parse_global_filters(stmt.query);
+        }
+    }
+
     return stmt;
 }
 
@@ -158,24 +175,173 @@ GroupCommand Parser::parse_command() {
     else if (kw == "sort") cmd.type = CommandType::SORT;
     else if (kw == "freq") cmd.type = CommandType::FREQ;
     else if (kw == "coll") cmd.type = CommandType::COLL;
-    else if (kw == "dcoll") cmd.type = CommandType::DCOLL;
+    else if (kw == "keyness") cmd.type = CommandType::KEYNESS;
+    else if (kw == "dcoll") {
+        cmd.type = CommandType::DCOLL;
+        // Syntax: dcoll [QueryName] [anchor.] rel1[, rel2, ...] by field[, field, ...]
+        // Relations: "head" (go up), "descendants" (subtree), any other = deprel on children
+        // Empty relations = all children (default)
+        //
+        // Disambiguation: if first IDENT is followed by DOT and then "by"/comma/relation,
+        // it's an anchor (e.g. "a.head" → anchor=a, rel=head).
+        // If first IDENT is followed by another IDENT that is "by", it's a query name.
+        // Otherwise it's a relation name.
+
+        // Step 1: try to parse optional query name and/or anchor
+        if (lexer_.peek().type == TokType::IDENT && lexer_.peek().text != "by") {
+            std::string first = lexer_.next().text;
+            if (lexer_.peek().type == TokType::DOT) {
+                // Could be anchor.relation (a.head) or query_name followed by something
+                // Peek past DOT to see if it's a relation or "by"
+                lexer_.consume(); // consume DOT
+                if (lexer_.peek().type == TokType::IDENT) {
+                    // a.head or a.amod — first is the anchor, next is a relation
+                    cmd.dcoll_anchor = first;
+                    cmd.relations.push_back(lexer_.next().text);
+                } else {
+                    // Malformed — treat first as query name, put DOT back? Can't.
+                    // Just treat as query name and hope for the best
+                    cmd.query_name = first;
+                }
+            } else if (lexer_.peek().type == TokType::IDENT &&
+                       lexer_.peek().text == "by") {
+                // "dcoll QueryName by ..." — first is a query name
+                cmd.query_name = first;
+            } else if (lexer_.peek().type == TokType::COMMA ||
+                       lexer_.peek().type == TokType::IDENT) {
+                // "dcoll nsubj, obj by ..." — first is a relation
+                cmd.relations.push_back(first);
+            } else {
+                // "dcoll head;" — first is a relation, nothing follows
+                cmd.relations.push_back(first);
+            }
+        }
+
+        // Step 2: parse remaining comma-separated relations before "by"
+        while (lexer_.peek().type == TokType::COMMA ||
+               (lexer_.peek().type == TokType::IDENT && lexer_.peek().text != "by")) {
+            if (lexer_.peek().type == TokType::COMMA) lexer_.consume();
+            if (lexer_.peek().type == TokType::IDENT && lexer_.peek().text != "by") {
+                cmd.relations.push_back(lexer_.next().text);
+            } else break;
+        }
+
+        // Step 3: parse optional "by" field_list
+        if (lexer_.peek().type == TokType::IDENT && lexer_.peek().text == "by") {
+            lexer_.consume();
+            std::string field = lexer_.next().text;
+            if (lexer_.peek().type == TokType::DOT) {
+                lexer_.consume();
+                field += "." + lexer_.expect(TokType::IDENT).text;
+            }
+            cmd.fields.push_back(field);
+            while (lexer_.peek().type == TokType::COMMA) {
+                lexer_.consume();
+                field = lexer_.next().text;
+                if (lexer_.peek().type == TokType::DOT) {
+                    lexer_.consume();
+                    field += "." + lexer_.expect(TokType::IDENT).text;
+                }
+                cmd.fields.push_back(field);
+            }
+        }
+        return cmd;
+    }
     else if (kw == "cat") cmd.type = CommandType::CAT;
     else if (kw == "size") cmd.type = CommandType::SIZE;
     else if (kw == "raw") cmd.type = CommandType::RAW;
-    else if (kw == "tabulate") cmd.type = CommandType::TABULATE;
+    else if (kw == "tabulate") {
+        cmd.type = CommandType::TABULATE;
+        // tabulate [QueryName] field1[, field2, ...]   (no "by" keyword)
+        // Heuristic: if first IDENT is followed by DOT → it's a field, not a query name.
+        if (lexer_.peek().type == TokType::IDENT) {
+            std::string first = lexer_.next().text;
+            if (lexer_.peek().type == TokType::DOT) {
+                // First ident is start of a dotted field (e.g. a.text_genre)
+                lexer_.consume();
+                cmd.fields.push_back(first + "." + lexer_.expect(TokType::IDENT).text);
+            } else {
+                // First ident is a query name
+                cmd.query_name = first;
+            }
+        }
+        // Parse remaining fields: comma or space separated IDENT[.IDENT]
+        while (lexer_.peek().type == TokType::IDENT || lexer_.peek().type == TokType::COMMA) {
+            if (lexer_.peek().type == TokType::COMMA) lexer_.consume();
+            if (lexer_.peek().type != TokType::IDENT) break;
+            std::string field = lexer_.next().text;
+            if (lexer_.peek().type == TokType::DOT) {
+                lexer_.consume();
+                field += "." + lexer_.expect(TokType::IDENT).text;
+            }
+            cmd.fields.push_back(field);
+        }
+        return cmd;
+    }
+    else if (kw == "set") {
+        cmd.type = CommandType::SET;
+        // Syntax: set <name> <value>
+        // value can be a number, ident, or comma-separated list
+        Token name_tok = lexer_.next();
+        cmd.set_name = name_tok.text;
+        // Collect the rest as value: concatenate tokens separated by commas/spaces
+        std::string val;
+        while (lexer_.peek().type != TokType::END && lexer_.peek().type != TokType::SEMI) {
+            if (lexer_.peek().type == TokType::COMMA) {
+                lexer_.consume();
+                if (!val.empty()) val += ",";
+                continue;
+            }
+            Token vt = lexer_.next();
+            if (!val.empty() && val.back() != ',') val += " ";
+            val += vt.text;
+        }
+        cmd.set_value = val;
+        return cmd;
+    }
+    else if (kw == "drop") {
+        cmd.type = CommandType::DROP;
+        Token what = lexer_.next();
+        cmd.query_name = what.text;  // "all" or a named query name
+        return cmd;
+    }
     else if (kw == "show") {
         Token what = lexer_.next();
         if (what.text == "attributes" || what.text == "attrs") cmd.type = CommandType::SHOW_ATTRS;
-        else if (what.text == "regions") cmd.type = CommandType::SHOW_REGIONS;
+        else if (what.text == "settings") {
+            cmd.type = CommandType::SHOW_SETTINGS;
+        }
+        else if (what.text == "regions") {
+            cmd.type = CommandType::SHOW_REGIONS;
+            // Optional type name: "show regions text" → list all regions of type "text"
+            if (lexer_.peek().type == TokType::IDENT) {
+                cmd.query_name = lexer_.next().text;
+            }
+        }
         else if (what.text == "named") cmd.type = CommandType::SHOW_NAMED;
+        else if (what.text == "info") cmd.type = CommandType::SHOW_INFO;
+        else if (what.text == "values") {
+            cmd.type = CommandType::SHOW_VALUES;
+            // Required attribute name: "show values upos" or "show values text_genre"
+            Token attr_tok = lexer_.next();
+            cmd.query_name = attr_tok.text;
+        }
         else throw std::runtime_error("Unknown show target: " + what.text);
         return cmd;
     }
     else throw std::runtime_error("Unknown command: " + kw);
 
     // Optional query name
-    if (lexer_.peek().type == TokType::IDENT && lexer_.peek().text != "by") {
+    if (lexer_.peek().type == TokType::IDENT && lexer_.peek().text != "by"
+        && lexer_.peek().text != "vs") {
         cmd.query_name = lexer_.next().text;
+    }
+
+    // keyness: optional "vs RefName"
+    if (cmd.type == CommandType::KEYNESS &&
+        lexer_.peek().type == TokType::IDENT && lexer_.peek().text == "vs") {
+        lexer_.consume();  // eat "vs"
+        cmd.ref_query_name = lexer_.expect(TokType::IDENT).text;
     }
 
     // "by" field_list
@@ -216,10 +382,34 @@ TokenQuery Parser::parse_token_query() {
         tq.tokens.push_back(parse_token_expr());
     }
 
-    // Within clause
-    if (lexer_.peek().type == TokType::IDENT && lexer_.peek().text == "within") {
-        lexer_.consume();
-        tq.within = lexer_.expect(TokType::IDENT).text;
+    // Structural clauses: within, not within, containing, not containing
+    // These can be chained: "within s containing np not containing subtree [upos='VERB']"
+    while (lexer_.peek().type == TokType::IDENT) {
+        const std::string& kw = lexer_.peek().text;
+        if (kw == "within") {
+            lexer_.consume();
+            parse_within_clause(tq);
+        } else if (kw == "not") {
+            // Look ahead: "not within" or "not containing"
+            Token not_tok = lexer_.next();
+            Token next = lexer_.peek();
+            if (next.type == TokType::IDENT && next.text == "within") {
+                lexer_.consume();
+                tq.not_within = true;
+                parse_within_clause(tq);
+            } else if (next.type == TokType::IDENT && next.text == "containing") {
+                lexer_.consume();
+                parse_containing_clause(tq, /*negated=*/true);
+            } else {
+                throw std::runtime_error("Expected 'within' or 'containing' after 'not' at position " +
+                                         std::to_string(not_tok.pos));
+            }
+        } else if (kw == "containing") {
+            lexer_.consume();
+            parse_containing_clause(tq, /*negated=*/false);
+        } else {
+            break;
+        }
     }
 
     // #12: Global filters :: [match.region_attr op value | a.attr = b.attr] [& ...]*
@@ -249,10 +439,56 @@ QueryToken Parser::parse_token_expr() {
         }
     }
 
-    // Optional target marker @
-    if (lexer_.peek().type == TokType::AT) {
-        lexer_.consume();
-        qt.is_target = true;
+    // Region boundary anchors: <s>, </s>, <text genre="book"> etc.
+    if (lexer_.peek().type == TokType::REGION_START) {
+        Token rs = lexer_.next();
+        qt.anchor = RegionAnchorType::REGION_START;
+        qt.conditions = nullptr;
+
+        // Parse token text: "s" or "text genre=\"book\" id=\"doc42\""
+        // Extract region name (first word) and optional key="value" pairs
+        const std::string& content = rs.text;
+        size_t i = 0;
+        // Region name
+        while (i < content.size() && !std::isspace(content[i])) ++i;
+        qt.anchor_region = content.substr(0, i);
+
+        // Optional attrs: key="value" pairs
+        while (i < content.size()) {
+            while (i < content.size() && std::isspace(content[i])) ++i;
+            if (i >= content.size()) break;
+            // key
+            size_t key_start = i;
+            while (i < content.size() && content[i] != '=' && !std::isspace(content[i])) ++i;
+            std::string key = content.substr(key_start, i - key_start);
+            if (key.empty()) break;
+            // =
+            while (i < content.size() && std::isspace(content[i])) ++i;
+            if (i >= content.size() || content[i] != '=') break;
+            ++i;
+            while (i < content.size() && std::isspace(content[i])) ++i;
+            // "value"
+            std::string value;
+            if (i < content.size() && content[i] == '"') {
+                ++i;
+                while (i < content.size() && content[i] != '"') value += content[i++];
+                if (i < content.size()) ++i; // consume closing "
+            } else {
+                size_t val_start = i;
+                while (i < content.size() && !std::isspace(content[i])) ++i;
+                value = content.substr(val_start, i - val_start);
+            }
+            qt.anchor_attrs.emplace_back(std::move(key), std::move(value));
+        }
+
+        return qt;
+    }
+    if (lexer_.peek().type == TokType::REGION_END) {
+        Token re = lexer_.next();
+        qt.anchor = RegionAnchorType::REGION_END;
+        qt.anchor_region = re.text;
+        qt.conditions = nullptr;
+        return qt;
     }
 
     // Token expression: "[" conditions "]" or "string"
@@ -375,6 +611,68 @@ ConditionPtr Parser::parse_primary_condition() {
         return cond;
     }
 
+    // Check for [not] structural relation keyword
+    if (lexer_.peek().type == TokType::IDENT) {
+        std::string lower = lexer_.peek().text;
+        std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+
+        // Check for "not child [...]" etc.
+        bool negated = false;
+        if (lower == "not") {
+            // Peek further: if next is a structural keyword, this is negated structural
+            Token not_tok = lexer_.next();  // consume "not"
+            if (lexer_.peek().type == TokType::IDENT) {
+                std::string next_lower = lexer_.peek().text;
+                std::transform(next_lower.begin(), next_lower.end(), next_lower.begin(), ::tolower);
+                if (next_lower == "child" || next_lower == "parent" || next_lower == "sibling" ||
+                    next_lower == "descendant" || next_lower == "ancestor") {
+                    negated = true;
+                    lower = next_lower;
+                } else {
+                    // Not a structural keyword after "not" — error, "not" isn't a valid attr name
+                    throw std::runtime_error("Expected structural keyword (child/parent/sibling/descendant/ancestor) after 'not' at position " + std::to_string(not_tok.pos));
+                }
+            } else {
+                throw std::runtime_error("Expected structural keyword after 'not' at position " + std::to_string(not_tok.pos));
+            }
+        }
+
+        StructRelType srt;
+        bool is_struct = true;
+        if (lower == "child") srt = StructRelType::CHILD;
+        else if (lower == "parent") srt = StructRelType::PARENT;
+        else if (lower == "sibling") srt = StructRelType::SIBLING;
+        else if (lower == "descendant") srt = StructRelType::DESCENDANT;
+        else if (lower == "ancestor") srt = StructRelType::ANCESTOR;
+        else is_struct = false;
+
+        if (is_struct) {
+            lexer_.consume();  // consume the keyword
+
+            // Optional name: child b:[...]
+            std::string nested_name;
+            if (lexer_.peek().type == TokType::IDENT) {
+                // Could be name:[] - check for colon
+                Token name_tok = lexer_.next();
+                if (lexer_.peek().type == TokType::COLON) {
+                    lexer_.consume();
+                    nested_name = name_tok.text;
+                } else {
+                    // Not a name, error - we expected [ after keyword
+                    throw std::runtime_error("Expected '[' or name:[] after structural keyword at position " + std::to_string(name_tok.pos));
+                }
+            }
+
+            lexer_.expect(TokType::LBRACKET);
+            ConditionPtr nested;
+            if (lexer_.peek().type != TokType::RBRACKET) {
+                nested = parse_conditions();
+            }
+            lexer_.expect(TokType::RBRACKET);
+            return ConditionNode::make_structural(srt, nested, nested_name, negated);
+        }
+    }
+
     // attr op value
     AttrCondition ac;
 
@@ -413,6 +711,15 @@ ConditionPtr Parser::parse_primary_condition() {
                                      std::to_string(op.pos));
     }
 
+    // Optional %c (case-insensitive), %d (diacritics-insensitive) flags
+    while (lexer_.peek().type == TokType::PERCENT) {
+        lexer_.consume();
+        Token flag = lexer_.expect(TokType::IDENT);
+        if (flag.text == "c") ac.case_insensitive = true;
+        else if (flag.text == "d") ac.diacritics_insensitive = true;
+        else throw std::runtime_error("Unknown flag '%" + flag.text + "' (expected %c or %d)");
+    }
+
     return ConditionNode::make_leaf(std::move(ac));
 }
 
@@ -427,15 +734,16 @@ bool Parser::try_parse_relation(QueryRelation& rel) {
         case TokType::BANG_LT: rel.type = RelationType::NOT_GOV_BY;    break;
 
         case TokType::LBRACKET:
-        case TokType::AT:
         case TokType::STRING:
+        case TokType::REGION_START:
+        case TokType::REGION_END:
             // Implicit SEQUENCE relation (adjacency)
             rel.type = RelationType::SEQUENCE;
             return true;   // don't consume — the token expr will consume it
 
         case TokType::IDENT:
-            // Could be a label for next token, or "within" keyword
-            if (t.text == "within") return false;
+            // Could be a label for next token, or structural keyword
+            if (t.text == "within" || t.text == "with" || t.text == "not" || t.text == "containing") return false;
             // Check if IDENT is followed by ":" (label) — treat as sequence
             rel.type = RelationType::SEQUENCE;
             return true;
@@ -447,6 +755,88 @@ bool Parser::try_parse_relation(QueryRelation& rel) {
     // Consume the explicit relation operator
     lexer_.consume();
     return true;
+}
+
+void Parser::parse_within_clause(TokenQuery& tq) {
+    // Expects "within" keyword already consumed. Parses:
+    //   within s
+    //   within s_tuid="XXX"
+    //   within s having [cond]
+    Token struct_tok = lexer_.expect(TokType::IDENT);
+    std::string full_name = struct_tok.text;
+
+    // Check if this is shorthand: within s_tuid="XXX"
+    Token next = lexer_.peek();
+    if (next.type == TokType::EQ || next.type == TokType::NEQ ||
+        next.type == TokType::LT || next.type == TokType::GT ||
+        next.type == TokType::LTE || next.type == TokType::GTE) {
+        // Shorthand: decompose region_attr into structure + attr
+        auto us = full_name.find('_');
+        if (us == std::string::npos || us + 1 >= full_name.size())
+            throw std::runtime_error("within shorthand requires region_attr format (e.g., s_tuid)");
+        tq.within = full_name.substr(0, us);
+
+        // Parse operator and value, add as global region filter
+        GlobalRegionFilter gf;
+        gf.region_attr = full_name;
+        Token op = lexer_.next();
+        switch (op.type) {
+            case TokType::EQ:   gf.op = CompOp::EQ;  break;
+            case TokType::NEQ:  gf.op = CompOp::NEQ; break;
+            case TokType::LT:   gf.op = CompOp::LT;  break;
+            case TokType::GT:   gf.op = CompOp::GT;   break;
+            case TokType::LTE:  gf.op = CompOp::LTE; break;
+            case TokType::GTE:  gf.op = CompOp::GTE; break;
+            default: break;
+        }
+        if (lexer_.peek().type == TokType::STRING)
+            gf.value = lexer_.next().text;
+        else if (lexer_.peek().type == TokType::NUMBER)
+            gf.value = lexer_.next().text;
+        else
+            gf.value = lexer_.expect(TokType::IDENT).text;
+        tq.global_region_filters.push_back(std::move(gf));
+    } else {
+        // Regular within: store the structure name
+        tq.within = full_name;
+    }
+
+    // Check for "having [cond]" — works after both plain and shorthand within
+    if (lexer_.peek().type == TokType::IDENT && lexer_.peek().text == "having") {
+        lexer_.consume();
+        lexer_.expect(TokType::LBRACKET);
+        if (lexer_.peek().type != TokType::RBRACKET) {
+            tq.within_having = parse_conditions();
+        }
+        lexer_.expect(TokType::RBRACKET);
+    }
+}
+
+void Parser::parse_containing_clause(TokenQuery& tq, bool negated) {
+    // "containing" keyword already consumed.  Parses:
+    //   containing s                    — structural: match encloses a full region
+    //   containing subtree [cond]       — dependency: match encloses full subtree of token matching cond
+    //   not containing s / not containing subtree [cond]  — negated forms
+
+    ContainingClause cc;
+    cc.negated = negated;
+
+    Token t = lexer_.peek();
+    if (t.type == TokType::IDENT && t.text == "subtree") {
+        lexer_.consume();
+        cc.is_subtree = true;
+        lexer_.expect(TokType::LBRACKET);
+        if (lexer_.peek().type != TokType::RBRACKET)
+            cc.subtree_cond = parse_conditions();
+        lexer_.expect(TokType::RBRACKET);
+    } else if (t.type == TokType::IDENT) {
+        lexer_.consume();
+        cc.region = t.text;
+    } else {
+        throw std::runtime_error("Expected region name or 'subtree' after 'containing'");
+    }
+
+    tq.containing_clauses.push_back(std::move(cc));
 }
 
 void Parser::parse_global_filters(TokenQuery& tq) {
@@ -480,15 +870,59 @@ void Parser::parse_global_filters(TokenQuery& tq) {
                 gf.value = lexer_.expect(TokType::IDENT).text;
             tq.global_region_filters.push_back(std::move(gf));
         } else {
-            GlobalAlignmentFilter af;
-            af.name1 = t.text;
-            lexer_.expect(TokType::DOT);
-            af.attr1 = lexer_.expect(TokType::IDENT).text;
-            lexer_.expect(TokType::EQ);
-            af.name2 = lexer_.expect(TokType::IDENT).text;
-            lexer_.expect(TokType::DOT);
-            af.attr2 = lexer_.expect(TokType::IDENT).text;
-            tq.global_alignment_filters.push_back(std::move(af));
+            // Look ahead: "a < b" (position order), "a.attr op value" (anchored region),
+            // or "a.attr = b.attr" (alignment)
+            Token next = lexer_.peek();
+            if (next.type == TokType::LT || next.type == TokType::GT) {
+                // Positional ordering: :: a < b or :: a > b
+                CompOp op = (next.type == TokType::LT) ? CompOp::LT : CompOp::GT;
+                lexer_.consume();
+                Token name2 = lexer_.expect(TokType::IDENT);
+                tq.position_orders.push_back({t.text, name2.text, op});
+            } else if (next.type == TokType::DOT) {
+                // a.attr ... — could be anchored region filter or alignment
+                lexer_.consume(); // consume DOT
+                std::string attr1 = lexer_.expect(TokType::IDENT).text;
+                // Compose full region attr (handle dotted sub-attrs like feats.Number)
+                if (lexer_.peek().type == TokType::DOT) {
+                    lexer_.consume();
+                    attr1 += "." + lexer_.expect(TokType::IDENT).text;
+                }
+                // Read comparison operator
+                Token op_tok = lexer_.next();
+                CompOp op;
+                switch (op_tok.type) {
+                    case TokType::EQ:   op = CompOp::EQ;  break;
+                    case TokType::NEQ:  op = CompOp::NEQ; break;
+                    case TokType::LT:   op = CompOp::LT;  break;
+                    case TokType::GT:   op = CompOp::GT;  break;
+                    case TokType::LTE:  op = CompOp::LTE; break;
+                    case TokType::GTE:  op = CompOp::GTE; break;
+                    default: throw std::runtime_error("Expected comparison operator in global filter");
+                }
+                // RHS: string/number → anchored region filter; IDENT → alignment
+                Token rhs = lexer_.peek();
+                if (rhs.type == TokType::STRING || rhs.type == TokType::NUMBER) {
+                    // Anchored region filter: :: a.text_lang = "French"
+                    GlobalRegionFilter gf;
+                    gf.anchor_name = t.text;
+                    gf.region_attr = attr1;
+                    gf.op = op;
+                    gf.value = lexer_.next().text;
+                    tq.global_region_filters.push_back(std::move(gf));
+                } else {
+                    // Alignment: :: a.upos = b.upos
+                    GlobalAlignmentFilter af;
+                    af.name1 = t.text;
+                    af.attr1 = attr1;
+                    af.name2 = lexer_.expect(TokType::IDENT).text;
+                    lexer_.expect(TokType::DOT);
+                    af.attr2 = lexer_.expect(TokType::IDENT).text;
+                    tq.global_alignment_filters.push_back(std::move(af));
+                }
+            } else {
+                throw std::runtime_error("Expected '<', '>', or '.' after identifier in global filter");
+            }
         }
     };
 

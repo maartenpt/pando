@@ -37,7 +37,8 @@ public:
     void add_token(const std::unordered_map<std::string, std::string>& attrs,
                    int sentence_head_id = -1);
 
-    void end_sentence();
+    /// Optional per-sentence structural attributes (e.g. `tuid` → `s_tuid` in corpus.info).
+    void end_sentence(const std::vector<std::pair<std::string, std::string>>& sent_region_attrs = {});
 
     // Add a non-sentence structural region (e.g. "text", "p").
     void add_region(const std::string& type, CorpusPos start, CorpusPos end);
@@ -103,6 +104,8 @@ private:
 
     // Sentence region file (streamed)
     FILE* sent_rgn_file_ = nullptr;
+    // One entry per sentence region (parallel to s.rgn), for named attrs like tuid
+    std::vector<std::vector<std::pair<std::string, std::string>>> sentence_region_attr_rows_;
 
     // Other structural regions (buffered — typically few)
     std::unordered_map<std::string, std::vector<Region>> regions_;

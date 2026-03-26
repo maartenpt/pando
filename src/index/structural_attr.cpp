@@ -71,6 +71,29 @@ int64_t StructuralAttr::find_region(CorpusPos pos) const {
     return -1;
 }
 
+int64_t StructuralAttr::find_region_from(CorpusPos pos, int64_t hint) const {
+    size_t n = region_count();
+    if (n == 0) return -1;
+    const Region* r = file_.as<Region>();
+
+    // If hint is valid, try linear advance from there
+    if (hint >= 0 && static_cast<size_t>(hint) < n) {
+        size_t h = static_cast<size_t>(hint);
+        // Check if pos is still in the hinted region
+        if (pos >= r[h].start && pos <= r[h].end) return hint;
+        // Advance forward (pos > r[h].end means we moved past this region)
+        if (pos > r[h].end) {
+            // Scan forward a few regions (bounded to avoid degenerate cases)
+            for (size_t i = h + 1; i < n && i <= h + 8; ++i) {
+                if (pos < r[i].start) return -1;  // gap between regions
+                if (pos <= r[i].end) return static_cast<int64_t>(i);
+            }
+        }
+    }
+    // Fallback to full binary search
+    return find_region(pos);
+}
+
 bool StructuralAttr::same_region(CorpusPos a, CorpusPos b) const {
     int64_t ra = find_region(a);
     return ra >= 0 && ra == find_region(b);

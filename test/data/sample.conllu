@@ -1,51 +1,1549 @@
-# sent_id = 1
-# text = The big cat sat on the mat.
-1	The	the	DET	DT	Definite=Def|PronType=Art	3	det	_	_
-2	big	big	ADJ	JJ	Degree=Pos	3	amod	_	_
-3	cat	cat	NOUN	NN	Number=Sing	4	nsubj	_	_
-4	sat	sit	VERB	VBD	Mood=Ind|Tense=Past|VerbForm=Fin	0	root	_	_
-5	on	on	ADP	IN	_	7	case	_	_
-6	the	the	DET	DT	Definite=Def|PronType=Art	7	det	_	_
-7	mat	mat	NOUN	NN	Number=Sing	4	nmod	_	_
-8	.	.	PUNCT	.	_	4	punct	_	_
+# newregion text
+# text_lang = English
+# text_genre = Book
+# generator = UDPipe 2, https://lindat.mff.cuni.cz/services/udpipe
+# udpipe_model = english-ewt-ud-2.17-251125
+# udpipe_model_licence = CC BY-NC-SA
+# newregion p
+# p_tuid = sample-p1
+# newregion s
+# sent_id = sample-en_p1-s1
+# tuid = p1-s1
+# text = In the old part of the city, the library sits between a bakery and a narrow park.
+1	In	in	ADP	IN	_	4	case	_	TokenRange=0:2|tuid=sample-p1-s1.1
+2	the	the	DET	DT	Definite=Def|PronType=Art	4	det	_	TokenRange=3:6|tuid=sample-p1-s1.2
+3	old	old	ADJ	JJ	Degree=Pos	4	amod	_	TokenRange=7:10|tuid=sample-p1-s1.3
+4	part	part	NOUN	NN	Number=Sing	11	obl	_	TokenRange=11:15|tuid=sample-p1-s1.4
+5	of	of	ADP	IN	_	7	case	_	TokenRange=16:18|tuid=sample-p1-s1.5
+6	the	the	DET	DT	Definite=Def|PronType=Art	7	det	_	TokenRange=19:22|tuid=sample-p1-s1.6
+7	city	city	NOUN	NN	Number=Sing	4	nmod	_	SpaceAfter=No|TokenRange=23:27|tuid=sample-p1-s1.7
+8	,	,	PUNCT	,	_	4	punct	_	TokenRange=27:28|tuid=sample-p1-s1.8
+9	the	the	DET	DT	Definite=Def|PronType=Art	10	det	_	TokenRange=29:32|tuid=sample-p1-s1.9
+10	library	library	NOUN	NN	Number=Sing	11	nsubj	_	TokenRange=33:40|tuid=sample-p1-s1.10
+11	sits	sit	VERB	VBZ	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=41:45|tuid=sample-p1-s1.11
+12	between	between	ADP	IN	_	14	case	_	TokenRange=46:53|tuid=sample-p1-s1.12
+13	a	a	DET	DT	Definite=Ind|PronType=Art	14	det	_	TokenRange=54:55|tuid=sample-p1-s1.13
+14	bakery	bakery	NOUN	NN	Number=Sing	11	obl	_	TokenRange=56:62|tuid=sample-p1-s1.14
+15	and	and	CCONJ	CC	_	18	cc	_	TokenRange=63:66|tuid=sample-p1-s1.15
+16	a	a	DET	DT	Definite=Ind|PronType=Art	18	det	_	TokenRange=67:68|tuid=sample-p1-s1.16
+17	narrow	narrow	ADJ	JJ	Degree=Pos	18	amod	_	TokenRange=69:75|tuid=sample-p1-s1.17
+18	park	park	NOUN	NN	Number=Sing	14	conj	_	SpaceAfter=No|TokenRange=76:80|tuid=sample-p1-s1.18
+19	.	.	PUNCT	.	_	11	punct	_	TokenRange=80:81|tuid=sample-p1-s1.19
 
-# sent_id = 2
-# text = A small dog chased the big cat.
-1	A	a	DET	DT	Definite=Ind|PronType=Art	3	det	_	_
-2	small	small	ADJ	JJ	Degree=Pos	3	amod	_	_
-3	dog	dog	NOUN	NN	Number=Sing	4	nsubj	_	_
-4	chased	chase	VERB	VBD	Mood=Ind|Tense=Past|VerbForm=Fin	0	root	_	_
-5	the	the	DET	DT	Definite=Def|PronType=Art	7	det	_	_
-6	big	big	ADJ	JJ	Degree=Pos	7	amod	_	_
-7	cat	cat	NOUN	NN	Number=Sing	4	obj	_	_
-8	.	.	PUNCT	.	_	4	punct	_	_
+# newregion s
+# sent_id = sample-en_p1-s2
+# tuid = p1-s2
+# text = The librarian, Emma, opens the heavy door at seven every morning.
+1	The	the	DET	DT	Definite=Def|PronType=Art	2	det	_	TokenRange=82:85|tuid=sample-p1-s2.1
+2	librarian	librarian	NOUN	NN	Number=Sing	6	nsubj	_	SpaceAfter=No|TokenRange=86:95|tuid=sample-p1-s2.2
+3	,	,	PUNCT	,	_	4	punct	_	TokenRange=95:96|tuid=sample-p1-s2.3
+4	Emma	Emma	PROPN	NNP	Number=Sing	2	appos	_	SpaceAfter=No|TokenRange=97:101|tuid=sample-p1-s2.4
+5	,	,	PUNCT	,	_	2	punct	_	TokenRange=101:102|tuid=sample-p1-s2.5
+6	opens	open	VERB	VBZ	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=103:108|tuid=sample-p1-s2.6
+7	the	the	DET	DT	Definite=Def|PronType=Art	9	det	_	TokenRange=109:112|tuid=sample-p1-s2.7
+8	heavy	heavy	ADJ	JJ	Degree=Pos	9	amod	_	TokenRange=113:118|tuid=sample-p1-s2.8
+9	door	door	NOUN	NN	Number=Sing	6	obj	_	TokenRange=119:123|tuid=sample-p1-s2.9
+10	at	at	ADP	IN	_	11	case	_	TokenRange=124:126|tuid=sample-p1-s2.10
+11	seven	seven	NUM	CD	NumForm=Word|NumType=Card	6	obl	_	TokenRange=127:132|tuid=sample-p1-s2.11
+12	every	every	DET	DT	PronType=Tot	13	det	_	TokenRange=133:138|tuid=sample-p1-s2.12
+13	morning	morning	NOUN	NN	Number=Sing	6	obl:unmarked	_	SpaceAfter=No|TokenRange=139:146|tuid=sample-p1-s2.13
+14	.	.	PUNCT	.	_	6	punct	_	TokenRange=146:147|tuid=sample-p1-s2.14
 
-# sent_id = 3
-# text = She quickly ran to the old house near the river.
-1	She	she	PRON	PRP	Case=Nom|Gender=Fem|Number=Sing|Person=3|PronType=Prs	3	nsubj	_	_
-2	quickly	quickly	ADV	RB	_	3	advmod	_	_
-3	ran	run	VERB	VBD	Mood=Ind|Tense=Past|VerbForm=Fin	0	root	_	_
-4	to	to	ADP	IN	_	7	case	_	_
-5	the	the	DET	DT	Definite=Def|PronType=Art	7	det	_	_
-6	old	old	ADJ	JJ	Degree=Pos	7	amod	_	_
-7	house	house	NOUN	NN	Number=Sing	3	obl	_	_
-8	near	near	ADP	IN	_	10	case	_	_
-9	the	the	DET	DT	Definite=Def|PronType=Art	10	det	_	_
-10	river	river	NOUN	NN	Number=Sing	7	nmod	_	_
-11	.	.	PUNCT	.	_	3	punct	_	_
+# newregion s
+# sent_id = sample-en_p1-s3
+# tuid = p1-s3
+# text = She checks the lights, waters a small green plant, and puts a handwritten note on the desk:
+1	She	she	PRON	PRP	Case=Nom|Gender=Fem|Number=Sing|Person=3|PronType=Prs	2	nsubj	_	TokenRange=148:151|tuid=sample-p1-s3.1
+2	checks	check	VERB	VBZ	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=152:158|tuid=sample-p1-s3.2
+3	the	the	DET	DT	Definite=Def|PronType=Art	4	det	_	TokenRange=159:162|tuid=sample-p1-s3.3
+4	lights	light	NOUN	NNS	Number=Plur	2	obj	_	SpaceAfter=No|TokenRange=163:169|tuid=sample-p1-s3.4
+5	,	,	PUNCT	,	_	6	punct	_	TokenRange=169:170|tuid=sample-p1-s3.5
+6	waters	water	VERB	VBZ	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	2	conj	_	TokenRange=171:177|tuid=sample-p1-s3.6
+7	a	a	DET	DT	Definite=Ind|PronType=Art	10	det	_	TokenRange=178:179|tuid=sample-p1-s3.7
+8	small	small	ADJ	JJ	Degree=Pos	10	amod	_	TokenRange=180:185|tuid=sample-p1-s3.8
+9	green	green	ADJ	JJ	Degree=Pos	10	amod	_	TokenRange=186:191|tuid=sample-p1-s3.9
+10	plant	plant	NOUN	NN	Number=Sing	6	obj	_	SpaceAfter=No|TokenRange=192:197|tuid=sample-p1-s3.10
+11	,	,	PUNCT	,	_	13	punct	_	TokenRange=197:198|tuid=sample-p1-s3.11
+12	and	and	CCONJ	CC	_	13	cc	_	TokenRange=199:202|tuid=sample-p1-s3.12
+13	puts	put	VERB	VBZ	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	2	conj	_	TokenRange=203:207|tuid=sample-p1-s3.13
+14	a	a	DET	DT	Definite=Ind|PronType=Art	16	det	_	TokenRange=208:209|tuid=sample-p1-s3.14
+15	handwritten	handwritten	ADJ	JJ	Degree=Pos	16	amod	_	TokenRange=210:221|tuid=sample-p1-s3.15
+16	note	note	NOUN	NN	Number=Sing	13	obj	_	TokenRange=222:226|tuid=sample-p1-s3.16
+17	on	on	ADP	IN	_	19	case	_	TokenRange=227:229|tuid=sample-p1-s3.17
+18	the	the	DET	DT	Definite=Def|PronType=Art	19	det	_	TokenRange=230:233|tuid=sample-p1-s3.18
+19	desk	desk	NOUN	NN	Number=Sing	13	obl	_	SpaceAfter=No|TokenRange=234:238|tuid=sample-p1-s3.19
+20	:	:	PUNCT	:	_	2	punct	_	TokenRange=238:239|tuid=sample-p1-s3.20
 
-# sent_id = 4
-# text = The young man and the old woman walked slowly through the park.
-1	The	the	DET	DT	Definite=Def|PronType=Art	3	det	_	_
-2	young	young	ADJ	JJ	Degree=Pos	3	amod	_	_
-3	man	man	NOUN	NN	Number=Sing	8	nsubj	_	_
-4	and	and	CCONJ	CC	_	7	cc	_	_
-5	the	the	DET	DT	Definite=Def|PronType=Art	7	det	_	_
-6	old	old	ADJ	JJ	Degree=Pos	7	amod	_	_
-7	woman	woman	NOUN	NN	Number=Sing	3	conj	_	_
-8	walked	walk	VERB	VBD	Mood=Ind|Tense=Past|VerbForm=Fin	0	root	_	_
-9	slowly	slowly	ADV	RB	_	8	advmod	_	_
-10	through	through	ADP	IN	_	12	case	_	_
-11	the	the	DET	DT	Definite=Def|PronType=Art	12	det	_	_
-12	park	park	NOUN	NN	Number=Sing	8	obl	_	_
-13	.	.	PUNCT	.	_	8	punct	_	_
+# newregion s
+# sent_id = sample-en_p1-s4
+# tuid = p1-s4
+# text = Please return every book on time.
+1	Please	please	INTJ	UH	_	2	discourse	_	TokenRange=240:246|tuid=sample-p1-s4.1
+2	return	return	VERB	VB	Mood=Imp|VerbForm=Fin	0	root	_	TokenRange=247:253|tuid=sample-p1-s4.2
+3	every	every	DET	DT	PronType=Tot	4	det	_	TokenRange=254:259|tuid=sample-p1-s4.3
+4	book	book	NOUN	NN	Number=Sing	2	obj	_	TokenRange=260:264|tuid=sample-p1-s4.4
+5	on	on	ADP	IN	_	6	case	_	TokenRange=265:267|tuid=sample-p1-s4.5
+6	time	time	NOUN	NN	Number=Sing	2	obl	_	SpaceAfter=No|TokenRange=268:272|tuid=sample-p1-s4.6
+7	.	.	PUNCT	.	_	2	punct	_	TokenRange=272:273|tuid=sample-p1-s4.7
+
+# newregion s
+# sent_id = sample-en_p1-s5
+# tuid = p1-s5
+# text = The first visitors are usually students, but on rainy days some people book study rooms before breakfast and wait outside with coffee in their hands.
+1	The	the	DET	DT	Definite=Def|PronType=Art	3	det	_	TokenRange=274:277|tuid=sample-p1-s5.1
+2	first	first	ADJ	JJ	Degree=Pos|NumForm=Word|NumType=Ord	3	amod	_	TokenRange=278:283|tuid=sample-p1-s5.2
+3	visitors	visitor	NOUN	NNS	Number=Plur	6	nsubj	_	TokenRange=284:292|tuid=sample-p1-s5.3
+4	are	be	AUX	VBP	Mood=Ind|Number=Plur|Person=3|Tense=Pres|VerbForm=Fin	6	cop	_	TokenRange=293:296|tuid=sample-p1-s5.4
+5	usually	usually	ADV	RB	_	6	advmod	_	TokenRange=297:304|tuid=sample-p1-s5.5
+6	students	student	NOUN	NNS	Number=Plur	0	root	_	SpaceAfter=No|TokenRange=305:313|tuid=sample-p1-s5.6
+7	,	,	PUNCT	,	_	14	punct	_	TokenRange=313:314|tuid=sample-p1-s5.7
+8	but	but	CCONJ	CC	_	14	cc	_	TokenRange=315:318|tuid=sample-p1-s5.8
+9	on	on	ADP	IN	_	11	case	_	TokenRange=319:321|tuid=sample-p1-s5.9
+10	rainy	rainy	ADJ	JJ	Degree=Pos	11	amod	_	TokenRange=322:327|tuid=sample-p1-s5.10
+11	days	day	NOUN	NNS	Number=Plur	14	obl	_	TokenRange=328:332|tuid=sample-p1-s5.11
+12	some	some	DET	DT	PronType=Ind	13	det	_	TokenRange=333:337|tuid=sample-p1-s5.12
+13	people	people	NOUN	NNS	Number=Plur	14	nsubj	_	TokenRange=338:344|tuid=sample-p1-s5.13
+14	book	book	VERB	VBP	Mood=Ind|Number=Plur|Person=3|Tense=Pres|VerbForm=Fin	6	conj	_	TokenRange=345:349|tuid=sample-p1-s5.14
+15	study	study	NOUN	NN	Number=Sing	16	compound	_	TokenRange=350:355|tuid=sample-p1-s5.15
+16	rooms	room	NOUN	NNS	Number=Plur	14	obj	_	TokenRange=356:361|tuid=sample-p1-s5.16
+17	before	before	ADP	IN	_	18	case	_	TokenRange=362:368|tuid=sample-p1-s5.17
+18	breakfast	breakfast	NOUN	NN	Number=Sing	14	obl	_	TokenRange=369:378|tuid=sample-p1-s5.18
+19	and	and	CCONJ	CC	_	20	cc	_	TokenRange=379:382|tuid=sample-p1-s5.19
+20	wait	wait	VERB	VBP	Mood=Ind|Number=Plur|Person=3|Tense=Pres|VerbForm=Fin	14	conj	_	TokenRange=383:387|tuid=sample-p1-s5.20
+21	outside	outside	ADV	RB	_	20	advmod	_	TokenRange=388:395|tuid=sample-p1-s5.21
+22	with	with	SCONJ	IN	_	26	mark	_	TokenRange=396:400|tuid=sample-p1-s5.22
+23	coffee	coffee	NOUN	NN	Number=Sing	26	nsubj	_	TokenRange=401:407|tuid=sample-p1-s5.23
+24	in	in	ADP	IN	_	26	case	_	TokenRange=408:410|tuid=sample-p1-s5.24
+25	their	their	PRON	PRP$	Case=Gen|Number=Plur|Person=3|Poss=Yes|PronType=Prs	26	nmod:poss	_	TokenRange=411:416|tuid=sample-p1-s5.25
+26	hands	hand	NOUN	NNS	Number=Plur	20	advcl	_	SpaceAfter=No|TokenRange=417:422|tuid=sample-p1-s5.26
+27	.	.	PUNCT	.	_	6	punct	_	SpacesAfter=\n\n|TokenRange=422:423|tuid=sample-p1-s5.27
+
+# newregion p
+# p_tuid = sample-p2
+# newregion s
+# sent_id = sample-en_p2-s1
+# tuid = p2-s1
+# text = The main hall is quiet, yet never empty.
+1	The	the	DET	DT	Definite=Def|PronType=Art	3	det	_	TokenRange=425:428|tuid=sample-p2-s1.1
+2	main	main	ADJ	JJ	Degree=Pos	3	amod	_	TokenRange=429:433|tuid=sample-p2-s1.2
+3	hall	hall	NOUN	NN	Number=Sing	5	nsubj	_	TokenRange=434:438|tuid=sample-p2-s1.3
+4	is	be	AUX	VBZ	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	5	cop	_	TokenRange=439:441|tuid=sample-p2-s1.4
+5	quiet	quiet	ADJ	JJ	Degree=Pos	0	root	_	SpaceAfter=No|TokenRange=442:447|tuid=sample-p2-s1.5
+6	,	,	PUNCT	,	_	9	punct	_	TokenRange=447:448|tuid=sample-p2-s1.6
+7	yet	yet	CCONJ	CC	_	9	cc	_	TokenRange=449:452|tuid=sample-p2-s1.7
+8	never	never	ADV	RB	PronType=Neg	9	advmod	_	TokenRange=453:458|tuid=sample-p2-s1.8
+9	empty	empty	ADJ	JJ	Degree=Pos	5	conj	_	SpaceAfter=No|TokenRange=459:464|tuid=sample-p2-s1.9
+10	.	.	PUNCT	.	_	5	punct	_	TokenRange=464:465|tuid=sample-p2-s1.10
+
+# newregion s
+# sent_id = sample-en_p2-s2
+# tuid = p2-s2
+# text = A young teacher asks for the book on river birds.
+1	A	a	DET	DT	Definite=Ind|PronType=Art	3	det	_	TokenRange=466:467|tuid=sample-p2-s2.1
+2	young	young	ADJ	JJ	Degree=Pos	3	amod	_	TokenRange=468:473|tuid=sample-p2-s2.2
+3	teacher	teacher	NOUN	NN	Number=Sing	4	nsubj	_	TokenRange=474:481|tuid=sample-p2-s2.3
+4	asks	ask	VERB	VBZ	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=482:486|tuid=sample-p2-s2.4
+5	for	for	ADP	IN	_	7	case	_	TokenRange=487:490|tuid=sample-p2-s2.5
+6	the	the	DET	DT	Definite=Def|PronType=Art	7	det	_	TokenRange=491:494|tuid=sample-p2-s2.6
+7	book	book	NOUN	NN	Number=Sing	4	obl	_	TokenRange=495:499|tuid=sample-p2-s2.7
+8	on	on	ADP	IN	_	10	case	_	TokenRange=500:502|tuid=sample-p2-s2.8
+9	river	river	NOUN	NN	Number=Sing	10	compound	_	TokenRange=503:508|tuid=sample-p2-s2.9
+10	birds	bird	NOUN	NNS	Number=Plur	7	nmod	_	SpaceAfter=No|TokenRange=509:514|tuid=sample-p2-s2.10
+11	.	.	PUNCT	.	_	4	punct	_	TokenRange=514:515|tuid=sample-p2-s2.11
+
+# newregion s
+# sent_id = sample-en_p2-s3
+# tuid = p2-s3
+# text = A retired engineer asks for a small book about bridge design.
+1	A	a	DET	DT	Definite=Ind|PronType=Art	3	det	_	TokenRange=516:517|tuid=sample-p2-s3.1
+2	retired	retired	ADJ	JJ	Degree=Pos	3	amod	_	TokenRange=518:525|tuid=sample-p2-s3.2
+3	engineer	engineer	NOUN	NN	Number=Sing	4	nsubj	_	TokenRange=526:534|tuid=sample-p2-s3.3
+4	asks	ask	VERB	VBZ	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=535:539|tuid=sample-p2-s3.4
+5	for	for	ADP	IN	_	8	case	_	TokenRange=540:543|tuid=sample-p2-s3.5
+6	a	a	DET	DT	Definite=Ind|PronType=Art	8	det	_	TokenRange=544:545|tuid=sample-p2-s3.6
+7	small	small	ADJ	JJ	Degree=Pos	8	amod	_	TokenRange=546:551|tuid=sample-p2-s3.7
+8	book	book	NOUN	NN	Number=Sing	4	obl	_	TokenRange=552:556|tuid=sample-p2-s3.8
+9	about	about	ADP	IN	_	11	case	_	TokenRange=557:562|tuid=sample-p2-s3.9
+10	bridge	bridge	NOUN	NN	Number=Sing	11	compound	_	TokenRange=563:569|tuid=sample-p2-s3.10
+11	design	design	NOUN	NN	Number=Sing	8	nmod	_	SpaceAfter=No|TokenRange=570:576|tuid=sample-p2-s3.11
+12	.	.	PUNCT	.	_	4	punct	_	TokenRange=576:577|tuid=sample-p2-s3.12
+
+# newregion s
+# sent_id = sample-en_p2-s4
+# tuid = p2-s4
+# text = A child points at the green book with a dragon on the cover.
+1	A	a	DET	DT	Definite=Ind|PronType=Art	2	det	_	TokenRange=578:579|tuid=sample-p2-s4.1
+2	child	child	NOUN	NN	Number=Sing	3	nsubj	_	TokenRange=580:585|tuid=sample-p2-s4.2
+3	points	point	VERB	VBZ	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=586:592|tuid=sample-p2-s4.3
+4	at	at	ADP	IN	_	7	case	_	TokenRange=593:595|tuid=sample-p2-s4.4
+5	the	the	DET	DT	Definite=Def|PronType=Art	7	det	_	TokenRange=596:599|tuid=sample-p2-s4.5
+6	green	green	ADJ	JJ	Degree=Pos	7	amod	_	TokenRange=600:605|tuid=sample-p2-s4.6
+7	book	book	NOUN	NN	Number=Sing	3	obl	_	TokenRange=606:610|tuid=sample-p2-s4.7
+8	with	with	SCONJ	IN	_	13	mark	_	TokenRange=611:615|tuid=sample-p2-s4.8
+9	a	a	DET	DT	Definite=Ind|PronType=Art	10	det	_	TokenRange=616:617|tuid=sample-p2-s4.9
+10	dragon	dragon	NOUN	NN	Number=Sing	13	nsubj	_	TokenRange=618:624|tuid=sample-p2-s4.10
+11	on	on	ADP	IN	_	13	case	_	TokenRange=625:627|tuid=sample-p2-s4.11
+12	the	the	DET	DT	Definite=Def|PronType=Art	13	det	_	TokenRange=628:631|tuid=sample-p2-s4.12
+13	cover	cover	NOUN	NN	Number=Sing	3	advcl	_	SpaceAfter=No|TokenRange=632:637|tuid=sample-p2-s4.13
+14	.	.	PUNCT	.	_	3	punct	_	TokenRange=637:638|tuid=sample-p2-s4.14
+
+# newregion s
+# sent_id = sample-en_p2-s5
+# tuid = p2-s5
+# text = Near the window, an old woman compares the old book and the new book and says she prefers the old paper.
+1	Near	near	ADP	IN	_	3	case	_	TokenRange=639:643|tuid=sample-p2-s5.1
+2	the	the	DET	DT	Definite=Def|PronType=Art	3	det	_	TokenRange=644:647|tuid=sample-p2-s5.2
+3	window	window	NOUN	NN	Number=Sing	8	obl	_	SpaceAfter=No|TokenRange=648:654|tuid=sample-p2-s5.3
+4	,	,	PUNCT	,	_	3	punct	_	TokenRange=654:655|tuid=sample-p2-s5.4
+5	an	a	DET	DT	Definite=Ind|PronType=Art	7	det	_	TokenRange=656:658|tuid=sample-p2-s5.5
+6	old	old	ADJ	JJ	Degree=Pos	7	amod	_	TokenRange=659:662|tuid=sample-p2-s5.6
+7	woman	woman	NOUN	NN	Number=Sing	8	nsubj	_	TokenRange=663:668|tuid=sample-p2-s5.7
+8	compares	compare	VERB	VBZ	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=669:677|tuid=sample-p2-s5.8
+9	the	the	DET	DT	Definite=Def|PronType=Art	11	det	_	TokenRange=678:681|tuid=sample-p2-s5.9
+10	old	old	ADJ	JJ	Degree=Pos	11	amod	_	TokenRange=682:685|tuid=sample-p2-s5.10
+11	book	book	NOUN	NN	Number=Sing	8	obj	_	TokenRange=686:690|tuid=sample-p2-s5.11
+12	and	and	CCONJ	CC	_	15	cc	_	TokenRange=691:694|tuid=sample-p2-s5.12
+13	the	the	DET	DT	Definite=Def|PronType=Art	15	det	_	TokenRange=695:698|tuid=sample-p2-s5.13
+14	new	new	ADJ	JJ	Degree=Pos	15	amod	_	TokenRange=699:702|tuid=sample-p2-s5.14
+15	book	book	NOUN	NN	Number=Sing	11	conj	_	TokenRange=703:707|tuid=sample-p2-s5.15
+16	and	and	CCONJ	CC	_	17	cc	_	TokenRange=708:711|tuid=sample-p2-s5.16
+17	says	say	VERB	VBZ	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	8	conj	_	TokenRange=712:716|tuid=sample-p2-s5.17
+18	she	she	PRON	PRP	Case=Nom|Gender=Fem|Number=Sing|Person=3|PronType=Prs	19	nsubj	_	TokenRange=717:720|tuid=sample-p2-s5.18
+19	prefers	prefer	VERB	VBZ	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	17	ccomp	_	TokenRange=721:728|tuid=sample-p2-s5.19
+20	the	the	DET	DT	Definite=Def|PronType=Art	22	det	_	TokenRange=729:732|tuid=sample-p2-s5.20
+21	old	old	ADJ	JJ	Degree=Pos	22	amod	_	TokenRange=733:736|tuid=sample-p2-s5.21
+22	paper	paper	NOUN	NN	Number=Sing	19	obj	_	SpaceAfter=No|TokenRange=737:742|tuid=sample-p2-s5.22
+23	.	.	PUNCT	.	_	8	punct	_	TokenRange=742:743|tuid=sample-p2-s5.23
+
+# newregion s
+# sent_id = sample-en_p2-s6
+# tuid = p2-s6
+# text = At the back table, two friends discuss a travel guide and then book train tickets for spring.
+1	At	at	ADP	IN	_	4	case	_	TokenRange=744:746|tuid=sample-p2-s6.1
+2	the	the	DET	DT	Definite=Def|PronType=Art	4	det	_	TokenRange=747:750|tuid=sample-p2-s6.2
+3	back	back	NOUN	NN	Number=Sing	4	compound	_	TokenRange=751:755|tuid=sample-p2-s6.3
+4	table	table	NOUN	NN	Number=Sing	8	obl	_	SpaceAfter=No|TokenRange=756:761|tuid=sample-p2-s6.4
+5	,	,	PUNCT	,	_	4	punct	_	TokenRange=761:762|tuid=sample-p2-s6.5
+6	two	two	NUM	CD	NumForm=Word|NumType=Card	7	nummod	_	TokenRange=763:766|tuid=sample-p2-s6.6
+7	friends	friend	NOUN	NNS	Number=Plur	8	nsubj	_	TokenRange=767:774|tuid=sample-p2-s6.7
+8	discuss	discuss	VERB	VBP	Mood=Ind|Number=Plur|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=775:782|tuid=sample-p2-s6.8
+9	a	a	DET	DT	Definite=Ind|PronType=Art	11	det	_	TokenRange=783:784|tuid=sample-p2-s6.9
+10	travel	travel	NOUN	NN	Number=Sing	11	compound	_	TokenRange=785:791|tuid=sample-p2-s6.10
+11	guide	guide	NOUN	NN	Number=Sing	8	obj	_	TokenRange=792:797|tuid=sample-p2-s6.11
+12	and	and	CCONJ	CC	_	14	cc	_	TokenRange=798:801|tuid=sample-p2-s6.12
+13	then	then	ADV	RB	PronType=Dem	14	advmod	_	TokenRange=802:806|tuid=sample-p2-s6.13
+14	book	book	VERB	VBP	Mood=Ind|Number=Plur|Person=3|Tense=Pres|VerbForm=Fin	8	conj	_	TokenRange=807:811|tuid=sample-p2-s6.14
+15	train	train	NOUN	NN	Number=Sing	16	compound	_	TokenRange=812:817|tuid=sample-p2-s6.15
+16	tickets	ticket	NOUN	NNS	Number=Plur	14	obj	_	TokenRange=818:825|tuid=sample-p2-s6.16
+17	for	for	ADP	IN	_	18	case	_	TokenRange=826:829|tuid=sample-p2-s6.17
+18	spring	spring	NOUN	NN	Number=Sing	16	nmod	_	SpaceAfter=No|TokenRange=830:836|tuid=sample-p2-s6.18
+19	.	.	PUNCT	.	_	8	punct	_	SpacesAfter=\n\n|TokenRange=836:837|tuid=sample-p2-s6.19
+
+# newregion p
+# p_tuid = sample-p3
+# newregion s
+# sent_id = sample-en_p3-s1
+# tuid = p3-s1
+# text = At noon, the director arrives to inspect the property next door.
+1	At	at	ADP	IN	_	2	case	_	TokenRange=839:841|tuid=sample-p3-s1.1
+2	noon	noon	NOUN	NN	Number=Sing	6	obl	_	SpaceAfter=No|TokenRange=842:846|tuid=sample-p3-s1.2
+3	,	,	PUNCT	,	_	2	punct	_	TokenRange=846:847|tuid=sample-p3-s1.3
+4	the	the	DET	DT	Definite=Def|PronType=Art	5	det	_	TokenRange=848:851|tuid=sample-p3-s1.4
+5	director	director	NOUN	NN	Number=Sing	6	nsubj	_	TokenRange=852:860|tuid=sample-p3-s1.5
+6	arrives	arrive	VERB	VBZ	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=861:868|tuid=sample-p3-s1.6
+7	to	to	PART	TO	_	8	mark	_	TokenRange=869:871|tuid=sample-p3-s1.7
+8	inspect	inspect	VERB	VB	VerbForm=Inf	6	advcl	_	TokenRange=872:879|tuid=sample-p3-s1.8
+9	the	the	DET	DT	Definite=Def|PronType=Art	10	det	_	TokenRange=880:883|tuid=sample-p3-s1.9
+10	property	property	NOUN	NN	Number=Sing	8	obj	_	TokenRange=884:892|tuid=sample-p3-s1.10
+11	next	next	ADJ	JJ	Degree=Pos	12	amod	_	TokenRange=893:897|tuid=sample-p3-s1.11
+12	door	door	NOUN	NN	Number=Sing	8	obl:unmarked	_	SpaceAfter=No|TokenRange=898:902|tuid=sample-p3-s1.12
+13	.	.	PUNCT	.	_	6	punct	_	TokenRange=902:903|tuid=sample-p3-s1.13
+
+# newregion s
+# sent_id = sample-en_p3-s2
+# tuid = p3-s2
+# text = The property used to be a printing house, and now the council wants to turn it into a reading center.
+1	The	the	DET	DT	Definite=Def|PronType=Art	2	det	_	TokenRange=904:907|tuid=sample-p3-s2.1
+2	property	property	NOUN	NN	Number=Sing	3	nsubj	_	TokenRange=908:916|tuid=sample-p3-s2.2
+3	used	use	VERB	VBD	Mood=Ind|Number=Sing|Person=3|Tense=Past|VerbForm=Fin	0	root	_	TokenRange=917:921|tuid=sample-p3-s2.3
+4	to	to	PART	TO	_	8	mark	_	TokenRange=922:924|tuid=sample-p3-s2.4
+5	be	be	AUX	VB	VerbForm=Inf	8	cop	_	TokenRange=925:927|tuid=sample-p3-s2.5
+6	a	a	DET	DT	Definite=Ind|PronType=Art	8	det	_	TokenRange=928:929|tuid=sample-p3-s2.6
+7	printing	printing	NOUN	NN	Number=Sing	8	compound	_	TokenRange=930:938|tuid=sample-p3-s2.7
+8	house	house	NOUN	NN	Number=Sing	3	xcomp	_	SpaceAfter=No|TokenRange=939:944|tuid=sample-p3-s2.8
+9	,	,	PUNCT	,	_	14	punct	_	TokenRange=944:945|tuid=sample-p3-s2.9
+10	and	and	CCONJ	CC	_	14	cc	_	TokenRange=946:949|tuid=sample-p3-s2.10
+11	now	now	ADV	RB	PronType=Dem	14	advmod	_	TokenRange=950:953|tuid=sample-p3-s2.11
+12	the	the	DET	DT	Definite=Def|PronType=Art	13	det	_	TokenRange=954:957|tuid=sample-p3-s2.12
+13	council	council	NOUN	NN	Number=Sing	14	nsubj	_	TokenRange=958:965|tuid=sample-p3-s2.13
+14	wants	want	VERB	VBZ	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	3	conj	_	TokenRange=966:971|tuid=sample-p3-s2.14
+15	to	to	PART	TO	_	16	mark	_	TokenRange=972:974|tuid=sample-p3-s2.15
+16	turn	turn	VERB	VB	VerbForm=Inf	14	xcomp	_	TokenRange=975:979|tuid=sample-p3-s2.16
+17	it	it	PRON	PRP	Case=Acc|Gender=Neut|Number=Sing|Person=3|PronType=Prs	16	obj	_	TokenRange=980:982|tuid=sample-p3-s2.17
+18	into	into	ADP	IN	_	21	case	_	TokenRange=983:987|tuid=sample-p3-s2.18
+19	a	a	DET	DT	Definite=Ind|PronType=Art	21	det	_	TokenRange=988:989|tuid=sample-p3-s2.19
+20	reading	reading	NOUN	NN	Number=Sing	21	compound	_	TokenRange=990:997|tuid=sample-p3-s2.20
+21	center	center	NOUN	NN	Number=Sing	16	obl	_	SpaceAfter=No|TokenRange=998:1004|tuid=sample-p3-s2.21
+22	.	.	PUNCT	.	_	3	punct	_	TokenRange=1004:1005|tuid=sample-p3-s2.22
+
+# newregion s
+# sent_id = sample-en_p3-s3
+# tuid = p3-s3
+# text = The proposal includes restoration of the brick walls, insulation of the roof, and careful protection of the old staircase.
+1	The	the	DET	DT	Definite=Def|PronType=Art	2	det	_	TokenRange=1006:1009|tuid=sample-p3-s3.1
+2	proposal	proposal	NOUN	NN	Number=Sing	3	nsubj	_	TokenRange=1010:1018|tuid=sample-p3-s3.2
+3	includes	include	VERB	VBZ	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=1019:1027|tuid=sample-p3-s3.3
+4	restoration	restoration	NOUN	NN	Number=Sing	3	obj	_	TokenRange=1028:1039|tuid=sample-p3-s3.4
+5	of	of	ADP	IN	_	8	case	_	TokenRange=1040:1042|tuid=sample-p3-s3.5
+6	the	the	DET	DT	Definite=Def|PronType=Art	8	det	_	TokenRange=1043:1046|tuid=sample-p3-s3.6
+7	brick	brick	NOUN	NN	Number=Sing	8	compound	_	TokenRange=1047:1052|tuid=sample-p3-s3.7
+8	walls	wall	NOUN	NNS	Number=Plur	4	nmod	_	SpaceAfter=No|TokenRange=1053:1058|tuid=sample-p3-s3.8
+9	,	,	PUNCT	,	_	10	punct	_	TokenRange=1058:1059|tuid=sample-p3-s3.9
+10	insulation	insulation	NOUN	NN	Number=Sing	4	conj	_	TokenRange=1060:1070|tuid=sample-p3-s3.10
+11	of	of	ADP	IN	_	13	case	_	TokenRange=1071:1073|tuid=sample-p3-s3.11
+12	the	the	DET	DT	Definite=Def|PronType=Art	13	det	_	TokenRange=1074:1077|tuid=sample-p3-s3.12
+13	roof	roof	NOUN	NN	Number=Sing	10	nmod	_	SpaceAfter=No|TokenRange=1078:1082|tuid=sample-p3-s3.13
+14	,	,	PUNCT	,	_	17	punct	_	TokenRange=1082:1083|tuid=sample-p3-s3.14
+15	and	and	CCONJ	CC	_	17	cc	_	TokenRange=1084:1087|tuid=sample-p3-s3.15
+16	careful	careful	ADJ	JJ	Degree=Pos	17	amod	_	TokenRange=1088:1095|tuid=sample-p3-s3.16
+17	protection	protection	NOUN	NN	Number=Sing	4	conj	_	TokenRange=1096:1106|tuid=sample-p3-s3.17
+18	of	of	ADP	IN	_	21	case	_	TokenRange=1107:1109|tuid=sample-p3-s3.18
+19	the	the	DET	DT	Definite=Def|PronType=Art	21	det	_	TokenRange=1110:1113|tuid=sample-p3-s3.19
+20	old	old	ADJ	JJ	Degree=Pos	21	amod	_	TokenRange=1114:1117|tuid=sample-p3-s3.20
+21	staircase	staircase	NOUN	NN	Number=Sing	17	nmod	_	SpaceAfter=No|TokenRange=1118:1127|tuid=sample-p3-s3.21
+22	.	.	PUNCT	.	_	3	punct	_	TokenRange=1127:1128|tuid=sample-p3-s3.22
+
+# newregion s
+# sent_id = sample-en_p3-s4
+# tuid = p3-s4
+# text = During the presentation, he repeats three words: coordination, documentation, and preservation.
+1	During	during	ADP	IN	_	3	case	_	TokenRange=1129:1135|tuid=sample-p3-s4.1
+2	the	the	DET	DT	Definite=Def|PronType=Art	3	det	_	TokenRange=1136:1139|tuid=sample-p3-s4.2
+3	presentation	presentation	NOUN	NN	Number=Sing	6	obl	_	SpaceAfter=No|TokenRange=1140:1152|tuid=sample-p3-s4.3
+4	,	,	PUNCT	,	_	3	punct	_	TokenRange=1152:1153|tuid=sample-p3-s4.4
+5	he	he	PRON	PRP	Case=Nom|Gender=Masc|Number=Sing|Person=3|PronType=Prs	6	nsubj	_	TokenRange=1154:1156|tuid=sample-p3-s4.5
+6	repeats	repeat	VERB	VBZ	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=1157:1164|tuid=sample-p3-s4.6
+7	three	three	NUM	CD	NumForm=Word|NumType=Card	8	nummod	_	TokenRange=1165:1170|tuid=sample-p3-s4.7
+8	words	word	NOUN	NNS	Number=Plur	6	obj	_	SpaceAfter=No|TokenRange=1171:1176|tuid=sample-p3-s4.8
+9	:	:	PUNCT	:	_	10	punct	_	TokenRange=1176:1177|tuid=sample-p3-s4.9
+10	coordination	coordination	NOUN	NN	Number=Sing	8	appos	_	SpaceAfter=No|TokenRange=1178:1190|tuid=sample-p3-s4.10
+11	,	,	PUNCT	,	_	12	punct	_	TokenRange=1190:1191|tuid=sample-p3-s4.11
+12	documentation	documentation	NOUN	NN	Number=Sing	10	conj	_	SpaceAfter=No|TokenRange=1192:1205|tuid=sample-p3-s4.12
+13	,	,	PUNCT	,	_	15	punct	_	TokenRange=1205:1206|tuid=sample-p3-s4.13
+14	and	and	CCONJ	CC	_	15	cc	_	TokenRange=1207:1210|tuid=sample-p3-s4.14
+15	preservation	preservation	NOUN	NN	Number=Sing	10	conj	_	SpaceAfter=No|TokenRange=1211:1223|tuid=sample-p3-s4.15
+16	.	.	PUNCT	.	_	6	punct	_	TokenRange=1223:1224|tuid=sample-p3-s4.16
+
+# newregion s
+# sent_id = sample-en_p3-s5
+# tuid = p3-s5
+# text = Later, in a formal letter, he adds another list: action, transition, and translation.
+1	Later	late	ADV	RBR	Degree=Cmp	9	advmod	_	SpaceAfter=No|TokenRange=1225:1230|tuid=sample-p3-s5.1
+2	,	,	PUNCT	,	_	1	punct	_	TokenRange=1230:1231|tuid=sample-p3-s5.2
+3	in	in	ADP	IN	_	6	case	_	TokenRange=1232:1234|tuid=sample-p3-s5.3
+4	a	a	DET	DT	Definite=Ind|PronType=Art	6	det	_	TokenRange=1235:1236|tuid=sample-p3-s5.4
+5	formal	formal	ADJ	JJ	Degree=Pos	6	amod	_	TokenRange=1237:1243|tuid=sample-p3-s5.5
+6	letter	letter	NOUN	NN	Number=Sing	9	obl	_	SpaceAfter=No|TokenRange=1244:1250|tuid=sample-p3-s5.6
+7	,	,	PUNCT	,	_	6	punct	_	TokenRange=1250:1251|tuid=sample-p3-s5.7
+8	he	he	PRON	PRP	Case=Nom|Gender=Masc|Number=Sing|Person=3|PronType=Prs	9	nsubj	_	TokenRange=1252:1254|tuid=sample-p3-s5.8
+9	adds	add	VERB	VBZ	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=1255:1259|tuid=sample-p3-s5.9
+10	another	another	DET	DT	PronType=Ind	11	det	_	TokenRange=1260:1267|tuid=sample-p3-s5.10
+11	list	list	NOUN	NN	Number=Sing	9	obj	_	SpaceAfter=No|TokenRange=1268:1272|tuid=sample-p3-s5.11
+12	:	:	PUNCT	:	_	13	punct	_	TokenRange=1272:1273|tuid=sample-p3-s5.12
+13	action	action	NOUN	NN	Number=Sing	11	appos	_	SpaceAfter=No|TokenRange=1274:1280|tuid=sample-p3-s5.13
+14	,	,	PUNCT	,	_	15	punct	_	TokenRange=1280:1281|tuid=sample-p3-s5.14
+15	transition	transition	NOUN	NN	Number=Sing	13	conj	_	SpaceAfter=No|TokenRange=1282:1292|tuid=sample-p3-s5.15
+16	,	,	PUNCT	,	_	18	punct	_	TokenRange=1292:1293|tuid=sample-p3-s5.16
+17	and	and	CCONJ	CC	_	18	cc	_	TokenRange=1294:1297|tuid=sample-p3-s5.17
+18	translation	translation	NOUN	NN	Number=Sing	13	conj	_	SpaceAfter=No|TokenRange=1298:1309|tuid=sample-p3-s5.18
+19	.	.	PUNCT	.	_	9	punct	_	SpacesAfter=\n\n|TokenRange=1309:1310|tuid=sample-p3-s5.19
+
+# newregion p
+# p_tuid = sample-p4
+# newregion s
+# sent_id = sample-en_p4-s1
+# tuid = p4-s1
+# text = After lunch, Emma leads a workshop for volunteers.
+1	After	after	ADP	IN	_	2	case	_	TokenRange=1312:1317|tuid=sample-p4-s1.1
+2	lunch	lunch	NOUN	NN	Number=Sing	5	obl	_	SpaceAfter=No|TokenRange=1318:1323|tuid=sample-p4-s1.2
+3	,	,	PUNCT	,	_	2	punct	_	TokenRange=1323:1324|tuid=sample-p4-s1.3
+4	Emma	Emma	PROPN	NNP	Number=Sing	5	nsubj	_	TokenRange=1325:1329|tuid=sample-p4-s1.4
+5	leads	lead	VERB	VBZ	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=1330:1335|tuid=sample-p4-s1.5
+6	a	a	DET	DT	Definite=Ind|PronType=Art	7	det	_	TokenRange=1336:1337|tuid=sample-p4-s1.6
+7	workshop	workshop	NOUN	NN	Number=Sing	5	obj	_	TokenRange=1338:1346|tuid=sample-p4-s1.7
+8	for	for	ADP	IN	_	9	case	_	TokenRange=1347:1350|tuid=sample-p4-s1.8
+9	volunteers	volunteer	NOUN	NNS	Number=Plur	7	nmod	_	SpaceAfter=No|TokenRange=1351:1361|tuid=sample-p4-s1.9
+10	.	.	PUNCT	.	_	5	punct	_	TokenRange=1361:1362|tuid=sample-p4-s1.10
+
+# newregion s
+# sent_id = sample-en_p4-s2
+# tuid = p4-s2
+# text = “The catalog is not magic,” she says, smiling.
+1	“	"	PUNCT	``	_	6	punct	_	SpaceAfter=No|TokenRange=1363:1364|tuid=sample-p4-s2.1
+2	The	the	DET	DT	Definite=Def|PronType=Art	3	det	_	TokenRange=1364:1367|tuid=sample-p4-s2.2
+3	catalog	catalog	NOUN	NN	Number=Sing	6	nsubj	_	TokenRange=1368:1375|tuid=sample-p4-s2.3
+4	is	be	AUX	VBZ	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	6	cop	_	TokenRange=1376:1378|tuid=sample-p4-s2.4
+5	not	not	PART	RB	Polarity=Neg	6	advmod	_	TokenRange=1379:1382|tuid=sample-p4-s2.5
+6	magic	magic	ADJ	JJ	Degree=Pos	10	ccomp	_	SpaceAfter=No|TokenRange=1383:1388|tuid=sample-p4-s2.6
+7	,	,	PUNCT	,	_	6	punct	_	SpaceAfter=No|TokenRange=1388:1389|tuid=sample-p4-s2.7
+8	”	"	PUNCT	''	_	6	punct	_	TokenRange=1389:1390|tuid=sample-p4-s2.8
+9	she	she	PRON	PRP	Case=Nom|Gender=Fem|Number=Sing|Person=3|PronType=Prs	10	nsubj	_	TokenRange=1391:1394|tuid=sample-p4-s2.9
+10	says	say	VERB	VBZ	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	SpaceAfter=No|TokenRange=1395:1399|tuid=sample-p4-s2.10
+11	,	,	PUNCT	,	_	12	punct	_	TokenRange=1399:1400|tuid=sample-p4-s2.11
+12	smiling	smile	VERB	VBG	Tense=Pres|VerbForm=Part	10	advcl	_	SpaceAfter=No|TokenRange=1401:1408|tuid=sample-p4-s2.12
+13	.	.	PUNCT	.	_	10	punct	_	TokenRange=1408:1409|tuid=sample-p4-s2.13
+
+# newregion s
+# sent_id = sample-en_p4-s3
+# tuid = p4-s3
+# text = “If you can sort a box, you can sort a collection.”
+1	“	"	PUNCT	``	_	11	punct	_	SpaceAfter=No|TokenRange=1410:1411|tuid=sample-p4-s3.1
+2	If	if	SCONJ	IN	_	5	mark	_	TokenRange=1411:1413|tuid=sample-p4-s3.2
+3	you	you	PRON	PRP	Case=Nom|Person=2|PronType=Prs	5	nsubj	_	TokenRange=1414:1417|tuid=sample-p4-s3.3
+4	can	can	AUX	MD	VerbForm=Fin	5	aux	_	TokenRange=1418:1421|tuid=sample-p4-s3.4
+5	sort	sort	VERB	VB	VerbForm=Inf	11	advcl	_	TokenRange=1422:1426|tuid=sample-p4-s3.5
+6	a	a	DET	DT	Definite=Ind|PronType=Art	7	det	_	TokenRange=1427:1428|tuid=sample-p4-s3.6
+7	box	box	NOUN	NN	Number=Sing	5	obj	_	SpaceAfter=No|TokenRange=1429:1432|tuid=sample-p4-s3.7
+8	,	,	PUNCT	,	_	5	punct	_	TokenRange=1432:1433|tuid=sample-p4-s3.8
+9	you	you	PRON	PRP	Case=Nom|Person=2|PronType=Prs	11	nsubj	_	TokenRange=1434:1437|tuid=sample-p4-s3.9
+10	can	can	AUX	MD	VerbForm=Fin	11	aux	_	TokenRange=1438:1441|tuid=sample-p4-s3.10
+11	sort	sort	VERB	VB	VerbForm=Inf	0	root	_	TokenRange=1442:1446|tuid=sample-p4-s3.11
+12	a	a	DET	DT	Definite=Ind|PronType=Art	13	det	_	TokenRange=1447:1448|tuid=sample-p4-s3.12
+13	collection	collection	NOUN	NN	Number=Sing	11	obj	_	SpaceAfter=No|TokenRange=1449:1459|tuid=sample-p4-s3.13
+14	.	.	PUNCT	.	_	11	punct	_	SpaceAfter=No|TokenRange=1459:1460|tuid=sample-p4-s3.14
+15	”	"	PUNCT	''	_	11	punct	_	TokenRange=1460:1461|tuid=sample-p4-s3.15
+
+# newregion s
+# sent_id = sample-en_p4-s4
+# tuid = p4-s4
+# text = They practice with donations: one box has books about cooking, another has books about navigation, and a third has a strange mix of poetry and instruction manuals.
+1	They	they	PRON	PRP	Case=Nom|Number=Plur|Person=3|PronType=Prs	2	nsubj	_	TokenRange=1462:1466|tuid=sample-p4-s4.1
+2	practice	practice	VERB	VBP	Mood=Ind|Number=Plur|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=1467:1475|tuid=sample-p4-s4.2
+3	with	with	ADP	IN	_	4	case	_	TokenRange=1476:1480|tuid=sample-p4-s4.3
+4	donations	donation	NOUN	NNS	Number=Plur	2	obl	_	SpaceAfter=No|TokenRange=1481:1490|tuid=sample-p4-s4.4
+5	:	:	PUNCT	:	_	8	punct	_	TokenRange=1490:1491|tuid=sample-p4-s4.5
+6	one	one	NUM	CD	NumForm=Word|NumType=Card	7	nummod	_	TokenRange=1492:1495|tuid=sample-p4-s4.6
+7	box	box	NOUN	NN	Number=Sing	8	nsubj	_	TokenRange=1496:1499|tuid=sample-p4-s4.7
+8	has	have	VERB	VBZ	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	2	parataxis	_	TokenRange=1500:1503|tuid=sample-p4-s4.8
+9	books	book	NOUN	NNS	Number=Plur	8	obj	_	TokenRange=1504:1509|tuid=sample-p4-s4.9
+10	about	about	ADP	IN	_	11	case	_	TokenRange=1510:1515|tuid=sample-p4-s4.10
+11	cooking	cooking	NOUN	NN	Number=Sing	9	nmod	_	SpaceAfter=No|TokenRange=1516:1523|tuid=sample-p4-s4.11
+12	,	,	PUNCT	,	_	14	punct	_	TokenRange=1523:1524|tuid=sample-p4-s4.12
+13	another	another	DET	DT	PronType=Ind	14	nsubj	_	TokenRange=1525:1532|tuid=sample-p4-s4.13
+14	has	have	VERB	VBZ	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	8	conj	_	TokenRange=1533:1536|tuid=sample-p4-s4.14
+15	books	book	NOUN	NNS	Number=Plur	14	obj	_	TokenRange=1537:1542|tuid=sample-p4-s4.15
+16	about	about	ADP	IN	_	17	case	_	TokenRange=1543:1548|tuid=sample-p4-s4.16
+17	navigation	navigation	NOUN	NN	Number=Sing	15	nmod	_	SpaceAfter=No|TokenRange=1549:1559|tuid=sample-p4-s4.17
+18	,	,	PUNCT	,	_	22	punct	_	TokenRange=1559:1560|tuid=sample-p4-s4.18
+19	and	and	CCONJ	CC	_	22	cc	_	TokenRange=1561:1564|tuid=sample-p4-s4.19
+20	a	a	DET	DT	Definite=Ind|PronType=Art	21	det	_	TokenRange=1565:1566|tuid=sample-p4-s4.20
+21	third	third	ADJ	JJ	Degree=Pos|NumForm=Word|NumType=Ord	22	nsubj	_	TokenRange=1567:1572|tuid=sample-p4-s4.21
+22	has	have	VERB	VBZ	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	8	conj	_	TokenRange=1573:1576|tuid=sample-p4-s4.22
+23	a	a	DET	DT	Definite=Ind|PronType=Art	25	det	_	TokenRange=1577:1578|tuid=sample-p4-s4.23
+24	strange	strange	ADJ	JJ	Degree=Pos	25	amod	_	TokenRange=1579:1586|tuid=sample-p4-s4.24
+25	mix	mix	NOUN	NN	Number=Sing	22	obj	_	TokenRange=1587:1590|tuid=sample-p4-s4.25
+26	of	of	ADP	IN	_	27	case	_	TokenRange=1591:1593|tuid=sample-p4-s4.26
+27	poetry	poetry	NOUN	NN	Number=Sing	25	nmod	_	TokenRange=1594:1600|tuid=sample-p4-s4.27
+28	and	and	CCONJ	CC	_	30	cc	_	TokenRange=1601:1604|tuid=sample-p4-s4.28
+29	instruction	instruction	NOUN	NN	Number=Sing	30	compound	_	TokenRange=1605:1616|tuid=sample-p4-s4.29
+30	manuals	manual	NOUN	NNS	Number=Plur	27	conj	_	SpaceAfter=No|TokenRange=1617:1624|tuid=sample-p4-s4.30
+31	.	.	PUNCT	.	_	2	punct	_	TokenRange=1624:1625|tuid=sample-p4-s4.31
+
+# newregion s
+# sent_id = sample-en_p4-s5
+# tuid = p4-s5
+# text = Someone jokes that classification is a form of meditation.
+1	Someone	someone	PRON	NN	Number=Sing|PronType=Ind	2	nsubj	_	TokenRange=1626:1633|tuid=sample-p4-s5.1
+2	jokes	joke	VERB	VBZ	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=1634:1639|tuid=sample-p4-s5.2
+3	that	that	SCONJ	IN	_	7	mark	_	TokenRange=1640:1644|tuid=sample-p4-s5.3
+4	classification	classification	NOUN	NN	Number=Sing	7	nsubj	_	TokenRange=1645:1659|tuid=sample-p4-s5.4
+5	is	be	AUX	VBZ	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	7	cop	_	TokenRange=1660:1662|tuid=sample-p4-s5.5
+6	a	a	DET	DT	Definite=Ind|PronType=Art	7	det	_	TokenRange=1663:1664|tuid=sample-p4-s5.6
+7	form	form	NOUN	NN	Number=Sing	2	ccomp	_	TokenRange=1665:1669|tuid=sample-p4-s5.7
+8	of	of	ADP	IN	_	9	case	_	TokenRange=1670:1672|tuid=sample-p4-s5.8
+9	meditation	meditation	NOUN	NN	Number=Sing	7	nmod	_	SpaceAfter=No|TokenRange=1673:1683|tuid=sample-p4-s5.9
+10	.	.	PUNCT	.	_	2	punct	_	TokenRange=1683:1684|tuid=sample-p4-s5.10
+
+# newregion s
+# sent_id = sample-en_p4-s6
+# tuid = p4-s6
+# text = Someone else says the whole operation feels like a conversation with the past.
+1	Someone	someone	PRON	NN	Number=Sing|PronType=Ind	3	nsubj	_	TokenRange=1685:1692|tuid=sample-p4-s6.1
+2	else	else	ADV	RB	_	1	advmod	_	TokenRange=1693:1697|tuid=sample-p4-s6.2
+3	says	say	VERB	VBZ	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=1698:1702|tuid=sample-p4-s6.3
+4	the	the	DET	DT	Definite=Def|PronType=Art	6	det	_	TokenRange=1703:1706|tuid=sample-p4-s6.4
+5	whole	whole	ADJ	JJ	Degree=Pos	6	amod	_	TokenRange=1707:1712|tuid=sample-p4-s6.5
+6	operation	operation	NOUN	NN	Number=Sing	7	nsubj	_	TokenRange=1713:1722|tuid=sample-p4-s6.6
+7	feels	feel	VERB	VBZ	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	3	ccomp	_	TokenRange=1723:1728|tuid=sample-p4-s6.7
+8	like	like	ADP	IN	_	10	case	_	TokenRange=1729:1733|tuid=sample-p4-s6.8
+9	a	a	DET	DT	Definite=Ind|PronType=Art	10	det	_	TokenRange=1734:1735|tuid=sample-p4-s6.9
+10	conversation	conversation	NOUN	NN	Number=Sing	7	obl	_	TokenRange=1736:1748|tuid=sample-p4-s6.10
+11	with	with	ADP	IN	_	13	case	_	TokenRange=1749:1753|tuid=sample-p4-s6.11
+12	the	the	DET	DT	Definite=Def|PronType=Art	13	det	_	TokenRange=1754:1757|tuid=sample-p4-s6.12
+13	past	past	NOUN	NN	Number=Sing	10	nmod	_	SpaceAfter=No|TokenRange=1758:1762|tuid=sample-p4-s6.13
+14	.	.	PUNCT	.	_	3	punct	_	SpacesAfter=\n\n|TokenRange=1762:1763|tuid=sample-p4-s6.14
+
+# newregion p
+# p_tuid = sample-p5
+# newregion s
+# sent_id = sample-en_p5-s1
+# tuid = p5-s1
+# text = In the evening, the reading club meets in Room B. “Hi!” says Mark when he enters.
+1	In	in	ADP	IN	_	3	case	_	TokenRange=1765:1767|tuid=sample-p5-s1.1
+2	the	the	DET	DT	Definite=Def|PronType=Art	3	det	_	TokenRange=1768:1771|tuid=sample-p5-s1.2
+3	evening	evening	NOUN	NN	Number=Sing	8	obl	_	SpaceAfter=No|TokenRange=1772:1779|tuid=sample-p5-s1.3
+4	,	,	PUNCT	,	_	3	punct	_	TokenRange=1779:1780|tuid=sample-p5-s1.4
+5	the	the	DET	DT	Definite=Def|PronType=Art	7	det	_	TokenRange=1781:1784|tuid=sample-p5-s1.5
+6	reading	reading	NOUN	NN	Number=Sing	7	compound	_	TokenRange=1785:1792|tuid=sample-p5-s1.6
+7	club	club	NOUN	NN	Number=Sing	8	nsubj	_	TokenRange=1793:1797|tuid=sample-p5-s1.7
+8	meets	meet	VERB	VBZ	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	17	ccomp	_	TokenRange=1798:1803|tuid=sample-p5-s1.8
+9	in	in	ADP	IN	_	10	case	_	TokenRange=1804:1806|tuid=sample-p5-s1.9
+10	Room	room	NOUN	NN	Number=Sing	8	obl	_	TokenRange=1807:1811|tuid=sample-p5-s1.10
+11	B	B	NOUN	NN	Number=Sing	10	flat	_	SpaceAfter=No|TokenRange=1812:1813|tuid=sample-p5-s1.11
+12	.	.	PUNCT	.	_	8	punct	_	TokenRange=1813:1814|tuid=sample-p5-s1.12
+13	“	"	PUNCT	``	_	14	punct	_	SpaceAfter=No|TokenRange=1815:1816|tuid=sample-p5-s1.13
+14	Hi	hi	INTJ	UH	_	8	parataxis	_	SpaceAfter=No|TokenRange=1816:1818|tuid=sample-p5-s1.14
+15	!	!	PUNCT	.	_	14	punct	_	SpaceAfter=No|TokenRange=1818:1819|tuid=sample-p5-s1.15
+16	”	"	PUNCT	''	_	14	punct	_	TokenRange=1819:1820|tuid=sample-p5-s1.16
+17	says	say	VERB	VBZ	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=1821:1825|tuid=sample-p5-s1.17
+18	Mark	Mark	PROPN	NNP	Number=Sing	17	nsubj	_	TokenRange=1826:1830|tuid=sample-p5-s1.18
+19	when	when	ADV	WRB	PronType=Int	21	advmod	_	TokenRange=1831:1835|tuid=sample-p5-s1.19
+20	he	he	PRON	PRP	Case=Nom|Gender=Masc|Number=Sing|Person=3|PronType=Prs	21	nsubj	_	TokenRange=1836:1838|tuid=sample-p5-s1.20
+21	enters	enter	VERB	VBZ	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	17	advcl	_	SpaceAfter=No|TokenRange=1839:1845|tuid=sample-p5-s1.21
+22	.	.	PUNCT	.	_	17	punct	_	TokenRange=1845:1846|tuid=sample-p5-s1.22
+
+# newregion s
+# sent_id = sample-en_p5-s2
+# tuid = p5-s2
+# text = “My cat followed me to the tram stop.”
+1	“	"	PUNCT	``	_	4	punct	_	SpaceAfter=No|TokenRange=1847:1848|tuid=sample-p5-s2.1
+2	My	my	PRON	PRP$	Case=Gen|Number=Sing|Person=1|Poss=Yes|PronType=Prs	3	nmod:poss	_	TokenRange=1848:1850|tuid=sample-p5-s2.2
+3	cat	cat	NOUN	NN	Number=Sing	4	nsubj	_	TokenRange=1851:1854|tuid=sample-p5-s2.3
+4	followed	follow	VERB	VBD	Mood=Ind|Number=Sing|Person=3|Tense=Past|VerbForm=Fin	0	root	_	TokenRange=1855:1863|tuid=sample-p5-s2.4
+5	me	I	PRON	PRP	Case=Acc|Number=Sing|Person=1|PronType=Prs	4	obj	_	TokenRange=1864:1866|tuid=sample-p5-s2.5
+6	to	to	ADP	IN	_	9	case	_	TokenRange=1867:1869|tuid=sample-p5-s2.6
+7	the	the	DET	DT	Definite=Def|PronType=Art	9	det	_	TokenRange=1870:1873|tuid=sample-p5-s2.7
+8	tram	tram	NOUN	NN	Number=Sing	9	compound	_	TokenRange=1874:1878|tuid=sample-p5-s2.8
+9	stop	stop	NOUN	NN	Number=Sing	4	obl	_	SpaceAfter=No|TokenRange=1879:1883|tuid=sample-p5-s2.9
+10	.	.	PUNCT	.	_	4	punct	_	SpaceAfter=No|TokenRange=1883:1884|tuid=sample-p5-s2.10
+11	”	"	PUNCT	''	_	4	punct	_	TokenRange=1884:1885|tuid=sample-p5-s2.11
+
+# newregion s
+# sent_id = sample-en_p5-s3
+# tuid = p5-s3
+# text = Everyone laughs, and he adds that the cat always appears when he carries fish from the market.
+1	Everyone	everyone	PRON	NN	Number=Sing|PronType=Tot	2	nsubj	_	TokenRange=1886:1894|tuid=sample-p5-s3.1
+2	laughs	laugh	VERB	VBZ	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	SpaceAfter=No|TokenRange=1895:1901|tuid=sample-p5-s3.2
+3	,	,	PUNCT	,	_	6	punct	_	TokenRange=1901:1902|tuid=sample-p5-s3.3
+4	and	and	CCONJ	CC	_	6	cc	_	TokenRange=1903:1906|tuid=sample-p5-s3.4
+5	he	he	PRON	PRP	Case=Nom|Gender=Masc|Number=Sing|Person=3|PronType=Prs	6	nsubj	_	TokenRange=1907:1909|tuid=sample-p5-s3.5
+6	adds	add	VERB	VBZ	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	2	conj	_	TokenRange=1910:1914|tuid=sample-p5-s3.6
+7	that	that	SCONJ	IN	_	11	mark	_	TokenRange=1915:1919|tuid=sample-p5-s3.7
+8	the	the	DET	DT	Definite=Def|PronType=Art	9	det	_	TokenRange=1920:1923|tuid=sample-p5-s3.8
+9	cat	cat	NOUN	NN	Number=Sing	11	nsubj	_	TokenRange=1924:1927|tuid=sample-p5-s3.9
+10	always	always	ADV	RB	PronType=Tot	11	advmod	_	TokenRange=1928:1934|tuid=sample-p5-s3.10
+11	appears	appear	VERB	VBZ	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	6	ccomp	_	TokenRange=1935:1942|tuid=sample-p5-s3.11
+12	when	when	ADV	WRB	PronType=Int	14	advmod	_	TokenRange=1943:1947|tuid=sample-p5-s3.12
+13	he	he	PRON	PRP	Case=Nom|Gender=Masc|Number=Sing|Person=3|PronType=Prs	14	nsubj	_	TokenRange=1948:1950|tuid=sample-p5-s3.13
+14	carries	carry	VERB	VBZ	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	11	advcl	_	TokenRange=1951:1958|tuid=sample-p5-s3.14
+15	fish	fish	NOUN	NN	Number=Sing	14	obj	_	TokenRange=1959:1963|tuid=sample-p5-s3.15
+16	from	from	ADP	IN	_	18	case	_	TokenRange=1964:1968|tuid=sample-p5-s3.16
+17	the	the	DET	DT	Definite=Def|PronType=Art	18	det	_	TokenRange=1969:1972|tuid=sample-p5-s3.17
+18	market	market	NOUN	NN	Number=Sing	14	obl	_	SpaceAfter=No|TokenRange=1973:1979|tuid=sample-p5-s3.18
+19	.	.	PUNCT	.	_	2	punct	_	TokenRange=1979:1980|tuid=sample-p5-s3.19
+
+# newregion s
+# sent_id = sample-en_p5-s4
+# tuid = p5-s4
+# text = During discussion, the group compares a dramatic novel with a historical one.
+1	During	during	ADP	IN	_	2	case	_	TokenRange=1981:1987|tuid=sample-p5-s4.1
+2	discussion	discussion	NOUN	NN	Number=Sing	6	obl	_	SpaceAfter=No|TokenRange=1988:1998|tuid=sample-p5-s4.2
+3	,	,	PUNCT	,	_	2	punct	_	TokenRange=1998:1999|tuid=sample-p5-s4.3
+4	the	the	DET	DT	Definite=Def|PronType=Art	5	det	_	TokenRange=2000:2003|tuid=sample-p5-s4.4
+5	group	group	NOUN	NN	Number=Sing	6	nsubj	_	TokenRange=2004:2009|tuid=sample-p5-s4.5
+6	compares	compare	VERB	VBZ	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=2010:2018|tuid=sample-p5-s4.6
+7	a	a	DET	DT	Definite=Ind|PronType=Art	9	det	_	TokenRange=2019:2020|tuid=sample-p5-s4.7
+8	dramatic	dramatic	ADJ	JJ	Degree=Pos	9	amod	_	TokenRange=2021:2029|tuid=sample-p5-s4.8
+9	novel	novel	NOUN	NN	Number=Sing	6	obj	_	TokenRange=2030:2035|tuid=sample-p5-s4.9
+10	with	with	ADP	IN	_	13	case	_	TokenRange=2036:2040|tuid=sample-p5-s4.10
+11	a	a	DET	DT	Definite=Ind|PronType=Art	13	det	_	TokenRange=2041:2042|tuid=sample-p5-s4.11
+12	historical	historical	ADJ	JJ	Degree=Pos	13	amod	_	TokenRange=2043:2053|tuid=sample-p5-s4.12
+13	one	one	NOUN	NN	Number=Sing	6	obl	_	SpaceAfter=No|TokenRange=2054:2057|tuid=sample-p5-s4.13
+14	.	.	PUNCT	.	_	6	punct	_	TokenRange=2057:2058|tuid=sample-p5-s4.14
+
+# newregion s
+# sent_id = sample-en_p5-s5
+# tuid = p5-s5
+# text = They quote lines about a house near the river, a table by the window, and a person who walks slowly through a park while thinking about duty and desire.
+1	They	they	PRON	PRP	Case=Nom|Number=Plur|Person=3|PronType=Prs	2	nsubj	_	TokenRange=2059:2063|tuid=sample-p5-s5.1
+2	quote	quote	VERB	VBP	Mood=Ind|Number=Plur|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=2064:2069|tuid=sample-p5-s5.2
+3	lines	line	NOUN	NNS	Number=Plur	2	obj	_	TokenRange=2070:2075|tuid=sample-p5-s5.3
+4	about	about	ADP	IN	_	6	case	_	TokenRange=2076:2081|tuid=sample-p5-s5.4
+5	a	a	DET	DT	Definite=Ind|PronType=Art	6	det	_	TokenRange=2082:2083|tuid=sample-p5-s5.5
+6	house	house	NOUN	NN	Number=Sing	3	nmod	_	TokenRange=2084:2089|tuid=sample-p5-s5.6
+7	near	near	ADP	IN	_	9	case	_	TokenRange=2090:2094|tuid=sample-p5-s5.7
+8	the	the	DET	DT	Definite=Def|PronType=Art	9	det	_	TokenRange=2095:2098|tuid=sample-p5-s5.8
+9	river	river	NOUN	NN	Number=Sing	6	nmod	_	SpaceAfter=No|TokenRange=2099:2104|tuid=sample-p5-s5.9
+10	,	,	PUNCT	,	_	12	punct	_	TokenRange=2104:2105|tuid=sample-p5-s5.10
+11	a	a	DET	DT	Definite=Ind|PronType=Art	12	det	_	TokenRange=2106:2107|tuid=sample-p5-s5.11
+12	table	table	NOUN	NN	Number=Sing	6	conj	_	TokenRange=2108:2113|tuid=sample-p5-s5.12
+13	by	by	ADP	IN	_	15	case	_	TokenRange=2114:2116|tuid=sample-p5-s5.13
+14	the	the	DET	DT	Definite=Def|PronType=Art	15	det	_	TokenRange=2117:2120|tuid=sample-p5-s5.14
+15	window	window	NOUN	NN	Number=Sing	12	nmod	_	SpaceAfter=No|TokenRange=2121:2127|tuid=sample-p5-s5.15
+16	,	,	PUNCT	,	_	19	punct	_	TokenRange=2127:2128|tuid=sample-p5-s5.16
+17	and	and	CCONJ	CC	_	19	cc	_	TokenRange=2129:2132|tuid=sample-p5-s5.17
+18	a	a	DET	DT	Definite=Ind|PronType=Art	19	det	_	TokenRange=2133:2134|tuid=sample-p5-s5.18
+19	person	person	NOUN	NN	Number=Sing	6	conj	_	TokenRange=2135:2141|tuid=sample-p5-s5.19
+20	who	who	PRON	WP	PronType=Rel	21	nsubj	_	TokenRange=2142:2145|tuid=sample-p5-s5.20
+21	walks	walk	VERB	VBZ	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	19	acl:relcl	_	TokenRange=2146:2151|tuid=sample-p5-s5.21
+22	slowly	slowly	ADV	RB	_	21	advmod	_	TokenRange=2152:2158|tuid=sample-p5-s5.22
+23	through	through	ADP	IN	_	25	case	_	TokenRange=2159:2166|tuid=sample-p5-s5.23
+24	a	a	DET	DT	Definite=Ind|PronType=Art	25	det	_	TokenRange=2167:2168|tuid=sample-p5-s5.24
+25	park	park	NOUN	NN	Number=Sing	21	obl	_	TokenRange=2169:2173|tuid=sample-p5-s5.25
+26	while	while	SCONJ	IN	_	27	mark	_	TokenRange=2174:2179|tuid=sample-p5-s5.26
+27	thinking	think	VERB	VBG	Tense=Pres|VerbForm=Part	21	advcl	_	TokenRange=2180:2188|tuid=sample-p5-s5.27
+28	about	about	ADP	IN	_	29	case	_	TokenRange=2189:2194|tuid=sample-p5-s5.28
+29	duty	duty	NOUN	NN	Number=Sing	27	obl	_	TokenRange=2195:2199|tuid=sample-p5-s5.29
+30	and	and	CCONJ	CC	_	31	cc	_	TokenRange=2200:2203|tuid=sample-p5-s5.30
+31	desire	desire	NOUN	NN	Number=Sing	29	conj	_	SpaceAfter=No|TokenRange=2204:2210|tuid=sample-p5-s5.31
+32	.	.	PUNCT	.	_	2	punct	_	SpacesAfter=\n\n|TokenRange=2210:2211|tuid=sample-p5-s5.32
+
+# newregion p
+# p_tuid = sample-p6
+# newregion s
+# sent_id = sample-en_p6-s1
+# tuid = p6-s1
+# text = Before closing, Emma checks reservations again.
+1	Before	before	SCONJ	IN	_	2	mark	_	TokenRange=2213:2219|tuid=sample-p6-s1.1
+2	closing	close	VERB	VBG	Tense=Pres|VerbForm=Part	5	advcl	_	SpaceAfter=No|TokenRange=2220:2227|tuid=sample-p6-s1.2
+3	,	,	PUNCT	,	_	2	punct	_	TokenRange=2227:2228|tuid=sample-p6-s1.3
+4	Emma	Emma	PROPN	NNP	Number=Sing	5	nsubj	_	TokenRange=2229:2233|tuid=sample-p6-s1.4
+5	checks	check	VERB	VBZ	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=2234:2240|tuid=sample-p6-s1.5
+6	reservations	reservation	NOUN	NNS	Number=Plur	5	obj	_	TokenRange=2241:2253|tuid=sample-p6-s1.6
+7	again	again	ADV	RB	_	5	advmod	_	SpaceAfter=No|TokenRange=2254:2259|tuid=sample-p6-s1.7
+8	.	.	PUNCT	.	_	5	punct	_	TokenRange=2259:2260|tuid=sample-p6-s1.8
+
+# newregion s
+# sent_id = sample-en_p6-s2
+# tuid = p6-s2
+# text = Three people book a room for Saturday.
+1	Three	three	NUM	CD	NumForm=Word|NumType=Card	2	nummod	_	TokenRange=2261:2266|tuid=sample-p6-s2.1
+2	people	people	NOUN	NNS	Number=Plur	3	nsubj	_	TokenRange=2267:2273|tuid=sample-p6-s2.2
+3	book	book	VERB	VBP	Mood=Ind|Number=Plur|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=2274:2278|tuid=sample-p6-s2.3
+4	a	a	DET	DT	Definite=Ind|PronType=Art	5	det	_	TokenRange=2279:2280|tuid=sample-p6-s2.4
+5	room	room	NOUN	NN	Number=Sing	3	obj	_	TokenRange=2281:2285|tuid=sample-p6-s2.5
+6	for	for	ADP	IN	_	7	case	_	TokenRange=2286:2289|tuid=sample-p6-s2.6
+7	Saturday	Saturday	PROPN	NNP	Number=Sing	3	obl	_	SpaceAfter=No|TokenRange=2290:2298|tuid=sample-p6-s2.7
+8	.	.	PUNCT	.	_	3	punct	_	TokenRange=2298:2299|tuid=sample-p6-s2.8
+
+# newregion s
+# sent_id = sample-en_p6-s3
+# tuid = p6-s3
+# text = One family books two seats for a storytelling event.
+1	One	one	NUM	CD	NumForm=Word|NumType=Card	2	nummod	_	TokenRange=2300:2303|tuid=sample-p6-s3.1
+2	family	family	NOUN	NN	Number=Sing	3	nsubj	_	TokenRange=2304:2310|tuid=sample-p6-s3.2
+3	books	book	VERB	VBZ	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=2311:2316|tuid=sample-p6-s3.3
+4	two	two	NUM	CD	NumForm=Word|NumType=Card	5	nummod	_	TokenRange=2317:2320|tuid=sample-p6-s3.4
+5	seats	seat	NOUN	NNS	Number=Plur	3	obj	_	TokenRange=2321:2326|tuid=sample-p6-s3.5
+6	for	for	ADP	IN	_	9	case	_	TokenRange=2327:2330|tuid=sample-p6-s3.6
+7	a	a	DET	DT	Definite=Ind|PronType=Art	9	det	_	TokenRange=2331:2332|tuid=sample-p6-s3.7
+8	storytelling	storytelling	NOUN	NN	Number=Sing	9	compound	_	TokenRange=2333:2345|tuid=sample-p6-s3.8
+9	event	event	NOUN	NN	Number=Sing	3	obl	_	SpaceAfter=No|TokenRange=2346:2351|tuid=sample-p6-s3.9
+10	.	.	PUNCT	.	_	3	punct	_	TokenRange=2351:2352|tuid=sample-p6-s3.10
+
+# newregion s
+# sent_id = sample-en_p6-s4
+# tuid = p6-s4
+# text = A student cancels a booking and rebooks for next week.
+1	A	a	DET	DT	Definite=Ind|PronType=Art	2	det	_	TokenRange=2353:2354|tuid=sample-p6-s4.1
+2	student	student	NOUN	NN	Number=Sing	3	nsubj	_	TokenRange=2355:2362|tuid=sample-p6-s4.2
+3	cancels	cancel	VERB	VBZ	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=2363:2370|tuid=sample-p6-s4.3
+4	a	a	DET	DT	Definite=Ind|PronType=Art	5	det	_	TokenRange=2371:2372|tuid=sample-p6-s4.4
+5	booking	booking	NOUN	NN	Number=Sing	3	obj	_	TokenRange=2373:2380|tuid=sample-p6-s4.5
+6	and	and	CCONJ	CC	_	7	cc	_	TokenRange=2381:2384|tuid=sample-p6-s4.6
+7	rebooks	rebook	NOUN	NNS	Number=Plur	5	conj	_	TokenRange=2385:2392|tuid=sample-p6-s4.7
+8	for	for	ADP	IN	_	10	case	_	TokenRange=2393:2396|tuid=sample-p6-s4.8
+9	next	next	ADJ	JJ	Degree=Pos	10	amod	_	TokenRange=2397:2401|tuid=sample-p6-s4.9
+10	week	week	NOUN	NN	Number=Sing	3	obl	_	SpaceAfter=No|TokenRange=2402:2406|tuid=sample-p6-s4.10
+11	.	.	PUNCT	.	_	3	punct	_	TokenRange=2406:2407|tuid=sample-p6-s4.11
+
+# newregion s
+# sent_id = sample-en_p6-s5
+# tuid = p6-s5
+# text = Emma writes a short report: The library was calm, attendance was stable, and circulation increased.
+1	Emma	Emma	PROPN	NNP	Number=Sing	2	nsubj	_	TokenRange=2408:2412|tuid=sample-p6-s5.1
+2	writes	write	VERB	VBZ	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=2413:2419|tuid=sample-p6-s5.2
+3	a	a	DET	DT	Definite=Ind|PronType=Art	5	det	_	TokenRange=2420:2421|tuid=sample-p6-s5.3
+4	short	short	ADJ	JJ	Degree=Pos	5	amod	_	TokenRange=2422:2427|tuid=sample-p6-s5.4
+5	report	report	NOUN	NN	Number=Sing	2	obj	_	SpaceAfter=No|TokenRange=2428:2434|tuid=sample-p6-s5.5
+6	:	:	PUNCT	:	_	10	punct	_	TokenRange=2434:2435|tuid=sample-p6-s5.6
+7	The	the	DET	DT	Definite=Def|PronType=Art	8	det	_	TokenRange=2436:2439|tuid=sample-p6-s5.7
+8	library	library	NOUN	NN	Number=Sing	10	nsubj	_	TokenRange=2440:2447|tuid=sample-p6-s5.8
+9	was	be	AUX	VBD	Mood=Ind|Number=Sing|Person=3|Tense=Past|VerbForm=Fin	10	cop	_	TokenRange=2448:2451|tuid=sample-p6-s5.9
+10	calm	calm	ADJ	JJ	Degree=Pos	2	parataxis	_	SpaceAfter=No|TokenRange=2452:2456|tuid=sample-p6-s5.10
+11	,	,	PUNCT	,	_	14	punct	_	TokenRange=2456:2457|tuid=sample-p6-s5.11
+12	attendance	attendance	NOUN	NN	Number=Sing	14	nsubj	_	TokenRange=2458:2468|tuid=sample-p6-s5.12
+13	was	be	AUX	VBD	Mood=Ind|Number=Sing|Person=3|Tense=Past|VerbForm=Fin	14	cop	_	TokenRange=2469:2472|tuid=sample-p6-s5.13
+14	stable	stable	ADJ	JJ	Degree=Pos	10	conj	_	SpaceAfter=No|TokenRange=2473:2479|tuid=sample-p6-s5.14
+15	,	,	PUNCT	,	_	18	punct	_	TokenRange=2479:2480|tuid=sample-p6-s5.15
+16	and	and	CCONJ	CC	_	18	cc	_	TokenRange=2481:2484|tuid=sample-p6-s5.16
+17	circulation	circulation	NOUN	NN	Number=Sing	18	nsubj	_	TokenRange=2485:2496|tuid=sample-p6-s5.17
+18	increased	increase	VERB	VBD	Mood=Ind|Number=Sing|Person=3|Tense=Past|VerbForm=Fin	10	conj	_	SpaceAfter=No|TokenRange=2497:2506|tuid=sample-p6-s5.18
+19	.	.	PUNCT	.	_	2	punct	_	TokenRange=2506:2507|tuid=sample-p6-s5.19
+
+# newregion s
+# sent_id = sample-en_p6-s6
+# tuid = p6-s6
+# text = She turns off the lights, locks the door, and places the returned books on a cart: the blue atlas, the green dictionary, and the book about migration.
+1	She	she	PRON	PRP	Case=Nom|Gender=Fem|Number=Sing|Person=3|PronType=Prs	2	nsubj	_	TokenRange=2508:2511|tuid=sample-p6-s6.1
+2	turns	turn	VERB	VBZ	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=2512:2517|tuid=sample-p6-s6.2
+3	off	off	ADP	RP	_	2	compound:prt	_	TokenRange=2518:2521|tuid=sample-p6-s6.3
+4	the	the	DET	DT	Definite=Def|PronType=Art	5	det	_	TokenRange=2522:2525|tuid=sample-p6-s6.4
+5	lights	light	NOUN	NNS	Number=Plur	2	obj	_	SpaceAfter=No|TokenRange=2526:2532|tuid=sample-p6-s6.5
+6	,	,	PUNCT	,	_	7	punct	_	TokenRange=2532:2533|tuid=sample-p6-s6.6
+7	locks	lock	VERB	VBZ	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	2	conj	_	TokenRange=2534:2539|tuid=sample-p6-s6.7
+8	the	the	DET	DT	Definite=Def|PronType=Art	9	det	_	TokenRange=2540:2543|tuid=sample-p6-s6.8
+9	door	door	NOUN	NN	Number=Sing	7	obj	_	SpaceAfter=No|TokenRange=2544:2548|tuid=sample-p6-s6.9
+10	,	,	PUNCT	,	_	12	punct	_	TokenRange=2548:2549|tuid=sample-p6-s6.10
+11	and	and	CCONJ	CC	_	12	cc	_	TokenRange=2550:2553|tuid=sample-p6-s6.11
+12	places	place	VERB	VBZ	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	2	conj	_	TokenRange=2554:2560|tuid=sample-p6-s6.12
+13	the	the	DET	DT	Definite=Def|PronType=Art	15	det	_	TokenRange=2561:2564|tuid=sample-p6-s6.13
+14	returned	return	VERB	VBN	Tense=Past|VerbForm=Part|Voice=Pass	15	amod	_	TokenRange=2565:2573|tuid=sample-p6-s6.14
+15	books	book	NOUN	NNS	Number=Plur	12	obj	_	TokenRange=2574:2579|tuid=sample-p6-s6.15
+16	on	on	ADP	IN	_	18	case	_	TokenRange=2580:2582|tuid=sample-p6-s6.16
+17	a	a	DET	DT	Definite=Ind|PronType=Art	18	det	_	TokenRange=2583:2584|tuid=sample-p6-s6.17
+18	cart	cart	NOUN	NN	Number=Sing	12	obl	_	SpaceAfter=No|TokenRange=2585:2589|tuid=sample-p6-s6.18
+19	:	:	PUNCT	:	_	22	punct	_	TokenRange=2589:2590|tuid=sample-p6-s6.19
+20	the	the	DET	DT	Definite=Def|PronType=Art	22	det	_	TokenRange=2591:2594|tuid=sample-p6-s6.20
+21	blue	blue	ADJ	JJ	Degree=Pos	22	amod	_	TokenRange=2595:2599|tuid=sample-p6-s6.21
+22	atlas	atlas	NOUN	NN	Number=Sing	18	appos	_	SpaceAfter=No|TokenRange=2600:2605|tuid=sample-p6-s6.22
+23	,	,	PUNCT	,	_	26	punct	_	TokenRange=2605:2606|tuid=sample-p6-s6.23
+24	the	the	DET	DT	Definite=Def|PronType=Art	26	det	_	TokenRange=2607:2610|tuid=sample-p6-s6.24
+25	green	green	ADJ	JJ	Degree=Pos	26	amod	_	TokenRange=2611:2616|tuid=sample-p6-s6.25
+26	dictionary	dictionary	NOUN	NN	Number=Sing	22	conj	_	SpaceAfter=No|TokenRange=2617:2627|tuid=sample-p6-s6.26
+27	,	,	PUNCT	,	_	30	punct	_	TokenRange=2627:2628|tuid=sample-p6-s6.27
+28	and	and	CCONJ	CC	_	30	cc	_	TokenRange=2629:2632|tuid=sample-p6-s6.28
+29	the	the	DET	DT	Definite=Def|PronType=Art	30	det	_	TokenRange=2633:2636|tuid=sample-p6-s6.29
+30	book	book	NOUN	NN	Number=Sing	22	conj	_	TokenRange=2637:2641|tuid=sample-p6-s6.30
+31	about	about	ADP	IN	_	32	case	_	TokenRange=2642:2647|tuid=sample-p6-s6.31
+32	migration	migration	NOUN	NN	Number=Sing	30	nmod	_	SpaceAfter=No|TokenRange=2648:2657|tuid=sample-p6-s6.32
+33	.	.	PUNCT	.	_	2	punct	_	SpacesAfter=\n|TokenRange=2657:2658|tuid=sample-p6-s6.33
+
+# newregion text
+# text_lang = Dutch
+# text_genre = Book
+# generator = UDPipe 2, https://lindat.mff.cuni.cz/services/udpipe
+# udpipe_model = dutch-alpino-ud-2.17-251125
+# udpipe_model_licence = CC BY-NC-SA
+# newregion p
+# p_tuid = sample-p4
+# newregion s
+# sent_id = sample-nl_p4-s1
+# tuid = p4-s1
+# text = Na de lunch geeft Emma een workshop voor vrijwilligers.
+1	Na	na	ADP	VZ|init	_	3	case	_	TokenRange=0:2|tuid=sample-p4-s1.1
+2	de	de	DET	LID|bep|stan|rest	Definite=Def|PronType=Art	3	det	_	TokenRange=3:5|tuid=sample-p4-s1.2
+3	lunch	lunch	NOUN	N|soort|ev|basis|zijd|stan	Gender=Com|Number=Sing	4	obl	_	TokenRange=6:11|tuid=sample-p4-s1.3
+4	geeft	geven	VERB	WW|pv|tgw|met-t	Mood=Ind|Number=Sing|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=12:17|tuid=sample-p4-s1.4
+5	Emma	Emma	PROPN	N|eigen|ev|basis|zijd|stan	Gender=Com|Number=Sing	4	nsubj	_	TokenRange=18:22|tuid=sample-p4-s1.5
+6	een	een	DET	LID|onbep|stan|agr	Definite=Ind|PronType=Art	7	det	_	TokenRange=23:26|tuid=sample-p4-s1.6
+7	workshop	workshop	NOUN	N|soort|ev|basis|zijd|stan	Gender=Com|Number=Sing	4	obj	_	TokenRange=27:35|tuid=sample-p4-s1.7
+8	voor	voor	ADP	VZ|init	_	9	case	_	TokenRange=36:40|tuid=sample-p4-s1.8
+9	vrijwilligers	vrijwilliger	NOUN	N|soort|mv|basis	Number=Plur	7	nmod	_	SpaceAfter=No|TokenRange=41:54|tuid=sample-p4-s1.9
+10	.	.	PUNCT	LET	_	4	punct	_	TokenRange=54:55|tuid=sample-p4-s1.10
+
+# newregion s
+# sent_id = sample-nl_p3-s2
+# tuid = p3-s2
+# text = "De catalogus is geen toverkunst," zegt ze glimlachend.
+1	"	"	PUNCT	LET	_	6	punct	_	SpaceAfter=No|TokenRange=56:57|tuid=sample-p3-s2.1
+2	De	de	DET	LID|bep|stan|rest	Definite=Def|PronType=Art	3	det	_	TokenRange=57:59|tuid=sample-p3-s2.2
+3	catalogus	catalogus	NOUN	N|soort|ev|basis|zijd|stan	Gender=Com|Number=Sing	6	nsubj	_	TokenRange=60:69|tuid=sample-p3-s2.3
+4	is	zijn	AUX	WW|pv|tgw|ev	Mood=Ind|Number=Sing|Tense=Pres|VerbForm=Fin	6	cop	_	TokenRange=70:72|tuid=sample-p3-s2.4
+5	geen	geen	DET	VNW|onbep|det|stan|prenom|zonder|agr	PronType=Neg	6	det	_	TokenRange=73:77|tuid=sample-p3-s2.5
+6	toverkunst	tover_kunst	NOUN	N|soort|ev|basis|zijd|stan	Gender=Com|Number=Sing	0	root	_	SpaceAfter=No|TokenRange=78:88|tuid=sample-p3-s2.6
+7	,	,	PUNCT	LET	_	6	punct	_	SpaceAfter=No|TokenRange=88:89|tuid=sample-p3-s2.7
+8	"	"	PUNCT	LET	_	6	punct	_	TokenRange=89:90|tuid=sample-p3-s2.8
+9	zegt	zeggen	VERB	WW|pv|tgw|met-t	Mood=Ind|Number=Sing|Tense=Pres|VerbForm=Fin	6	parataxis	_	TokenRange=91:95|tuid=sample-p3-s2.9
+10	ze	ze	PRON	VNW|pers|pron|stan|red|3|ev|fem	Person=3|PronType=Prs	9	nsubj	_	TokenRange=96:98|tuid=sample-p3-s2.10
+11	glimlachend	glimlachen	VERB	WW|od|vrij|zonder	VerbForm=Part	9	obl	_	SpaceAfter=No|TokenRange=99:110|tuid=sample-p3-s2.11
+12	.	.	PUNCT	LET	_	6	punct	_	TokenRange=110:111|tuid=sample-p3-s2.12
+
+# newregion s
+# sent_id = sample-nl_p4-s3
+# tuid = p4-s3
+# text = "Als je een doos kunt sorteren, kun je een verzameling sorteren."
+1	"	"	PUNCT	LET	_	13	punct	_	SpaceAfter=No|TokenRange=112:113|tuid=sample-p4-s3.1
+2	Als	als	SCONJ	VG|onder	_	7	mark	_	TokenRange=113:116|tuid=sample-p4-s3.2
+3	je	je	PRON	VNW|pers|pron|nomin|red|2v|ev	Case=Nom|Person=2|PronType=Prs	7	nsubj	_	TokenRange=117:119|tuid=sample-p4-s3.3
+4	een	een	DET	LID|onbep|stan|agr	Definite=Ind|PronType=Art	5	det	_	TokenRange=120:123|tuid=sample-p4-s3.4
+5	doos	doos	NOUN	N|soort|ev|basis|zijd|stan	Gender=Com|Number=Sing	7	obj	_	TokenRange=124:128|tuid=sample-p4-s3.5
+6	kunt	kunnen	AUX	WW|pv|tgw|met-t	Mood=Ind|Number=Sing|Tense=Pres|VerbForm=Fin	7	aux	_	TokenRange=129:133|tuid=sample-p4-s3.6
+7	sorteren	sorteren	VERB	WW|inf|vrij|zonder	VerbForm=Inf	13	advcl	_	SpaceAfter=No|TokenRange=134:142|tuid=sample-p4-s3.7
+8	,	,	PUNCT	LET	_	7	punct	_	TokenRange=142:143|tuid=sample-p4-s3.8
+9	kun	kunnen	AUX	WW|pv|tgw|ev	Mood=Ind|Number=Sing|Tense=Pres|VerbForm=Fin	13	aux	_	TokenRange=144:147|tuid=sample-p4-s3.9
+10	je	je	PRON	VNW|pers|pron|nomin|red|2v|ev	Case=Nom|Person=2|PronType=Prs	13	nsubj	_	TokenRange=148:150|tuid=sample-p4-s3.10
+11	een	een	DET	LID|onbep|stan|agr	Definite=Ind|PronType=Art	12	det	_	TokenRange=151:154|tuid=sample-p4-s3.11
+12	verzameling	verzameling	NOUN	N|soort|ev|basis|zijd|stan	Gender=Com|Number=Sing	13	obj	_	TokenRange=155:166|tuid=sample-p4-s3.12
+13	sorteren	sorteren	VERB	WW|inf|vrij|zonder	VerbForm=Inf	0	root	_	SpaceAfter=No|TokenRange=167:175|tuid=sample-p4-s3.13
+14	.	.	PUNCT	LET	_	13	punct	_	SpaceAfter=No|TokenRange=175:176|tuid=sample-p4-s3.14
+15	"	"	PUNCT	LET	_	13	punct	_	TokenRange=176:177|tuid=sample-p4-s3.15
+
+# newregion s
+# sent_id = sample-nl_p4-s4
+# tuid = p4-s4
+# text = Ze oefenen met donaties: in de ene doos zitten kookboeken, in een andere boeken over navigatie en in een derde een vreemde mix van poëzie en handleidingen.
+1	Ze	ze	PRON	VNW|pers|pron|stan|red|3|mv	Person=3|PronType=Prs	2	nsubj	_	TokenRange=178:180|tuid=sample-p4-s4.1
+2	oefenen	oefenen	VERB	WW|pv|tgw|mv	Mood=Ind|Number=Plur|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=181:188|tuid=sample-p4-s4.2
+3	met	met	ADP	VZ|init	_	4	case	_	TokenRange=189:192|tuid=sample-p4-s4.3
+4	donaties	donatie	NOUN	N|soort|mv|basis	Number=Plur	2	obl	_	SpaceAfter=No|TokenRange=193:201|tuid=sample-p4-s4.4
+5	:	:	PUNCT	LET	_	10	punct	_	TokenRange=201:202|tuid=sample-p4-s4.5
+6	in	in	ADP	VZ|init	_	9	case	_	TokenRange=203:205|tuid=sample-p4-s4.6
+7	de	de	DET	LID|bep|stan|rest	Definite=Def|PronType=Art	9	det	_	TokenRange=206:208|tuid=sample-p4-s4.7
+8	ene	een	PRON	VNW|onbep|det|stan|prenom|met-e|evz	PronType=Ind	9	nmod	_	TokenRange=209:212|tuid=sample-p4-s4.8
+9	doos	doos	NOUN	N|soort|ev|basis|zijd|stan	Gender=Com|Number=Sing	10	obl	_	TokenRange=213:217|tuid=sample-p4-s4.9
+10	zitten	zitten	VERB	WW|pv|tgw|mv	Mood=Ind|Number=Plur|Tense=Pres|VerbForm=Fin	2	parataxis	_	TokenRange=218:224|tuid=sample-p4-s4.10
+11	kookboeken	kook_boek	NOUN	N|soort|mv|basis	Number=Plur	10	nsubj	_	SpaceAfter=No|TokenRange=225:235|tuid=sample-p4-s4.11
+12	,	,	PUNCT	LET	_	16	punct	_	TokenRange=235:236|tuid=sample-p4-s4.12
+13	in	in	ADP	VZ|init	_	16	case	_	TokenRange=237:239|tuid=sample-p4-s4.13
+14	een	een	DET	LID|onbep|stan|agr	Definite=Ind|PronType=Art	16	det	_	TokenRange=240:243|tuid=sample-p4-s4.14
+15	andere	ander	ADJ	ADJ|prenom|basis|met-e|stan	Degree=Pos	16	amod	_	TokenRange=244:250|tuid=sample-p4-s4.15
+16	boeken	boek	NOUN	N|soort|mv|basis	Number=Plur	11	conj	_	TokenRange=251:257|tuid=sample-p4-s4.16
+17	over	over	ADP	VZ|init	_	18	case	_	TokenRange=258:262|tuid=sample-p4-s4.17
+18	navigatie	navigatie	NOUN	N|soort|ev|basis|zijd|stan	Gender=Com|Number=Sing	16	nmod	_	TokenRange=263:272|tuid=sample-p4-s4.18
+19	en	en	CCONJ	VG|neven	_	25	cc	_	TokenRange=273:275|tuid=sample-p4-s4.19
+20	in	in	ADP	VZ|init	_	22	case	_	TokenRange=276:278|tuid=sample-p4-s4.20
+21	een	een	DET	LID|onbep|stan|agr	Definite=Ind|PronType=Art	22	det	_	TokenRange=279:282|tuid=sample-p4-s4.21
+22	derde	drie	ADJ	TW|rang|nom|zonder-n	_	25	orphan	_	TokenRange=283:288|tuid=sample-p4-s4.22
+23	een	een	DET	LID|onbep|stan|agr	Definite=Ind|PronType=Art	25	det	_	TokenRange=289:292|tuid=sample-p4-s4.23
+24	vreemde	vreemd	ADJ	ADJ|prenom|basis|met-e|stan	Degree=Pos	25	amod	_	TokenRange=293:300|tuid=sample-p4-s4.24
+25	mix	mix	NOUN	N|soort|ev|basis|zijd|stan	Gender=Com|Number=Sing	10	conj	_	TokenRange=301:304|tuid=sample-p4-s4.25
+26	van	van	ADP	VZ|init	_	27	case	_	TokenRange=305:308|tuid=sample-p4-s4.26
+27	poëzie	poëzie	NOUN	N|soort|ev|basis|zijd|stan	Gender=Com|Number=Sing	25	nmod	_	TokenRange=309:315|tuid=sample-p4-s4.27
+28	en	en	CCONJ	VG|neven	_	29	cc	_	TokenRange=316:318|tuid=sample-p4-s4.28
+29	handleidingen	handleiding	NOUN	N|soort|mv|basis	Number=Plur	27	conj	_	SpaceAfter=No|TokenRange=319:332|tuid=sample-p4-s4.29
+30	.	.	PUNCT	LET	_	2	punct	_	TokenRange=332:333|tuid=sample-p4-s4.30
+
+# newregion s
+# sent_id = sample-nl_p4-s5
+# tuid = p4-s5
+# text = Iemand grapt dat sorteren een vorm van meditatie is.
+1	Iemand	iemand	PRON	VNW|onbep|pron|stan|vol|3p|ev	Person=3|PronType=Ind	2	nsubj	_	TokenRange=334:340|tuid=sample-p4-s5.1
+2	grapt	grappen	VERB	WW|pv|tgw|met-t	Mood=Ind|Number=Sing|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=341:346|tuid=sample-p4-s5.2
+3	dat	dat	SCONJ	VG|onder	_	6	mark	_	TokenRange=347:350|tuid=sample-p4-s5.3
+4	sorteren	sorteren	VERB	WW|inf|nom|zonder|zonder-n	VerbForm=Inf	6	nsubj	_	TokenRange=351:359|tuid=sample-p4-s5.4
+5	een	een	DET	LID|onbep|stan|agr	Definite=Ind|PronType=Art	6	det	_	TokenRange=360:363|tuid=sample-p4-s5.5
+6	vorm	vorm	NOUN	N|soort|ev|basis|zijd|stan	Gender=Com|Number=Sing	2	ccomp	_	TokenRange=364:368|tuid=sample-p4-s5.6
+7	van	van	ADP	VZ|init	_	8	case	_	TokenRange=369:372|tuid=sample-p4-s5.7
+8	meditatie	meditatie	NOUN	N|soort|ev|basis|zijd|stan	Gender=Com|Number=Sing	6	nmod	_	TokenRange=373:382|tuid=sample-p4-s5.8
+9	is	zijn	AUX	WW|pv|tgw|ev	Mood=Ind|Number=Sing|Tense=Pres|VerbForm=Fin	6	cop	_	SpaceAfter=No|TokenRange=383:385|tuid=sample-p4-s5.9
+10	.	.	PUNCT	LET	_	2	punct	_	TokenRange=385:386|tuid=sample-p4-s5.10
+
+# newregion s
+# sent_id = sample-nl_p4-s6
+# tuid = p4-s6
+# text = Een ander zegt dat de hele operatie voelt als een gesprek met het verleden.
+1	Een	een	DET	LID|onbep|stan|agr	Definite=Ind|PronType=Art	2	det	_	TokenRange=387:390|tuid=sample-p4-s6.1
+2	ander	ander	ADJ	ADJ|nom|basis|zonder|zonder-n	Degree=Pos	3	nsubj	_	TokenRange=391:396|tuid=sample-p4-s6.2
+3	zegt	zeggen	VERB	WW|pv|tgw|met-t	Mood=Ind|Number=Sing|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=397:401|tuid=sample-p4-s6.3
+4	dat	dat	SCONJ	VG|onder	_	8	mark	_	TokenRange=402:405|tuid=sample-p4-s6.4
+5	de	de	DET	LID|bep|stan|rest	Definite=Def|PronType=Art	7	det	_	TokenRange=406:408|tuid=sample-p4-s6.5
+6	hele	heel	ADJ	ADJ|prenom|basis|met-e|stan	Degree=Pos	7	amod	_	TokenRange=409:413|tuid=sample-p4-s6.6
+7	operatie	operatie	NOUN	N|soort|ev|basis|zijd|stan	Gender=Com|Number=Sing	8	nsubj	_	TokenRange=414:422|tuid=sample-p4-s6.7
+8	voelt	voelen	VERB	WW|pv|tgw|met-t	Mood=Ind|Number=Sing|Tense=Pres|VerbForm=Fin	3	ccomp	_	TokenRange=423:428|tuid=sample-p4-s6.8
+9	als	als	SCONJ	VG|onder	_	11	mark	_	TokenRange=429:432|tuid=sample-p4-s6.9
+10	een	een	DET	LID|onbep|stan|agr	Definite=Ind|PronType=Art	11	det	_	TokenRange=433:436|tuid=sample-p4-s6.10
+11	gesprek	gesprek	NOUN	N|soort|ev|basis|onz|stan	Gender=Neut|Number=Sing	8	xcomp	_	TokenRange=437:444|tuid=sample-p4-s6.11
+12	met	met	ADP	VZ|init	_	14	case	_	TokenRange=445:448|tuid=sample-p4-s6.12
+13	het	het	DET	LID|bep|stan|evon	Definite=Def|PronType=Art	14	det	_	TokenRange=449:452|tuid=sample-p4-s6.13
+14	verleden	verleden	NOUN	N|soort|ev|basis|onz|stan	Gender=Neut|Number=Sing	11	nmod	_	SpaceAfter=No|TokenRange=453:461|tuid=sample-p4-s6.14
+15	.	.	PUNCT	LET	_	3	punct	_	SpacesAfter=\n\n|TokenRange=461:462|tuid=sample-p4-s6.15
+
+# newregion p
+# p_tuid = sample-p5
+# newregion s
+# sent_id = sample-nl_p5-s1
+# tuid = p5-s1
+# text = 's Avonds komt de leesclub bijeen in kamer B. "Hallo!"
+1	's	de	DET	LID|bep|gen|evmo	Definite=Def|ExtPos=ADV|PronType=Art	3	obl	_	TokenRange=464:466|tuid=sample-p5-s1.1
+2	Avonds	avond	NOUN	N|soort|ev|basis|gen	Number=Sing	1	fixed	_	TokenRange=467:473|tuid=sample-p5-s1.2
+3	komt	binnen_komen	VERB	WW|pv|tgw|met-t	Mood=Ind|Number=Sing|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=474:478|tuid=sample-p5-s1.3
+4	de	de	DET	LID|bep|stan|rest	Definite=Def|PronType=Art	5	det	_	TokenRange=479:481|tuid=sample-p5-s1.4
+5	leesclub	lees_club	NOUN	N|soort|ev|basis|zijd|stan	Gender=Com|Number=Sing	3	nsubj	_	TokenRange=482:490|tuid=sample-p5-s1.5
+6	bijeen	bijeen	ADV	BW	_	3	compound:prt	_	TokenRange=491:497|tuid=sample-p5-s1.6
+7	in	in	ADP	VZ|init	_	8	case	_	TokenRange=498:500|tuid=sample-p5-s1.7
+8	kamer	kamer	NOUN	N|soort|ev|basis|zijd|stan	Gender=Com|Number=Sing	3	obl	_	TokenRange=501:506|tuid=sample-p5-s1.8
+9	B.	B.	PROPN	N|eigen|ev|basis|zijd|stan	Gender=Com|Number=Sing	8	appos	_	TokenRange=507:509|tuid=sample-p5-s1.9
+10	"	"	PUNCT	LET	_	11	punct	_	SpaceAfter=No|TokenRange=510:511|tuid=sample-p5-s1.10
+11	Hallo	Hallo	PROPN	N|eigen|ev|basis|genus|stan	Gender=Com|Number=Sing	8	appos	_	SpaceAfter=No|TokenRange=511:516|tuid=sample-p5-s1.11
+12	!	!	PUNCT	LET	_	11	punct	_	SpaceAfter=No|TokenRange=516:517|tuid=sample-p5-s1.12
+13	"	"	PUNCT	LET	_	11	punct	_	TokenRange=517:518|tuid=sample-p5-s1.13
+
+# newregion s
+# sent_id = sample-nl_p5-s2
+# tuid = p5-s2
+# text = zegt Mark als hij binnenkomt.
+1	zegt	zeggen	VERB	WW|pv|tgw|met-t	Mood=Ind|Number=Sing|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=519:523|tuid=sample-p5-s2.1
+2	Mark	Mark	PROPN	N|eigen|ev|basis|zijd|stan	Gender=Com|Number=Sing	1	nsubj	_	TokenRange=524:528|tuid=sample-p5-s2.2
+3	als	als	SCONJ	VG|onder	_	5	mark	_	TokenRange=529:532|tuid=sample-p5-s2.3
+4	hij	hij	PRON	VNW|pers|pron|nomin|vol|3|ev|masc	Case=Nom|Person=3|PronType=Prs	5	nsubj	_	TokenRange=533:536|tuid=sample-p5-s2.4
+5	binnenkomt	binnen_komen	VERB	WW|pv|tgw|met-t	Mood=Ind|Number=Sing|Tense=Pres|VerbForm=Fin	1	advcl	_	SpaceAfter=No|TokenRange=537:547|tuid=sample-p5-s2.5
+6	.	.	PUNCT	LET	_	1	punct	_	TokenRange=547:548|tuid=sample-p5-s2.6
+
+# newregion s
+# sent_id = sample-nl_p5-s3
+# tuid = p5-s3
+# text = "Mijn kat is me naar de tramhalte gevolgd."
+1	"	"	PUNCT	LET	_	9	punct	_	SpaceAfter=No|TokenRange=549:550|tuid=sample-p5-s3.1
+2	Mijn	mijn	PRON	VNW|bez|det|stan|vol|1|ev|prenom|zonder|agr	Person=1|Poss=Yes|PronType=Prs	3	nmod:poss	_	TokenRange=550:554|tuid=sample-p5-s3.2
+3	kat	kat	NOUN	N|soort|ev|basis|zijd|stan	Gender=Com|Number=Sing	9	nsubj	_	TokenRange=555:558|tuid=sample-p5-s3.3
+4	is	zijn	AUX	WW|pv|tgw|ev	Mood=Ind|Number=Sing|Tense=Pres|VerbForm=Fin	9	aux	_	TokenRange=559:561|tuid=sample-p5-s3.4
+5	me	me	PRON	VNW|pr|pron|obl|red|1|ev	Case=Acc|Person=1|PronType=Prs	9	obj	_	TokenRange=562:564|tuid=sample-p5-s3.5
+6	naar	naar	ADP	VZ|init	_	8	case	_	TokenRange=565:569|tuid=sample-p5-s3.6
+7	de	de	DET	LID|bep|stan|rest	Definite=Def|PronType=Art	8	det	_	TokenRange=570:572|tuid=sample-p5-s3.7
+8	tramhalte	tramhalte	NOUN	N|soort|ev|basis|zijd|stan	Gender=Com|Number=Sing	9	obl	_	TokenRange=573:582|tuid=sample-p5-s3.8
+9	gevolgd	volgen	VERB	WW|vd|vrij|zonder	VerbForm=Part	0	root	_	SpaceAfter=No|TokenRange=583:590|tuid=sample-p5-s3.9
+10	.	.	PUNCT	LET	_	9	punct	_	SpaceAfter=No|TokenRange=590:591|tuid=sample-p5-s3.10
+11	"	"	PUNCT	LET	_	9	punct	_	TokenRange=591:592|tuid=sample-p5-s3.11
+
+# newregion s
+# sent_id = sample-nl_p5-s4
+# tuid = p5-s4
+# text = Iedereen lacht en hij voegt eraan toe dat de kat altijd verschijnt als hij vis van de markt draagt.
+1	Iedereen	iedereen	PRON	VNW|onbep|pron|stan|vol|3p|ev	Person=3|PronType=Ind	2	nsubj	_	TokenRange=593:601|tuid=sample-p5-s4.1
+2	lacht	lachen	VERB	WW|pv|tgw|met-t	Mood=Ind|Number=Sing|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=602:607|tuid=sample-p5-s4.2
+3	en	en	CCONJ	VG|neven	_	5	cc	_	TokenRange=608:610|tuid=sample-p5-s4.3
+4	hij	hij	PRON	VNW|pers|pron|nomin|vol|3|ev|masc	Case=Nom|Person=3|PronType=Prs	5	nsubj	_	TokenRange=611:614|tuid=sample-p5-s4.4
+5	voegt	toe_voegen	VERB	WW|pv|tgw|met-t	Mood=Ind|Number=Sing|Tense=Pres|VerbForm=Fin	2	conj	_	TokenRange=615:620|tuid=sample-p5-s4.5
+6	eraan	eraan	ADV	BW	_	5	advmod	_	TokenRange=621:626|tuid=sample-p5-s4.6
+7	toe	toe	ADP	VZ|fin	_	5	compound:prt	_	TokenRange=627:630|tuid=sample-p5-s4.7
+8	dat	dat	SCONJ	VG|onder	_	12	mark	_	TokenRange=631:634|tuid=sample-p5-s4.8
+9	de	de	DET	LID|bep|stan|rest	Definite=Def|PronType=Art	10	det	_	TokenRange=635:637|tuid=sample-p5-s4.9
+10	kat	kat	NOUN	N|soort|ev|basis|zijd|stan	Gender=Com|Number=Sing	12	nsubj	_	TokenRange=638:641|tuid=sample-p5-s4.10
+11	altijd	altijd	ADV	BW	_	12	advmod	_	TokenRange=642:648|tuid=sample-p5-s4.11
+12	verschijnt	verschijnen	VERB	WW|pv|tgw|met-t	Mood=Ind|Number=Sing|Tense=Pres|VerbForm=Fin	5	ccomp	_	TokenRange=649:659|tuid=sample-p5-s4.12
+13	als	als	SCONJ	VG|onder	_	19	mark	_	TokenRange=660:663|tuid=sample-p5-s4.13
+14	hij	hij	PRON	VNW|pers|pron|nomin|vol|3|ev|masc	Case=Nom|Person=3|PronType=Prs	19	nsubj	_	TokenRange=664:667|tuid=sample-p5-s4.14
+15	vis	vis	NOUN	N|soort|ev|basis|zijd|stan	Gender=Com|Number=Sing	19	obj	_	TokenRange=668:671|tuid=sample-p5-s4.15
+16	van	van	ADP	VZ|init	_	18	case	_	TokenRange=672:675|tuid=sample-p5-s4.16
+17	de	de	DET	LID|bep|stan|rest	Definite=Def|PronType=Art	18	det	_	TokenRange=676:678|tuid=sample-p5-s4.17
+18	markt	markt	NOUN	N|soort|ev|basis|zijd|stan	Gender=Com|Number=Sing	15	nmod	_	TokenRange=679:684|tuid=sample-p5-s4.18
+19	draagt	dragen	VERB	WW|pv|tgw|met-t	Mood=Ind|Number=Sing|Tense=Pres|VerbForm=Fin	12	advcl	_	SpaceAfter=No|TokenRange=685:691|tuid=sample-p5-s4.19
+20	.	.	PUNCT	LET	_	2	punct	_	TokenRange=691:692|tuid=sample-p5-s4.20
+
+# newregion s
+# sent_id = sample-nl_p5-s5
+# tuid = p5-s5
+# text = Tijdens de discussie vergelijkt de groep een dramatische roman met een historische roman.
+1	Tijdens	tijdens	ADP	VZ|init	_	3	case	_	TokenRange=693:700|tuid=sample-p5-s5.1
+2	de	de	DET	LID|bep|stan|rest	Definite=Def|PronType=Art	3	det	_	TokenRange=701:703|tuid=sample-p5-s5.2
+3	discussie	discussie	NOUN	N|soort|ev|basis|zijd|stan	Gender=Com|Number=Sing	4	obl	_	TokenRange=704:713|tuid=sample-p5-s5.3
+4	vergelijkt	vergelijken	VERB	WW|pv|tgw|met-t	Mood=Ind|Number=Sing|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=714:724|tuid=sample-p5-s5.4
+5	de	de	DET	LID|bep|stan|rest	Definite=Def|PronType=Art	6	det	_	TokenRange=725:727|tuid=sample-p5-s5.5
+6	groep	groep	NOUN	N|soort|ev|basis|zijd|stan	Gender=Com|Number=Sing	4	nsubj	_	TokenRange=728:733|tuid=sample-p5-s5.6
+7	een	een	DET	LID|onbep|stan|agr	Definite=Ind|PronType=Art	9	det	_	TokenRange=734:737|tuid=sample-p5-s5.7
+8	dramatische	dramatisch	ADJ	ADJ|prenom|basis|met-e|stan	Degree=Pos	9	amod	_	TokenRange=738:749|tuid=sample-p5-s5.8
+9	roman	roman	NOUN	N|soort|ev|basis|zijd|stan	Gender=Com|Number=Sing	4	obj	_	TokenRange=750:755|tuid=sample-p5-s5.9
+10	met	met	ADP	VZ|init	_	13	case	_	TokenRange=756:759|tuid=sample-p5-s5.10
+11	een	een	DET	LID|onbep|stan|agr	Definite=Ind|PronType=Art	13	det	_	TokenRange=760:763|tuid=sample-p5-s5.11
+12	historische	historisch	ADJ	ADJ|prenom|basis|met-e|stan	Degree=Pos	13	amod	_	TokenRange=764:775|tuid=sample-p5-s5.12
+13	roman	roman	NOUN	N|soort|ev|basis|zijd|stan	Gender=Com|Number=Sing	4	obl:arg	_	SpaceAfter=No|TokenRange=776:781|tuid=sample-p5-s5.13
+14	.	.	PUNCT	LET	_	4	punct	_	TokenRange=781:782|tuid=sample-p5-s5.14
+
+# newregion s
+# sent_id = sample-nl_p5-s6
+# tuid = p5-s6
+# text = Ze citeren passages over een huis aan de rivier, een tafel bij het raam en iemand die langzaam door een park wandelt en nadenkt over plicht en verlangen.
+1	Ze	ze	PRON	VNW|pers|pron|stan|red|3|mv	Person=3|PronType=Prs	2	nsubj	_	TokenRange=783:785|tuid=sample-p5-s6.1
+2	citeren	citeren	VERB	WW|pv|tgw|mv	Mood=Ind|Number=Plur|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=786:793|tuid=sample-p5-s6.2
+3	passages	passage	NOUN	N|soort|mv|basis	Number=Plur	2	obj	_	TokenRange=794:802|tuid=sample-p5-s6.3
+4	over	over	ADP	VZ|init	_	6	case	_	TokenRange=803:807|tuid=sample-p5-s6.4
+5	een	een	DET	LID|onbep|stan|agr	Definite=Ind|PronType=Art	6	det	_	TokenRange=808:811|tuid=sample-p5-s6.5
+6	huis	huis	NOUN	N|soort|ev|basis|onz|stan	Gender=Neut|Number=Sing	3	nmod	_	TokenRange=812:816|tuid=sample-p5-s6.6
+7	aan	aan	ADP	VZ|init	_	9	case	_	TokenRange=817:820|tuid=sample-p5-s6.7
+8	de	de	DET	LID|bep|stan|rest	Definite=Def|PronType=Art	9	det	_	TokenRange=821:823|tuid=sample-p5-s6.8
+9	rivier	rivier	NOUN	N|soort|ev|basis|zijd|stan	Gender=Com|Number=Sing	6	nmod	_	SpaceAfter=No|TokenRange=824:830|tuid=sample-p5-s6.9
+10	,	,	PUNCT	LET	_	12	punct	_	TokenRange=830:831|tuid=sample-p5-s6.10
+11	een	een	DET	LID|onbep|stan|agr	Definite=Ind|PronType=Art	12	det	_	TokenRange=832:835|tuid=sample-p5-s6.11
+12	tafel	tafel	NOUN	N|soort|ev|basis|zijd|stan	Gender=Com|Number=Sing	6	conj	_	TokenRange=836:841|tuid=sample-p5-s6.12
+13	bij	bij	ADP	VZ|init	_	15	case	_	TokenRange=842:845|tuid=sample-p5-s6.13
+14	het	het	DET	LID|bep|stan|evon	Definite=Def|PronType=Art	15	det	_	TokenRange=846:849|tuid=sample-p5-s6.14
+15	raam	raam	NOUN	N|soort|ev|basis|onz|stan	Gender=Neut|Number=Sing	12	nmod	_	TokenRange=850:854|tuid=sample-p5-s6.15
+16	en	en	CCONJ	VG|neven	_	17	cc	_	TokenRange=855:857|tuid=sample-p5-s6.16
+17	iemand	iemand	PRON	VNW|onbep|pron|stan|vol|3p|ev	Person=3|PronType=Ind	6	conj	_	TokenRange=858:864|tuid=sample-p5-s6.17
+18	die	die	PRON	VNW|betr|pron|stan|vol|persoon|getal	PronType=Rel	23	nsubj	_	TokenRange=865:868|tuid=sample-p5-s6.18
+19	langzaam	langzaam	ADJ	ADJ|vrij|basis|zonder	Degree=Pos	23	advmod	_	TokenRange=869:877|tuid=sample-p5-s6.19
+20	door	door	ADP	VZ|init	_	22	case	_	TokenRange=878:882|tuid=sample-p5-s6.20
+21	een	een	DET	LID|onbep|stan|agr	Definite=Ind|PronType=Art	22	det	_	TokenRange=883:886|tuid=sample-p5-s6.21
+22	park	park	NOUN	N|soort|ev|basis|onz|stan	Gender=Neut|Number=Sing	23	obl	_	TokenRange=887:891|tuid=sample-p5-s6.22
+23	wandelt	wandelen	VERB	WW|pv|tgw|met-t	Mood=Ind|Number=Sing|Tense=Pres|VerbForm=Fin	17	acl:relcl	_	TokenRange=892:899|tuid=sample-p5-s6.23
+24	en	en	CCONJ	VG|neven	_	25	cc	_	TokenRange=900:902|tuid=sample-p5-s6.24
+25	nadenkt	na_denken	VERB	WW|pv|tgw|met-t	Mood=Ind|Number=Sing|Tense=Pres|VerbForm=Fin	23	conj	_	TokenRange=903:910|tuid=sample-p5-s6.25
+26	over	over	ADP	VZ|init	_	27	case	_	TokenRange=911:915|tuid=sample-p5-s6.26
+27	plicht	plicht	NOUN	N|soort|ev|basis|onz|stan	Gender=Neut|Number=Sing	25	obl:arg	_	TokenRange=916:922|tuid=sample-p5-s6.27
+28	en	en	CCONJ	VG|neven	_	29	cc	_	TokenRange=923:925|tuid=sample-p5-s6.28
+29	verlangen	verlangen	NOUN	N|soort|ev|basis|onz|stan	Gender=Neut|Number=Sing	27	conj	_	SpaceAfter=No|TokenRange=926:935|tuid=sample-p5-s6.29
+30	.	.	PUNCT	LET	_	2	punct	_	SpacesAfter=\n|TokenRange=935:936|tuid=sample-p5-s6.30
+
+# newregion text
+# text_lang = French
+# text_genre = Book
+# generator = UDPipe 2, https://lindat.mff.cuni.cz/services/udpipe
+# udpipe_model = french-gsd-ud-2.17-251125
+# udpipe_model_licence = CC BY-NC-SA
+# newregion p
+# p_tuid = sample-p4
+# newregion s
+# sent_id = sample-fr_p4-s1
+# tuid = p4-s1
+# text = Après le déjeuner, Emma anime un atelier pour les bénévoles.
+1	Après	après	ADP	_	_	3	case	_	TokenRange=0:5|tuid=sample-p4-s1.1
+2	le	le	DET	_	Definite=Def|Gender=Masc|Number=Sing|PronType=Art	3	det	_	TokenRange=6:8|tuid=sample-p4-s1.2
+3	déjeuner	déjeuner	NOUN	_	Number=Sing	6	obl:mod	_	SpaceAfter=No|TokenRange=9:17|tuid=sample-p4-s1.3
+4	,	,	PUNCT	_	_	3	punct	_	TokenRange=17:18|tuid=sample-p4-s1.4
+5	Emma	Emma	PROPN	_	_	6	nsubj	_	TokenRange=19:23|tuid=sample-p4-s1.5
+6	anime	animer	VERB	_	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=24:29|tuid=sample-p4-s1.6
+7	un	un	DET	_	Definite=Ind|Gender=Masc|Number=Sing|PronType=Art	8	det	_	TokenRange=30:32|tuid=sample-p4-s1.7
+8	atelier	atelier	NOUN	_	Number=Sing	6	obj	_	TokenRange=33:40|tuid=sample-p4-s1.8
+9	pour	pour	ADP	_	_	11	case	_	TokenRange=41:45|tuid=sample-p4-s1.9
+10	les	le	DET	_	Definite=Def|Number=Plur|PronType=Art	11	det	_	TokenRange=46:49|tuid=sample-p4-s1.10
+11	bénévoles	bénévole	NOUN	_	Number=Plur	8	nmod	_	SpaceAfter=No|TokenRange=50:59|tuid=sample-p4-s1.11
+12	.	.	PUNCT	_	_	6	punct	_	TokenRange=59:60|tuid=sample-p4-s1.12
+
+# newregion s
+# sent_id = sample-fr_p4-s2
+# tuid = p4-s2
+# text = « Le catalogue n'a rien de magique », dit-elle en souriant.
+1	«	«	PUNCT	_	_	5	punct	_	TokenRange=61:62|tuid=sample-p4-s2.1
+2	Le	le	DET	_	Definite=Def|Gender=Masc|Number=Sing|PronType=Art	3	det	_	TokenRange=63:65|tuid=sample-p4-s2.2
+3	catalogue	catalogue	NOUN	_	Number=Sing	5	nsubj	_	TokenRange=66:75|tuid=sample-p4-s2.3
+4	n'	ne	ADV	_	Polarity=Neg	5	advmod	_	SpaceAfter=No|TokenRange=76:78|tuid=sample-p4-s2.4
+5	a	avoir	VERB	_	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=78:79|tuid=sample-p4-s2.5
+6	rien	rien	PRON	_	Gender=Masc|Number=Sing|PronType=Neg	5	obj	_	TokenRange=80:84|tuid=sample-p4-s2.6
+7	de	de	ADP	_	_	8	case	_	TokenRange=85:87|tuid=sample-p4-s2.7
+8	magique	magique	ADJ	_	Number=Sing	6	nmod	_	TokenRange=88:95|tuid=sample-p4-s2.8
+9	»	»	PUNCT	_	_	5	punct	_	SpaceAfter=No|TokenRange=96:97|tuid=sample-p4-s2.9
+10	,	,	PUNCT	_	_	5	punct	_	TokenRange=97:98|tuid=sample-p4-s2.10
+11	dit	dire	VERB	_	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	5	parataxis:insert	_	SpaceAfter=No|TokenRange=99:102|tuid=sample-p4-s2.11
+12	-elle	lui	PRON	_	Case=Nom|Emph=No|Gender=Fem|Number=Sing|Person=3|PronType=Prs	11	nsubj	_	TokenRange=102:107|tuid=sample-p4-s2.12
+13	en	en	ADP	_	_	14	mark	_	TokenRange=108:110|tuid=sample-p4-s2.13
+14	souriant	sourier	VERB	_	VerbForm=Part	11	advcl	_	SpaceAfter=No|TokenRange=111:119|tuid=sample-p4-s2.14
+15	.	.	PUNCT	_	_	5	punct	_	TokenRange=119:120|tuid=sample-p4-s2.15
+
+# newregion s
+# sent_id = sample-fr_p4-s3
+# tuid = p4-s3
+# text = « Si vous savez trier un carton, vous savez trier une collection.
+1	«	«	PUNCT	_	_	10	punct	_	TokenRange=121:122|tuid=sample-p4-s3.1
+2	Si	si	SCONJ	_	_	4	mark	_	TokenRange=123:125|tuid=sample-p4-s3.2
+3	vous	vous	PRON	_	Case=Nom|Emph=No|Number=Plur|Person=2|PronType=Prs	4	nsubj	_	TokenRange=126:130|tuid=sample-p4-s3.3
+4	savez	savoir	VERB	_	Mood=Ind|Number=Plur|Person=2|Tense=Pres|VerbForm=Fin	10	advcl	_	TokenRange=131:136|tuid=sample-p4-s3.4
+5	trier	trier	VERB	_	VerbForm=Inf	4	xcomp	_	TokenRange=137:142|tuid=sample-p4-s3.5
+6	un	un	DET	_	Definite=Ind|Gender=Masc|Number=Sing|PronType=Art	7	det	_	TokenRange=143:145|tuid=sample-p4-s3.6
+7	carton	carton	NOUN	_	Number=Sing	5	obj	_	SpaceAfter=No|TokenRange=146:152|tuid=sample-p4-s3.7
+8	,	,	PUNCT	_	_	4	punct	_	TokenRange=152:153|tuid=sample-p4-s3.8
+9	vous	vous	PRON	_	Case=Nom|Emph=No|Number=Plur|Person=2|PronType=Prs	10	nsubj	_	TokenRange=154:158|tuid=sample-p4-s3.9
+10	savez	savoir	VERB	_	Mood=Ind|Number=Plur|Person=2|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=159:164|tuid=sample-p4-s3.10
+11	trier	trier	VERB	_	VerbForm=Inf	10	xcomp	_	TokenRange=165:170|tuid=sample-p4-s3.11
+12	une	un	DET	_	Definite=Ind|Gender=Fem|Number=Sing|PronType=Art	13	det	_	TokenRange=171:174|tuid=sample-p4-s3.12
+13	collection	collection	NOUN	_	Number=Sing	11	obj	_	SpaceAfter=No|TokenRange=175:185|tuid=sample-p4-s3.13
+14	.	.	PUNCT	_	_	10	punct	_	TokenRange=185:186|tuid=sample-p4-s3.14
+
+# newregion s
+# sent_id = sample-fr_p4-s4
+# tuid = p4-s4
+# text = » Ils s'exercent avec des dons : un carton contient des livres de cuisine, un autre des ouvrages de navigation, et un troisième un étrange mélange de poésie et de manuels d'utilisation.
+1	»	»	PUNCT	_	_	4	punct	_	TokenRange=187:188|tuid=sample-p4-s4.1
+2	Ils	eux	PRON	_	Case=Nom|Emph=No|Gender=Masc|Number=Plur|Person=3|PronType=Prs	4	nsubj	_	TokenRange=189:192|tuid=sample-p4-s4.2
+3	s'	soi	PRON	_	Emph=No|Person=3|PronType=Prs|Reflex=Yes	4	obj	_	SpaceAfter=No|TokenRange=193:195|tuid=sample-p4-s4.3
+4	exercent	exercer	VERB	_	Mood=Ind|Number=Plur|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=195:203|tuid=sample-p4-s4.4
+5	avec	avec	ADP	_	_	8	case	_	TokenRange=204:208|tuid=sample-p4-s4.5
+6-7	des	_	_	_	_	_	_	_	TokenRange=209:212
+6	de	de	ADP	_	ExtPos=DET	8	det	_	tuid=sample-p4-s4.6
+7	les	le	DET	_	Definite=Def|Number=Plur|PronType=Art	8	det	_	tuid=sample-p4-s4.7
+8	dons	don	NOUN	_	Number=Plur	4	obl:mod	_	TokenRange=213:217|tuid=sample-p4-s4.8
+9	:	:	PUNCT	_	_	12	punct	_	TokenRange=218:219|tuid=sample-p4-s4.9
+10	un	un	DET	_	Definite=Ind|Gender=Masc|Number=Sing|PronType=Art	11	det	_	TokenRange=220:222|tuid=sample-p4-s4.10
+11	carton	carton	NOUN	_	Number=Sing	12	nsubj	_	TokenRange=223:229|tuid=sample-p4-s4.11
+12	contient	contenir	VERB	_	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	4	parataxis	_	TokenRange=230:238|tuid=sample-p4-s4.12
+13-14	des	_	_	_	_	_	_	_	TokenRange=239:242
+13	de	de	ADP	_	_	15	case	_	tuid=sample-p4-s4.13
+14	les	le	DET	_	Definite=Def|Number=Plur|PronType=Art	15	det	_	tuid=sample-p4-s4.14
+15	livres	livre	NOUN	_	Number=Plur	12	obj	_	TokenRange=243:249|tuid=sample-p4-s4.15
+16	de	de	ADP	_	_	17	case	_	TokenRange=250:252|tuid=sample-p4-s4.16
+17	cuisine	cuisine	NOUN	_	Number=Sing	15	nmod	_	SpaceAfter=No|TokenRange=253:260|tuid=sample-p4-s4.17
+18	,	,	PUNCT	_	_	20	punct	_	TokenRange=260:261|tuid=sample-p4-s4.18
+19	un	un	DET	_	Definite=Ind|Gender=Masc|Number=Sing|PronType=Art	20	det	_	TokenRange=262:264|tuid=sample-p4-s4.19
+20	autre	autre	PRON	_	Number=Sing|Person=3|PronType=Ind	12	conj	_	TokenRange=265:270|tuid=sample-p4-s4.20
+21-22	des	_	_	_	_	_	_	_	TokenRange=271:274
+21	de	de	ADP	_	_	23	case	_	tuid=sample-p4-s4.21
+22	les	le	DET	_	Definite=Def|Number=Plur|PronType=Art	23	det	_	tuid=sample-p4-s4.22
+23	ouvrages	ouvrage	NOUN	_	Number=Plur	20	nmod	_	TokenRange=275:283|tuid=sample-p4-s4.23
+24	de	de	ADP	_	_	25	case	_	TokenRange=284:286|tuid=sample-p4-s4.24
+25	navigation	navigation	NOUN	_	Number=Sing	23	nmod	_	SpaceAfter=No|TokenRange=287:297|tuid=sample-p4-s4.25
+26	,	,	PUNCT	_	_	32	punct	_	TokenRange=297:298|tuid=sample-p4-s4.26
+27	et	et	CCONJ	_	_	32	cc	_	TokenRange=299:301|tuid=sample-p4-s4.27
+28	un	un	DET	_	Definite=Ind|Gender=Masc|Number=Sing|PronType=Art	29	det	_	TokenRange=302:304|tuid=sample-p4-s4.28
+29	troisième	troisième	ADJ	_	Number=Sing	32	conj	_	TokenRange=305:314|tuid=sample-p4-s4.29
+30	un	un	DET	_	Definite=Ind|Gender=Masc|Number=Sing|PronType=Art	32	det	_	TokenRange=315:317|tuid=sample-p4-s4.30
+31	étrange	étrange	ADJ	_	Number=Sing	32	amod	_	TokenRange=318:325|tuid=sample-p4-s4.31
+32	mélange	mélange	NOUN	_	Number=Sing	12	conj	_	TokenRange=326:333|tuid=sample-p4-s4.32
+33	de	de	ADP	_	_	34	case	_	TokenRange=334:336|tuid=sample-p4-s4.33
+34	poésie	poésie	NOUN	_	Number=Sing	32	nmod	_	TokenRange=337:343|tuid=sample-p4-s4.34
+35	et	et	CCONJ	_	_	37	cc	_	TokenRange=344:346|tuid=sample-p4-s4.35
+36	de	de	ADP	_	_	37	case	_	TokenRange=347:349|tuid=sample-p4-s4.36
+37	manuels	manuel	NOUN	_	Number=Plur	34	conj	_	TokenRange=350:357|tuid=sample-p4-s4.37
+38	d'	de	ADP	_	_	39	case	_	SpaceAfter=No|TokenRange=358:360|tuid=sample-p4-s4.38
+39	utilisation	utilisation	NOUN	_	Number=Sing	37	nmod	_	SpaceAfter=No|TokenRange=360:371|tuid=sample-p4-s4.39
+40	.	.	PUNCT	_	_	4	punct	_	TokenRange=371:372|tuid=sample-p4-s4.40
+
+# newregion s
+# sent_id = sample-fr_p4-s5
+# tuid = p4-s5
+# text = Quelqu'un plaisante en disant que le classement est une forme de méditation.
+1	Quelqu'un	quelqu'un	PRON	_	Gender=Masc|Number=Sing|Person=3|PronType=Ind	2	nsubj	_	TokenRange=373:382|tuid=sample-p4-s5.1
+2	plaisante	plaisant	ADJ	_	Gender=Fem|Number=Sing	0	root	_	TokenRange=383:392|tuid=sample-p4-s5.2
+3	en	en	ADP	_	_	4	mark	_	TokenRange=393:395|tuid=sample-p4-s5.3
+4	disant	dire	VERB	_	VerbForm=Part	2	advcl	_	TokenRange=396:402|tuid=sample-p4-s5.4
+5	que	que	SCONJ	_	_	10	mark	_	TokenRange=403:406|tuid=sample-p4-s5.5
+6	le	le	DET	_	Definite=Def|Gender=Masc|Number=Sing|PronType=Art	7	det	_	TokenRange=407:409|tuid=sample-p4-s5.6
+7	classement	classement	NOUN	_	Number=Sing	10	nsubj	_	TokenRange=410:420|tuid=sample-p4-s5.7
+8	est	être	AUX	_	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	10	cop	_	TokenRange=421:424|tuid=sample-p4-s5.8
+9	une	un	DET	_	Definite=Ind|Gender=Fem|Number=Sing|PronType=Art	10	det	_	TokenRange=425:428|tuid=sample-p4-s5.9
+10	forme	forme	NOUN	_	Number=Sing	4	ccomp	_	TokenRange=429:434|tuid=sample-p4-s5.10
+11	de	de	ADP	_	_	12	case	_	TokenRange=435:437|tuid=sample-p4-s5.11
+12	méditation	méditation	NOUN	_	Number=Sing	10	nmod	_	SpaceAfter=No|TokenRange=438:448|tuid=sample-p4-s5.12
+13	.	.	PUNCT	_	_	2	punct	_	TokenRange=448:449|tuid=sample-p4-s5.13
+
+# newregion s
+# sent_id = sample-fr_p4-s6
+# tuid = p4-s6
+# text = Un autre dit que toute cette opération ressemble à un dialogue avec le passé.
+1	Un	un	DET	_	Definite=Ind|Gender=Masc|Number=Sing|PronType=Art	2	det	_	TokenRange=450:452|tuid=sample-p4-s6.1
+2	autre	autre	PRON	_	Number=Sing|Person=3|PronType=Ind	3	nsubj	_	TokenRange=453:458|tuid=sample-p4-s6.2
+3	dit	dire	VERB	_	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=459:462|tuid=sample-p4-s6.3
+4	que	que	SCONJ	_	_	8	mark	_	TokenRange=463:466|tuid=sample-p4-s6.4
+5	toute	tout	ADJ	_	Gender=Fem|Number=Sing	7	amod	_	TokenRange=467:472|tuid=sample-p4-s6.5
+6	cette	ce	DET	_	Gender=Fem|Number=Sing|PronType=Dem	7	det	_	TokenRange=473:478|tuid=sample-p4-s6.6
+7	opération	opération	NOUN	_	Number=Sing	8	nsubj	_	TokenRange=479:488|tuid=sample-p4-s6.7
+8	ressemble	ressembler	VERB	_	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	3	ccomp	_	TokenRange=489:498|tuid=sample-p4-s6.8
+9	à	à	ADP	_	_	11	case	_	TokenRange=499:500|tuid=sample-p4-s6.9
+10	un	un	DET	_	Definite=Ind|Gender=Masc|Number=Sing|PronType=Art	11	det	_	TokenRange=501:503|tuid=sample-p4-s6.10
+11	dialogue	dialogue	NOUN	_	Number=Sing	8	obl:arg	_	TokenRange=504:512|tuid=sample-p4-s6.11
+12	avec	avec	ADP	_	_	14	case	_	TokenRange=513:517|tuid=sample-p4-s6.12
+13	le	le	DET	_	Definite=Def|Gender=Masc|Number=Sing|PronType=Art	14	det	_	TokenRange=518:520|tuid=sample-p4-s6.13
+14	passé	passé	NOUN	_	Number=Sing	11	nmod	_	SpaceAfter=No|TokenRange=521:526|tuid=sample-p4-s6.14
+15	.	.	PUNCT	_	_	3	punct	_	SpacesAfter=\n\n|TokenRange=526:527|tuid=sample-p4-s6.15
+
+# newregion p
+# p_tuid = sample-p5
+# newregion s
+# sent_id = sample-fr_p5-s1
+# tuid = p5-s1
+# text = Le soir, le club de lecture se réunit dans la salle B. « Salut ! » lance Mark en entrant.
+1	Le	le	DET	_	Definite=Def|Gender=Masc|Number=Sing|PronType=Art	2	det	_	TokenRange=529:531|tuid=sample-p5-s1.1
+2	soir	soir	NOUN	_	Number=Sing	9	obl:mod	_	SpaceAfter=No|TokenRange=532:536|tuid=sample-p5-s1.2
+3	,	,	PUNCT	_	_	2	punct	_	TokenRange=536:537|tuid=sample-p5-s1.3
+4	le	le	DET	_	Definite=Def|Gender=Masc|Number=Sing|PronType=Art	5	det	_	TokenRange=538:540|tuid=sample-p5-s1.4
+5	club	club	NOUN	_	Number=Sing	9	nsubj	_	TokenRange=541:545|tuid=sample-p5-s1.5
+6	de	de	ADP	_	_	7	case	_	TokenRange=546:548|tuid=sample-p5-s1.6
+7	lecture	lecture	NOUN	_	Number=Sing	5	nmod	_	TokenRange=549:556|tuid=sample-p5-s1.7
+8	se	soi	PRON	_	Emph=No|Person=3|PronType=Prs|Reflex=Yes	9	obj	_	TokenRange=557:559|tuid=sample-p5-s1.8
+9	réunit	réunir	VERB	_	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=560:566|tuid=sample-p5-s1.9
+10	dans	dans	ADP	_	_	12	case	_	TokenRange=567:571|tuid=sample-p5-s1.10
+11	la	le	DET	_	Definite=Def|Gender=Fem|Number=Sing|PronType=Art	12	det	_	TokenRange=572:574|tuid=sample-p5-s1.11
+12	salle	salle	NOUN	_	Number=Sing	9	obl:mod	_	TokenRange=575:580|tuid=sample-p5-s1.12
+13	B.	B.	PROPN	_	_	12	appos	_	TokenRange=581:583|tuid=sample-p5-s1.13
+14	«	«	PUNCT	_	_	15	punct	_	TokenRange=584:585|tuid=sample-p5-s1.14
+15	Salut	Salut	PROPN	_	_	12	appos	_	TokenRange=586:591|tuid=sample-p5-s1.15
+16	!	!	PUNCT	_	_	15	punct	_	TokenRange=592:593|tuid=sample-p5-s1.16
+17	»	»	PUNCT	_	_	15	punct	_	TokenRange=594:595|tuid=sample-p5-s1.17
+18	lance	lancer	VERB	_	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	9	parataxis	_	TokenRange=596:601|tuid=sample-p5-s1.18
+19	Mark	Mark	PROPN	_	_	18	nsubj	_	TokenRange=602:606|tuid=sample-p5-s1.19
+20	en	en	ADP	_	_	21	mark	_	TokenRange=607:609|tuid=sample-p5-s1.20
+21	entrant	entrer	VERB	_	VerbForm=Part	18	advcl	_	SpaceAfter=No|TokenRange=610:617|tuid=sample-p5-s1.21
+22	.	.	PUNCT	_	_	9	punct	_	TokenRange=617:618|tuid=sample-p5-s1.22
+
+# newregion s
+# sent_id = sample-fr_p5-s2
+# tuid = p5-s2
+# text = « Mon chat m'a suivi jusqu'à l'arrêt de tram.
+1	«	«	PUNCT	_	_	6	punct	_	TokenRange=619:620|tuid=sample-p5-s2.1
+2	Mon	son	DET	_	Gender=Masc|Number=Sing|Number[psor]=Sing|Person[psor]=1|Poss=Yes|PronType=Prs	3	det	_	TokenRange=621:624|tuid=sample-p5-s2.2
+3	chat	chat	NOUN	_	Number=Sing	6	nsubj	_	TokenRange=625:629|tuid=sample-p5-s2.3
+4	m'	moi	PRON	_	Case=Dat|Emph=No|Number=Sing|Person=1|PronType=Prs	6	obj	_	SpaceAfter=No|TokenRange=630:632|tuid=sample-p5-s2.4
+5	a	avoir	AUX	_	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	6	aux:tense	_	TokenRange=632:633|tuid=sample-p5-s2.5
+6	suivi	suivre	VERB	_	Gender=Masc|Number=Sing|VerbForm=Part|Voice=Act	0	root	_	TokenRange=634:639|tuid=sample-p5-s2.6
+7	jusqu'	jusque	ADP	_	_	10	case	_	SpaceAfter=No|TokenRange=640:646|tuid=sample-p5-s2.7
+8	à	à	ADP	_	_	10	case	_	TokenRange=646:647|tuid=sample-p5-s2.8
+9	l'	le	DET	_	Definite=Def|Number=Sing|PronType=Art	10	det	_	SpaceAfter=No|TokenRange=648:650|tuid=sample-p5-s2.9
+10	arrêt	arrêt	NOUN	_	Number=Sing	6	obl:mod	_	TokenRange=650:655|tuid=sample-p5-s2.10
+11	de	de	ADP	_	_	12	case	_	TokenRange=656:658|tuid=sample-p5-s2.11
+12	tram	tram	NOUN	_	Number=Sing	10	nmod	_	SpaceAfter=No|TokenRange=659:663|tuid=sample-p5-s2.12
+13	.	.	PUNCT	_	_	6	punct	_	TokenRange=663:664|tuid=sample-p5-s2.13
+
+# newregion s
+# sent_id = sample-fr_p5-s3
+# tuid = p5-s3
+# text = » Tout le monde rit, et il ajoute que le chat apparaît toujours lorsqu'il ramène du poisson du marché.
+1	»	»	PUNCT	_	_	5	punct	_	TokenRange=665:666|tuid=sample-p5-s3.1
+2	Tout	tout	ADJ	_	Gender=Masc|Number=Sing	4	amod	_	TokenRange=667:671|tuid=sample-p5-s3.2
+3	le	le	DET	_	Definite=Def|Gender=Masc|Number=Sing|PronType=Art	4	det	_	TokenRange=672:674|tuid=sample-p5-s3.3
+4	monde	monde	NOUN	_	Number=Sing	5	nsubj	_	TokenRange=675:680|tuid=sample-p5-s3.4
+5	rit	rire	VERB	_	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	SpaceAfter=No|TokenRange=681:684|tuid=sample-p5-s3.5
+6	,	,	PUNCT	_	_	9	punct	_	TokenRange=684:685|tuid=sample-p5-s3.6
+7	et	et	CCONJ	_	_	9	cc	_	TokenRange=686:688|tuid=sample-p5-s3.7
+8	il	lui	PRON	_	Case=Nom|Emph=No|Gender=Masc|Number=Sing|Person=3|PronType=Prs	9	nsubj	_	TokenRange=689:691|tuid=sample-p5-s3.8
+9	ajoute	ajouter	VERB	_	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	5	conj	_	TokenRange=692:698|tuid=sample-p5-s3.9
+10	que	que	SCONJ	_	_	13	mark	_	TokenRange=699:702|tuid=sample-p5-s3.10
+11	le	le	DET	_	Definite=Def|Gender=Masc|Number=Sing|PronType=Art	12	det	_	TokenRange=703:705|tuid=sample-p5-s3.11
+12	chat	chat	NOUN	_	Number=Sing	13	nsubj	_	TokenRange=706:710|tuid=sample-p5-s3.12
+13	apparaît	apparaître	VERB	_	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	9	ccomp	_	TokenRange=711:719|tuid=sample-p5-s3.13
+14	toujours	toujours	ADV	_	_	13	advmod	_	TokenRange=720:728|tuid=sample-p5-s3.14
+15	lorsqu'	lorsque	SCONJ	_	_	17	mark	_	SpaceAfter=No|TokenRange=729:736|tuid=sample-p5-s3.15
+16	il	lui	PRON	_	Case=Nom|Emph=No|Gender=Masc|Number=Sing|Person=3|PronType=Prs	17	nsubj	_	TokenRange=736:738|tuid=sample-p5-s3.16
+17	ramène	ramener	VERB	_	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	13	advcl	_	TokenRange=739:745|tuid=sample-p5-s3.17
+18-19	du	_	_	_	_	_	_	_	TokenRange=746:748
+18	de	de	ADP	_	_	20	case	_	tuid=sample-p5-s3.18
+19	le	le	DET	_	Definite=Def|Gender=Masc|Number=Sing|PronType=Art	20	det	_	tuid=sample-p5-s3.19
+20	poisson	poisson	NOUN	_	Number=Sing	17	obj	_	TokenRange=749:756|tuid=sample-p5-s3.20
+21-22	du	_	_	_	_	_	_	_	TokenRange=757:759
+21	de	de	ADP	_	_	23	case	_	tuid=sample-p5-s3.21
+22	le	le	DET	_	Definite=Def|Gender=Masc|Number=Sing|PronType=Art	23	det	_	tuid=sample-p5-s3.22
+23	marché	marché	NOUN	_	Number=Sing	17	obl:arg	_	SpaceAfter=No|TokenRange=760:766|tuid=sample-p5-s3.23
+24	.	.	PUNCT	_	_	5	punct	_	TokenRange=766:767|tuid=sample-p5-s3.24
+
+# newregion s
+# sent_id = sample-fr_p5-s4
+# tuid = p5-s4
+# text = Au cours de la discussion, le groupe compare un roman dramatique à un roman historique.
+1-2	Au	_	_	_	_	_	_	_	TokenRange=768:770
+1	À	à	ADP	_	_	3	case	_	tuid=sample-p5-s4.1
+2	le	le	DET	_	Definite=Def|Gender=Masc|Number=Sing|PronType=Art	3	det	_	tuid=sample-p5-s4.2
+3	cours	cours	NOUN	_	_	10	obl:mod	_	TokenRange=771:776|tuid=sample-p5-s4.3
+4	de	de	ADP	_	_	6	case	_	TokenRange=777:779|tuid=sample-p5-s4.4
+5	la	le	DET	_	Definite=Def|Gender=Fem|Number=Sing|PronType=Art	6	det	_	TokenRange=780:782|tuid=sample-p5-s4.5
+6	discussion	discussion	NOUN	_	Number=Sing	3	nmod	_	SpaceAfter=No|TokenRange=783:793|tuid=sample-p5-s4.6
+7	,	,	PUNCT	_	_	3	punct	_	TokenRange=793:794|tuid=sample-p5-s4.7
+8	le	le	DET	_	Definite=Def|Gender=Masc|Number=Sing|PronType=Art	9	det	_	TokenRange=795:797|tuid=sample-p5-s4.8
+9	groupe	groupe	NOUN	_	Number=Sing	10	nsubj	_	TokenRange=798:804|tuid=sample-p5-s4.9
+10	compare	comparer	VERB	_	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=805:812|tuid=sample-p5-s4.10
+11	un	un	DET	_	Definite=Ind|Gender=Masc|Number=Sing|PronType=Art	12	det	_	TokenRange=813:815|tuid=sample-p5-s4.11
+12	roman	roman	NOUN	_	Number=Sing	10	obj	_	TokenRange=816:821|tuid=sample-p5-s4.12
+13	dramatique	dramatique	ADJ	_	Number=Sing	12	amod	_	TokenRange=822:832|tuid=sample-p5-s4.13
+14	à	à	ADP	_	_	16	case	_	TokenRange=833:834|tuid=sample-p5-s4.14
+15	un	un	DET	_	Definite=Ind|Gender=Masc|Number=Sing|PronType=Art	16	det	_	TokenRange=835:837|tuid=sample-p5-s4.15
+16	roman	roman	NOUN	_	Number=Sing	10	obl:arg	_	TokenRange=838:843|tuid=sample-p5-s4.16
+17	historique	historique	ADJ	_	Number=Sing	16	amod	_	SpaceAfter=No|TokenRange=844:854|tuid=sample-p5-s4.17
+18	.	.	PUNCT	_	_	10	punct	_	TokenRange=854:855|tuid=sample-p5-s4.18
+
+# newregion s
+# sent_id = sample-fr_p5-s5
+# tuid = p5-s5
+# text = Ils citent des passages évoquant une maison au bord de la rivière, une table près de la fenêtre et une personne qui déambule lentement dans un parc, songeant au devoir et au désir.
+1	Ils	eux	PRON	_	Case=Nom|Emph=No|Gender=Masc|Number=Plur|Person=3|PronType=Prs	2	nsubj	_	TokenRange=856:859|tuid=sample-p5-s5.1
+2	citent	citer	VERB	_	Mood=Ind|Number=Plur|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=860:866|tuid=sample-p5-s5.2
+3-4	des	_	_	_	_	_	_	_	TokenRange=867:870
+3	de	de	ADP	_	_	5	case	_	tuid=sample-p5-s5.3
+4	les	le	DET	_	Definite=Def|Number=Plur|PronType=Art	5	det	_	tuid=sample-p5-s5.4
+5	passages	passage	NOUN	_	Number=Plur	2	obl:arg	_	TokenRange=871:879|tuid=sample-p5-s5.5
+6	évoquant	évoquer	VERB	_	VerbForm=Part	5	acl	_	TokenRange=880:888|tuid=sample-p5-s5.6
+7	une	un	DET	_	Definite=Ind|Gender=Fem|Number=Sing|PronType=Art	8	det	_	TokenRange=889:892|tuid=sample-p5-s5.7
+8	maison	maison	NOUN	_	Number=Sing	6	obj	_	TokenRange=893:899|tuid=sample-p5-s5.8
+9-10	au	_	_	_	_	_	_	_	TokenRange=900:902
+9	à	à	ADP	_	_	11	case	_	tuid=sample-p5-s5.9
+10	le	le	DET	_	Definite=Def|Gender=Masc|Number=Sing|PronType=Art	11	det	_	tuid=sample-p5-s5.10
+11	bord	bord	NOUN	_	Number=Sing	8	nmod	_	TokenRange=903:907|tuid=sample-p5-s5.11
+12	de	de	ADP	_	_	14	case	_	TokenRange=908:910|tuid=sample-p5-s5.12
+13	la	le	DET	_	Definite=Def|Gender=Fem|Number=Sing|PronType=Art	14	det	_	TokenRange=911:913|tuid=sample-p5-s5.13
+14	rivière	rivière	NOUN	_	Number=Sing	11	nmod	_	SpaceAfter=No|TokenRange=914:921|tuid=sample-p5-s5.14
+15	,	,	PUNCT	_	_	17	punct	_	TokenRange=921:922|tuid=sample-p5-s5.15
+16	une	un	DET	_	Definite=Ind|Gender=Fem|Number=Sing|PronType=Art	17	det	_	TokenRange=923:926|tuid=sample-p5-s5.16
+17	table	table	NOUN	_	Number=Sing	8	conj	_	TokenRange=927:932|tuid=sample-p5-s5.17
+18	près	près	ADV	_	_	17	advmod	_	TokenRange=933:937|tuid=sample-p5-s5.18
+19	de	de	ADP	_	_	21	case	_	TokenRange=938:940|tuid=sample-p5-s5.19
+20	la	le	DET	_	Definite=Def|Gender=Fem|Number=Sing|PronType=Art	21	det	_	TokenRange=941:943|tuid=sample-p5-s5.20
+21	fenêtre	fenêtre	NOUN	_	Number=Sing	18	obl:arg	_	TokenRange=944:951|tuid=sample-p5-s5.21
+22	et	et	CCONJ	_	_	24	cc	_	TokenRange=952:954|tuid=sample-p5-s5.22
+23	une	un	DET	_	Definite=Ind|Gender=Fem|Number=Sing|PronType=Art	24	det	_	TokenRange=955:958|tuid=sample-p5-s5.23
+24	personne	personne	NOUN	_	Number=Sing	8	conj	_	TokenRange=959:967|tuid=sample-p5-s5.24
+25	qui	qui	PRON	_	PronType=Rel	26	nsubj	_	TokenRange=968:971|tuid=sample-p5-s5.25
+26	déambule	déambuler	VERB	_	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	24	acl:relcl	_	TokenRange=972:980|tuid=sample-p5-s5.26
+27	lentement	lentement	ADV	_	_	26	advmod	_	TokenRange=981:990|tuid=sample-p5-s5.27
+28	dans	dans	ADP	_	_	30	case	_	TokenRange=991:995|tuid=sample-p5-s5.28
+29	un	un	DET	_	Definite=Ind|Gender=Masc|Number=Sing|PronType=Art	30	det	_	TokenRange=996:998|tuid=sample-p5-s5.29
+30	parc	parc	NOUN	_	Number=Sing	26	obl:arg	_	SpaceAfter=No|TokenRange=999:1003|tuid=sample-p5-s5.30
+31	,	,	PUNCT	_	_	32	punct	_	TokenRange=1003:1004|tuid=sample-p5-s5.31
+32	songeant	songer	VERB	_	VerbForm=Part	26	advcl	_	TokenRange=1005:1013|tuid=sample-p5-s5.32
+33-34	au	_	_	_	_	_	_	_	TokenRange=1014:1016
+33	à	à	ADP	_	_	35	case	_	tuid=sample-p5-s5.33
+34	le	le	DET	_	Definite=Def|Gender=Masc|Number=Sing|PronType=Art	35	det	_	tuid=sample-p5-s5.34
+35	devoir	devoir	NOUN	_	Number=Sing	32	obl:arg	_	TokenRange=1017:1023|tuid=sample-p5-s5.35
+36	et	et	CCONJ	_	_	39	cc	_	TokenRange=1024:1026|tuid=sample-p5-s5.36
+37-38	au	_	_	_	_	_	_	_	TokenRange=1027:1029
+37	à	à	ADP	_	_	39	case	_	tuid=sample-p5-s5.37
+38	le	le	DET	_	Definite=Def|Gender=Masc|Number=Sing|PronType=Art	39	det	_	tuid=sample-p5-s5.38
+39	désir	désir	NOUN	_	Number=Sing	35	conj	_	SpaceAfter=No|TokenRange=1030:1035|tuid=sample-p5-s5.39
+40	.	.	PUNCT	_	_	2	punct	_	SpacesAfter=\n|TokenRange=1035:1036|tuid=sample-p5-s5.40
+
+# newregion text
+# text_lang = Spanish
+# text_genre = Book
+# generator = UDPipe 2, https://lindat.mff.cuni.cz/services/udpipe
+# udpipe_model = spanish-ancora-ud-2.17-251125
+# udpipe_model_licence = CC BY-NC-SA
+# newregion p
+# p_tuid = sample-p4
+# newregion s
+# sent_id = sample-es_p4-s1
+# tuid = p4-s1
+# text = Después del almuerzo, Emma dirige un taller para voluntarios.
+1	Después	después	ADV	rg	_	7	advmod	_	TokenRange=0:7|tuid=sample-p4-s1.1
+2-3	del	_	_	_	_	_	_	_	TokenRange=8:11
+2	de	de	ADP	spcms	_	4	case	_	tuid=sample-p4-s1.2
+3	el	el	DET	_	Definite=Def|Gender=Masc|Number=Sing|PronType=Art	4	det	_	tuid=sample-p4-s1.3
+4	almuerzo	almuerzo	NOUN	ncms000	Gender=Masc|Number=Sing	1	obl	_	SpaceAfter=No|TokenRange=12:20|tuid=sample-p4-s1.4
+5	,	,	PUNCT	fc	PunctType=Comm	1	punct	_	TokenRange=20:21|tuid=sample-p4-s1.5
+6	Emma	Emma	PROPN	np00000	_	7	nsubj	_	TokenRange=22:26|tuid=sample-p4-s1.6
+7	dirige	dirigir	VERB	vmip3s0	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=27:33|tuid=sample-p4-s1.7
+8	un	uno	DET	di0ms0	Definite=Ind|Gender=Masc|Number=Sing|PronType=Art	9	det	_	TokenRange=34:36|tuid=sample-p4-s1.8
+9	taller	taller	NOUN	ncms000	Gender=Masc|Number=Sing	7	obj	_	TokenRange=37:43|tuid=sample-p4-s1.9
+10	para	para	ADP	sps00	_	11	case	_	TokenRange=44:48|tuid=sample-p4-s1.10
+11	voluntarios	voluntario	NOUN	ncmp000	Gender=Masc|Number=Plur	9	nmod	_	SpaceAfter=No|TokenRange=49:60|tuid=sample-p4-s1.11
+12	.	.	PUNCT	fp	PunctType=Peri	7	punct	_	TokenRange=60:61|tuid=sample-p4-s1.12
+
+# newregion s
+# sent_id = sample-es_p4-s2
+# tuid = p4-s2
+# text = «El catálogo no tiene nada de mágico», dice sonriendo.
+1	«El	«el	DET	da0ms0	Definite=Def|Gender=Masc|Number=Sing|PronType=Art	2	det	_	TokenRange=62:65|tuid=sample-p4-s2.1
+2	catálogo	catálogo	NOUN	ncms000	Gender=Masc|Number=Sing	4	nsubj	_	TokenRange=66:74|tuid=sample-p4-s2.2
+3	no	no	ADV	rn	Polarity=Neg	4	advmod	_	TokenRange=75:77|tuid=sample-p4-s2.3
+4	tiene	tener	VERB	vmip3s0	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	9	ccomp	_	TokenRange=78:83|tuid=sample-p4-s2.4
+5	nada	nada	PRON	pi0cs000	Number=Sing|PronType=Neg	4	obj	_	TokenRange=84:88|tuid=sample-p4-s2.5
+6	de	de	ADP	sps00	_	7	case	_	TokenRange=89:91|tuid=sample-p4-s2.6
+7	mágico»	mágico»	NOUN	ncms000	Gender=Masc|Number=Sing	5	nmod	_	SpaceAfter=No|TokenRange=92:99|tuid=sample-p4-s2.7
+8	,	,	PUNCT	fc	PunctType=Comm	4	punct	_	TokenRange=99:100|tuid=sample-p4-s2.8
+9	dice	decir	VERB	vmip3s0	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=101:105|tuid=sample-p4-s2.9
+10	sonriendo	sonrer	VERB	vmg0000	VerbForm=Ger	9	xcomp	_	SpaceAfter=No|TokenRange=106:115|tuid=sample-p4-s2.10
+11	.	.	PUNCT	fp	PunctType=Peri	9	punct	_	TokenRange=115:116|tuid=sample-p4-s2.11
+
+# newregion s
+# sent_id = sample-es_p4-s3
+# tuid = p4-s3
+# text = «Si sabes ordenar una caja, puedes ordenar una colección».
+1	«Si	«si	SCONJ	cs	_	2	mark	_	TokenRange=117:120|tuid=sample-p4-s3.1
+2	sabes	saber	VERB	vmip2s0	Mood=Ind|Number=Sing|Person=2|Tense=Pres|VerbForm=Fin	8	advcl	_	TokenRange=121:126|tuid=sample-p4-s3.2
+3	ordenar	ordenar	VERB	vmn0000	VerbForm=Inf	2	xcomp	_	TokenRange=127:134|tuid=sample-p4-s3.3
+4	una	uno	DET	di0fs0	Definite=Ind|Gender=Fem|Number=Sing|PronType=Art	5	det	_	TokenRange=135:138|tuid=sample-p4-s3.4
+5	caja	caja	NOUN	ncfs000	Gender=Fem|Number=Sing	3	obj	_	SpaceAfter=No|TokenRange=139:143|tuid=sample-p4-s3.5
+6	,	,	PUNCT	fc	PunctType=Comm	2	punct	_	TokenRange=143:144|tuid=sample-p4-s3.6
+7	puedes	poder	AUX	vmip2s0	Mood=Ind|Number=Sing|Person=2|Tense=Pres|VerbForm=Fin	8	aux	_	TokenRange=145:151|tuid=sample-p4-s3.7
+8	ordenar	ordenar	VERB	vmn0000	VerbForm=Inf	0	root	_	TokenRange=152:159|tuid=sample-p4-s3.8
+9	una	uno	DET	di0fs0	Definite=Ind|Gender=Fem|Number=Sing|PronType=Art	10	det	_	TokenRange=160:163|tuid=sample-p4-s3.9
+10	colección»	colección»	NOUN	ncfs000	Gender=Fem|Number=Sing	8	obj	_	SpaceAfter=No|TokenRange=164:174|tuid=sample-p4-s3.10
+11	.	.	PUNCT	fp	PunctType=Peri	8	punct	_	TokenRange=174:175|tuid=sample-p4-s3.11
+
+# newregion s
+# sent_id = sample-es_p4-s4
+# tuid = p4-s4
+# text = Practican con donaciones: una caja contiene libros de cocina, otra, libros de navegación, y una tercera, una curiosa mezcla de poesía y manuales de instrucciones.
+1	Practican	practicar	VERB	vmip3p0	Mood=Ind|Number=Plur|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=176:185|tuid=sample-p4-s4.1
+2	con	con	ADP	sps00	_	3	case	_	TokenRange=186:189|tuid=sample-p4-s4.2
+3	donaciones	donación	NOUN	ncfp000	Gender=Fem|Number=Plur	1	obl	_	SpaceAfter=No|TokenRange=190:200|tuid=sample-p4-s4.3
+4	:	:	PUNCT	fd	PunctType=Colo	7	punct	_	TokenRange=200:201|tuid=sample-p4-s4.4
+5	una	uno	DET	di0fs0	Definite=Ind|Gender=Fem|Number=Sing|PronType=Art	6	det	_	TokenRange=202:205|tuid=sample-p4-s4.5
+6	caja	caja	NOUN	ncfs000	Gender=Fem|Number=Sing	7	nsubj	_	TokenRange=206:210|tuid=sample-p4-s4.6
+7	contiene	contener	VERB	vmip3s0	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	1	advcl	_	TokenRange=211:219|tuid=sample-p4-s4.7
+8	libros	libro	NOUN	ncmp000	Gender=Masc|Number=Plur	7	obj	_	TokenRange=220:226|tuid=sample-p4-s4.8
+9	de	de	ADP	sps00	_	10	case	_	TokenRange=227:229|tuid=sample-p4-s4.9
+10	cocina	cocina	NOUN	ncfs000	Gender=Fem|Number=Sing	8	nmod	_	SpaceAfter=No|TokenRange=230:236|tuid=sample-p4-s4.10
+11	,	,	PUNCT	fc	PunctType=Comm	12	punct	_	TokenRange=236:237|tuid=sample-p4-s4.11
+12	otra	otro	PRON	pi0fs000	Gender=Fem|Number=Sing|PronType=Ind	7	obl	_	SpaceAfter=No|TokenRange=238:242|tuid=sample-p4-s4.12
+13	,	,	PUNCT	fc	PunctType=Comm	14	punct	_	TokenRange=242:243|tuid=sample-p4-s4.13
+14	libros	libro	NOUN	ncmp000	Gender=Masc|Number=Plur	12	appos	_	TokenRange=244:250|tuid=sample-p4-s4.14
+15	de	de	ADP	sps00	_	16	case	_	TokenRange=251:253|tuid=sample-p4-s4.15
+16	navegación	navegación	NOUN	ncfs000	Gender=Fem|Number=Sing	14	nmod	_	SpaceAfter=No|TokenRange=254:264|tuid=sample-p4-s4.16
+17	,	,	PUNCT	fc	PunctType=Comm	12	punct	_	TokenRange=264:265|tuid=sample-p4-s4.17
+18	y	y	CCONJ	cc	_	20	cc	_	TokenRange=266:267|tuid=sample-p4-s4.18
+19	una	uno	DET	di0fs0	Definite=Ind|Gender=Fem|Number=Sing|PronType=Art	20	det	_	TokenRange=268:271|tuid=sample-p4-s4.19
+20	tercera	tercero	ADJ	ao0fs0	Gender=Fem|Number=Sing|NumType=Ord	7	conj	_	SpaceAfter=No|TokenRange=272:279|tuid=sample-p4-s4.20
+21	,	,	PUNCT	fc	PunctType=Comm	24	punct	_	TokenRange=279:280|tuid=sample-p4-s4.21
+22	una	uno	DET	di0fs0	Definite=Ind|Gender=Fem|Number=Sing|PronType=Art	24	det	_	TokenRange=281:284|tuid=sample-p4-s4.22
+23	curiosa	curioso	ADJ	aq0fs0	Gender=Fem|Number=Sing	24	amod	_	TokenRange=285:292|tuid=sample-p4-s4.23
+24	mezcla	mezcla	NOUN	ncfs000	Gender=Fem|Number=Sing	20	appos	_	TokenRange=293:299|tuid=sample-p4-s4.24
+25	de	de	ADP	sps00	_	26	case	_	TokenRange=300:302|tuid=sample-p4-s4.25
+26	poesía	poesía	NOUN	ncfs000	Gender=Fem|Number=Sing	24	nmod	_	TokenRange=303:309|tuid=sample-p4-s4.26
+27	y	y	CCONJ	cc	_	28	cc	_	TokenRange=310:311|tuid=sample-p4-s4.27
+28	manuales	manual	NOUN	ncmp000	Gender=Masc|Number=Plur	26	conj	_	TokenRange=312:320|tuid=sample-p4-s4.28
+29	de	de	ADP	sps00	_	30	case	_	TokenRange=321:323|tuid=sample-p4-s4.29
+30	instrucciones	instrucción	NOUN	ncfp000	Gender=Fem|Number=Plur	28	nmod	_	SpaceAfter=No|TokenRange=324:337|tuid=sample-p4-s4.30
+31	.	.	PUNCT	fp	PunctType=Peri	1	punct	_	TokenRange=337:338|tuid=sample-p4-s4.31
+
+# newregion s
+# sent_id = sample-es_p4-s5
+# tuid = p4-s5
+# text = Alguien bromea diciendo que clasificar es una forma de meditación.
+1	Alguien	alguien	PRON	pi0cs000	Number=Sing|PronType=Ind	2	nsubj	_	TokenRange=339:346|tuid=sample-p4-s5.1
+2	bromea	bromear	VERB	vmip3s0	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=347:353|tuid=sample-p4-s5.2
+3	diciendo	decir	VERB	vmg0000	VerbForm=Ger	2	advcl	_	TokenRange=354:362|tuid=sample-p4-s5.3
+4	que	que	SCONJ	cs	_	8	mark	_	TokenRange=363:366|tuid=sample-p4-s5.4
+5	clasificar	clasificar	VERB	vmn0000	VerbForm=Inf	8	csubj	_	TokenRange=367:377|tuid=sample-p4-s5.5
+6	es	ser	AUX	vsip3s0	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	8	cop	_	TokenRange=378:380|tuid=sample-p4-s5.6
+7	una	uno	DET	di0fs0	Definite=Ind|Gender=Fem|Number=Sing|PronType=Art	8	det	_	TokenRange=381:384|tuid=sample-p4-s5.7
+8	forma	forma	NOUN	ncfs000	Gender=Fem|Number=Sing	3	ccomp	_	TokenRange=385:390|tuid=sample-p4-s5.8
+9	de	de	ADP	sps00	_	10	case	_	TokenRange=391:393|tuid=sample-p4-s5.9
+10	meditación	meditación	NOUN	ncfs000	Gender=Fem|Number=Sing	8	nmod	_	SpaceAfter=No|TokenRange=394:404|tuid=sample-p4-s5.10
+11	.	.	PUNCT	fp	PunctType=Peri	2	punct	_	TokenRange=404:405|tuid=sample-p4-s5.11
+
+# newregion s
+# sent_id = sample-es_p4-s6
+# tuid = p4-s6
+# text = Otro comenta que toda la operación se siente como una conversación con el pasado.
+1	Otro	otro	PRON	pi0ms000	Gender=Masc|Number=Sing|PronType=Ind	2	nsubj	_	TokenRange=406:410|tuid=sample-p4-s6.1
+2	comenta	comentar	VERB	vmip3s0	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=411:418|tuid=sample-p4-s6.2
+3	que	que	SCONJ	cs	_	8	mark	_	TokenRange=419:422|tuid=sample-p4-s6.3
+4	toda	todo	DET	di0fs0	Gender=Fem|Number=Sing|PronType=Tot	6	det	_	TokenRange=423:427|tuid=sample-p4-s6.4
+5	la	el	DET	da0fs0	Definite=Def|Gender=Fem|Number=Sing|PronType=Art	6	det	_	TokenRange=428:430|tuid=sample-p4-s6.5
+6	operación	operación	NOUN	ncfs000	Gender=Fem|Number=Sing	8	nsubj	_	TokenRange=431:440|tuid=sample-p4-s6.6
+7	se	él	PRON	p0300000	Case=Acc|Person=3|PrepCase=Npr|PronType=Prs|Reflex=Yes	8	expl:pass	_	TokenRange=441:443|tuid=sample-p4-s6.7
+8	siente	sentir	VERB	vmip3s0	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	2	ccomp	_	TokenRange=444:450|tuid=sample-p4-s6.8
+9	como	como	SCONJ	cs	_	11	mark	_	TokenRange=451:455|tuid=sample-p4-s6.9
+10	una	uno	DET	di0fs0	Definite=Ind|Gender=Fem|Number=Sing|PronType=Art	11	det	_	TokenRange=456:459|tuid=sample-p4-s6.10
+11	conversación	conversación	NOUN	ncfs000	Gender=Fem|Number=Sing	8	obl	_	TokenRange=460:472|tuid=sample-p4-s6.11
+12	con	con	ADP	sps00	_	14	case	_	TokenRange=473:476|tuid=sample-p4-s6.12
+13	el	el	DET	da0ms0	Definite=Def|Gender=Masc|Number=Sing|PronType=Art	14	det	_	TokenRange=477:479|tuid=sample-p4-s6.13
+14	pasado	pasado	NOUN	ncms000	Gender=Masc|Number=Sing	11	nmod	_	SpaceAfter=No|TokenRange=480:486|tuid=sample-p4-s6.14
+15	.	.	PUNCT	fp	PunctType=Peri	2	punct	_	SpacesAfter=\n\n|TokenRange=486:487|tuid=sample-p4-s6.15
+
+# newregion p
+# p_tuid = sample-p5
+# newregion s
+# sent_id = sample-es_p5-s1
+# tuid = p5-s1
+# text = Por la noche, el club de lectura se reúne en la Sala B. «¡Hola!», dice Mark al entrar.
+1	Por	por	ADP	sps00	_	3	case	_	TokenRange=489:492|tuid=sample-p5-s1.1
+2	la	el	DET	da0fs0	Definite=Def|Gender=Fem|Number=Sing|PronType=Art	3	det	_	TokenRange=493:495|tuid=sample-p5-s1.2
+3	noche	noche	NOUN	ncfs000	Gender=Fem|Number=Sing	10	obl	_	SpaceAfter=No|TokenRange=496:501|tuid=sample-p5-s1.3
+4	,	,	PUNCT	fc	PunctType=Comm	3	punct	_	TokenRange=501:502|tuid=sample-p5-s1.4
+5	el	el	DET	da0ms0	Definite=Def|Gender=Masc|Number=Sing|PronType=Art	6	det	_	TokenRange=503:505|tuid=sample-p5-s1.5
+6	club	club	NOUN	ncms000	Gender=Masc|Number=Sing	10	nsubj	_	TokenRange=506:510|tuid=sample-p5-s1.6
+7	de	de	ADP	sps00	_	8	case	_	TokenRange=511:513|tuid=sample-p5-s1.7
+8	lectura	lectura	NOUN	ncfs000	Gender=Fem|Number=Sing	6	nmod	_	TokenRange=514:521|tuid=sample-p5-s1.8
+9	se	él	PRON	p0300000	Case=Acc|Person=3|PrepCase=Npr|PronType=Prs|Reflex=Yes	10	expl:pv	_	TokenRange=522:524|tuid=sample-p5-s1.9
+10	reúne	reunir	VERB	vmip3s0	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	19	ccomp	_	TokenRange=525:530|tuid=sample-p5-s1.10
+11	en	en	ADP	sps00	_	13	case	_	TokenRange=531:533|tuid=sample-p5-s1.11
+12	la	el	DET	da0fs0	Definite=Def|Gender=Fem|Number=Sing|PronType=Art	13	det	_	TokenRange=534:536|tuid=sample-p5-s1.12
+13	Sala	Sala	PROPN	np00000	_	10	obl	_	TokenRange=537:541|tuid=sample-p5-s1.13
+14	B.	B.	PROPN	_	_	13	flat	_	TokenRange=542:544|tuid=sample-p5-s1.14
+15	«¡	«¡	PUNCT	fe	PunctType=Quot	16	punct	_	SpaceAfter=No|TokenRange=545:547|tuid=sample-p5-s1.15
+16	Hola!	hola!	PROPN	_	_	10	dep	_	SpaceAfter=No|TokenRange=547:552|tuid=sample-p5-s1.16
+17	»	»	PUNCT	fe	PunctType=Quot	16	punct	_	SpaceAfter=No|TokenRange=552:553|tuid=sample-p5-s1.17
+18	,	,	PUNCT	fc	PunctType=Comm	10	punct	_	TokenRange=553:554|tuid=sample-p5-s1.18
+19	dice	decir	VERB	vmip3s0	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=555:559|tuid=sample-p5-s1.19
+20	Mark	Mark	PROPN	np00000	_	19	nsubj	_	TokenRange=560:564|tuid=sample-p5-s1.20
+21-22	al	_	_	_	_	_	_	_	TokenRange=565:567
+21	a	a	ADP	spcms	_	23	case	_	tuid=sample-p5-s1.21
+22	el	el	DET	_	Gender=Masc|Number=Sing|PronType=Dem	23	nsubj	_	tuid=sample-p5-s1.22
+23	entrar	entrar	VERB	vmn0000	VerbForm=Inf	19	advcl	_	SpaceAfter=No|TokenRange=568:574|tuid=sample-p5-s1.23
+24	.	.	PUNCT	fp	PunctType=Peri	19	punct	_	TokenRange=574:575|tuid=sample-p5-s1.24
+
+# newregion s
+# sent_id = sample-es_p5-s2
+# tuid = p5-s2
+# text = «Mi gato me siguió hasta la parada del tranvía».
+1	«Mi	«mi	DET	dp1css	Number=Sing|Number[psor]=Sing|Person=1|Poss=Yes|PronType=Prs	2	det	_	TokenRange=576:579|tuid=sample-p5-s2.1
+2	gato	gato	NOUN	ncms000	Gender=Masc|Number=Sing	4	nsubj	_	TokenRange=580:584|tuid=sample-p5-s2.2
+3	me	yo	PRON	pp1cs000	Case=Acc|Number=Sing|Person=1|PrepCase=Npr|PronType=Prs	4	obj	_	TokenRange=585:587|tuid=sample-p5-s2.3
+4	siguió	seguir	VERB	vmis3s0	Mood=Ind|Number=Sing|Person=3|Tense=Past|VerbForm=Fin	0	root	_	TokenRange=588:594|tuid=sample-p5-s2.4
+5	hasta	hasta	ADP	sps00	_	7	case	_	TokenRange=595:600|tuid=sample-p5-s2.5
+6	la	el	DET	da0fs0	Definite=Def|Gender=Fem|Number=Sing|PronType=Art	7	det	_	TokenRange=601:603|tuid=sample-p5-s2.6
+7	parada	parada	NOUN	ncfs000	Gender=Fem|Number=Sing	4	obl	_	TokenRange=604:610|tuid=sample-p5-s2.7
+8-9	del	_	_	_	_	_	_	_	TokenRange=611:614
+8	de	de	ADP	spcms	_	10	case	_	tuid=sample-p5-s2.8
+9	el	el	DET	_	Definite=Def|Gender=Masc|Number=Sing|PronType=Art	10	det	_	tuid=sample-p5-s2.9
+10	tranvía»	tranvía»	NOUN	ncms000	Gender=Masc|Number=Sing	7	nmod	_	SpaceAfter=No|TokenRange=615:623|tuid=sample-p5-s2.10
+11	.	.	PUNCT	fp	PunctType=Peri	4	punct	_	TokenRange=623:624|tuid=sample-p5-s2.11
+
+# newregion s
+# sent_id = sample-es_p5-s4
+# tuid = p5-s4
+# text = Todos ríen, y él añade que el gato siempre aparece cuando lleva pescado del mercado.
+1	Todos	todo	PRON	pi0mp000	Gender=Masc|Number=Plur|PronType=Tot	2	nsubj	_	TokenRange=625:630|tuid=sample-p5-s4.1
+2	ríen	reír	VERB	vmip3p0	Mood=Ind|Number=Plur|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	SpaceAfter=No|TokenRange=631:635|tuid=sample-p5-s4.2
+3	,	,	PUNCT	fc	PunctType=Comm	6	punct	_	TokenRange=635:636|tuid=sample-p5-s4.3
+4	y	y	CCONJ	cc	_	6	cc	_	TokenRange=637:638|tuid=sample-p5-s4.4
+5	él	él	PRON	pp3ms000	Case=Acc,Nom|Gender=Masc|Number=Sing|Person=3|PronType=Prs	6	nsubj	_	TokenRange=639:641|tuid=sample-p5-s4.5
+6	añade	añadir	VERB	vmip3s0	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	2	conj	_	TokenRange=642:647|tuid=sample-p5-s4.6
+7	que	que	SCONJ	cs	_	11	mark	_	TokenRange=648:651|tuid=sample-p5-s4.7
+8	el	el	DET	da0ms0	Definite=Def|Gender=Masc|Number=Sing|PronType=Art	9	det	_	TokenRange=652:654|tuid=sample-p5-s4.8
+9	gato	gato	NOUN	ncms000	Gender=Masc|Number=Sing	11	nsubj	_	TokenRange=655:659|tuid=sample-p5-s4.9
+10	siempre	siempre	ADV	rg	_	11	advmod	_	TokenRange=660:667|tuid=sample-p5-s4.10
+11	aparece	aparecer	VERB	vmip3s0	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	6	ccomp	_	TokenRange=668:675|tuid=sample-p5-s4.11
+12	cuando	cuando	SCONJ	cs	_	13	mark	_	TokenRange=676:682|tuid=sample-p5-s4.12
+13	lleva	llevar	VERB	vmip3s0	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	11	advcl	_	TokenRange=683:688|tuid=sample-p5-s4.13
+14	pescado	pescado	NOUN	ncms000	Gender=Masc|Number=Sing	13	obj	_	TokenRange=689:696|tuid=sample-p5-s4.14
+15-16	del	_	_	_	_	_	_	_	TokenRange=697:700
+15	de	de	ADP	spcms	_	17	case	_	tuid=sample-p5-s4.15
+16	el	el	DET	_	Definite=Def|Gender=Masc|Number=Sing|PronType=Art	17	det	_	tuid=sample-p5-s4.16
+17	mercado	mercado	NOUN	ncms000	Gender=Masc|Number=Sing	13	obl	_	SpaceAfter=No|TokenRange=701:708|tuid=sample-p5-s4.17
+18	.	.	PUNCT	fp	PunctType=Peri	2	punct	_	TokenRange=708:709|tuid=sample-p5-s4.18
+
+# newregion s
+# sent_id = sample-es_p5-s5
+# tuid = p5-s5
+# text = Durante la conversación, el grupo compara una novela dramática con una histórica.
+1	Durante	durante	ADP	sps00	_	3	case	_	TokenRange=710:717|tuid=sample-p5-s5.1
+2	la	el	DET	da0fs0	Definite=Def|Gender=Fem|Number=Sing|PronType=Art	3	det	_	TokenRange=718:720|tuid=sample-p5-s5.2
+3	conversación	conversación	NOUN	ncfs000	Gender=Fem|Number=Sing	7	obl	_	SpaceAfter=No|TokenRange=721:733|tuid=sample-p5-s5.3
+4	,	,	PUNCT	fc	PunctType=Comm	3	punct	_	TokenRange=733:734|tuid=sample-p5-s5.4
+5	el	el	DET	da0ms0	Definite=Def|Gender=Masc|Number=Sing|PronType=Art	6	det	_	TokenRange=735:737|tuid=sample-p5-s5.5
+6	grupo	grupo	NOUN	ncms000	Gender=Masc|Number=Sing	7	nsubj	_	TokenRange=738:743|tuid=sample-p5-s5.6
+7	compara	comparar	VERB	vmip3s0	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=744:751|tuid=sample-p5-s5.7
+8	una	uno	DET	di0fs0	Definite=Ind|Gender=Fem|Number=Sing|PronType=Art	9	det	_	TokenRange=752:755|tuid=sample-p5-s5.8
+9	novela	novela	NOUN	ncfs000	Gender=Fem|Number=Sing	7	obj	_	TokenRange=756:762|tuid=sample-p5-s5.9
+10	dramática	dramático	ADJ	aq0fs0	Gender=Fem|Number=Sing	9	amod	_	TokenRange=763:772|tuid=sample-p5-s5.10
+11	con	con	ADP	sps00	_	13	case	_	TokenRange=773:776|tuid=sample-p5-s5.11
+12	una	uno	DET	di0fs0	Definite=Ind|Gender=Fem|Number=Sing|PronType=Art	13	det	_	TokenRange=777:780|tuid=sample-p5-s5.12
+13	histórica	histórico	ADJ	aq0fs0	Gender=Fem|Number=Sing	7	amod	_	SpaceAfter=No|TokenRange=781:790|tuid=sample-p5-s5.13
+14	.	.	PUNCT	fp	PunctType=Peri	7	punct	_	TokenRange=790:791|tuid=sample-p5-s5.14
+
+# newregion s
+# sent_id = sample-es_p5-s6
+# tuid = p5-s6
+# text = Citan versos sobre una casa cerca del río, una mesa junto a la ventana y una persona que camina lentamente por un parque mientras reflexiona sobre el deber y el deseo.
+1	Citan	citar	VERB	vmip3p0	Mood=Ind|Number=Plur|Person=3|Tense=Pres|VerbForm=Fin	0	root	_	TokenRange=792:797|tuid=sample-p5-s6.1
+2	versos	verso	NOUN	ncmp000	Gender=Masc|Number=Plur	1	obj	_	TokenRange=798:804|tuid=sample-p5-s6.2
+3	sobre	sobre	ADP	sps00	_	5	case	_	TokenRange=805:810|tuid=sample-p5-s6.3
+4	una	uno	DET	di0fs0	Definite=Ind|Gender=Fem|Number=Sing|PronType=Art	5	det	_	TokenRange=811:814|tuid=sample-p5-s6.4
+5	casa	casa	NOUN	ncfs000	Gender=Fem|Number=Sing	2	nmod	_	TokenRange=815:819|tuid=sample-p5-s6.5
+6	cerca	cerca	ADV	rg	_	5	advmod	_	TokenRange=820:825|tuid=sample-p5-s6.6
+7-8	del	_	_	_	_	_	_	_	TokenRange=826:829
+7	de	de	ADP	spcms	_	9	case	_	tuid=sample-p5-s6.7
+8	el	el	DET	_	Definite=Def|Gender=Masc|Number=Sing|PronType=Art	9	det	_	tuid=sample-p5-s6.8
+9	río	río	NOUN	ncms000	Gender=Masc|Number=Sing	6	obl	_	SpaceAfter=No|TokenRange=830:833|tuid=sample-p5-s6.9
+10	,	,	PUNCT	fc	PunctType=Comm	12	punct	_	TokenRange=833:834|tuid=sample-p5-s6.10
+11	una	uno	DET	di0fs0	Definite=Ind|Gender=Fem|Number=Sing|PronType=Art	12	det	_	TokenRange=835:838|tuid=sample-p5-s6.11
+12	mesa	mesa	NOUN	ncfs000	Gender=Fem|Number=Sing	5	appos	_	TokenRange=839:843|tuid=sample-p5-s6.12
+13	junto	junto	ADJ	sps00	ExtPos=ADP	16	case	_	TokenRange=844:849|tuid=sample-p5-s6.13
+14	a	a	ADP	_	_	13	fixed	_	TokenRange=850:851|tuid=sample-p5-s6.14
+15	la	el	DET	da0fs0	Definite=Def|Gender=Fem|Number=Sing|PronType=Art	16	det	_	TokenRange=852:854|tuid=sample-p5-s6.15
+16	ventana	ventana	NOUN	ncfs000	Gender=Fem|Number=Sing	12	nmod	_	TokenRange=855:862|tuid=sample-p5-s6.16
+17	y	y	CCONJ	cc	_	19	cc	_	TokenRange=863:864|tuid=sample-p5-s6.17
+18	una	uno	DET	di0fs0	Definite=Ind|Gender=Fem|Number=Sing|PronType=Art	19	det	_	TokenRange=865:868|tuid=sample-p5-s6.18
+19	persona	persona	NOUN	ncfs000	Gender=Fem|Number=Sing	5	conj	_	TokenRange=869:876|tuid=sample-p5-s6.19
+20	que	que	PRON	pr0cn000	PronType=Rel	21	nsubj	_	TokenRange=877:880|tuid=sample-p5-s6.20
+21	camina	caminar	VERB	vmip3s0	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	19	acl	_	TokenRange=881:887|tuid=sample-p5-s6.21
+22	lentamente	lentamente	ADV	rg	_	21	advmod	_	TokenRange=888:898|tuid=sample-p5-s6.22
+23	por	por	ADP	sps00	_	25	case	_	TokenRange=899:902|tuid=sample-p5-s6.23
+24	un	uno	DET	di0ms0	Definite=Ind|Gender=Masc|Number=Sing|PronType=Art	25	det	_	TokenRange=903:905|tuid=sample-p5-s6.24
+25	parque	parque	NOUN	ncms000	Gender=Masc|Number=Sing	21	obl	_	TokenRange=906:912|tuid=sample-p5-s6.25
+26	mientras	mientras	SCONJ	cs	_	27	mark	_	TokenRange=913:921|tuid=sample-p5-s6.26
+27	reflexiona	reflexionar	VERB	vmip3s0	Mood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin	21	advcl	_	TokenRange=922:932|tuid=sample-p5-s6.27
+28	sobre	sobre	ADP	sps00	_	30	case	_	TokenRange=933:938|tuid=sample-p5-s6.28
+29	el	el	DET	da0ms0	Definite=Def|Gender=Masc|Number=Sing|PronType=Art	30	det	_	TokenRange=939:941|tuid=sample-p5-s6.29
+30	deber	deber	NOUN	ncms000	Gender=Masc|Number=Sing	27	obl	_	TokenRange=942:947|tuid=sample-p5-s6.30
+31	y	y	CCONJ	cc	_	33	cc	_	TokenRange=948:949|tuid=sample-p5-s6.31
+32	el	el	DET	da0ms0	Definite=Def|Gender=Masc|Number=Sing|PronType=Art	33	det	_	TokenRange=950:952|tuid=sample-p5-s6.32
+33	deseo	deseo	NOUN	ncms000	Gender=Masc|Number=Sing	30	conj	_	SpaceAfter=No|TokenRange=953:958|tuid=sample-p5-s6.33
+34	.	.	PUNCT	fp	PunctType=Peri	1	punct	_	SpaceAfter=No|TokenRange=958:959|tuid=sample-p5-s6.34

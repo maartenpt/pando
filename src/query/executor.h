@@ -3,11 +3,14 @@
 #include "core/types.h"
 #include "query/ast.h"
 #include "corpus/corpus.h"
+#include <algorithm>
 #include <vector>
 #include <string>
 #include <unordered_map>
 #include <functional>
 #include <memory>
+
+#include "index/fold_map.h"
 
 #ifdef PANDO_USE_RE2
 #include <re2/re2.h>
@@ -21,13 +24,61 @@ namespace manatree {
 struct Match {
     std::vector<CorpusPos> positions;    // start position of each query token's span
     std::vector<CorpusPos> span_ends;    // end position (inclusive) of each token's span
-    // #14: name → position for named query tokens (e.g. a:[], b:[] → a→pos0, b→pos1)
-    std::unordered_map<std::string, CorpusPos> name_to_position;
 
-    // Overall match extent (handles both single-position and span tokens)
-    CorpusPos first_pos() const { return positions.empty() ? 0 : positions.front(); }
-    CorpusPos last_pos() const { return span_ends.empty() ? (positions.empty() ? 0 : positions.back()) : span_ends.back(); }
+    // Overall match extent: min/max across ALL positions and span_ends.
+    // Safe for dependency queries where positions may not be in corpus order.
+    CorpusPos first_pos() const {
+        if (positions.empty()) return 0;
+        CorpusPos mn = positions[0];
+        for (CorpusPos p : positions)
+            if (p != NO_HEAD && p < mn) mn = p;
+        return mn;
+    }
+    CorpusPos last_pos() const {
+        if (positions.empty()) return 0;
+        // Use span_ends when present, otherwise positions
+        CorpusPos mx = 0;
+        for (size_t i = 0; i < positions.size(); ++i) {
+            CorpusPos end = (!span_ends.empty()) ? span_ends[i] : positions[i];
+            if (end != NO_HEAD && end > mx) mx = end;
+        }
+        return mx;
+    }
+
+    // Collect all matched corpus positions into a sorted vector.
+    // Used by KWIC display to know which positions are "highlighted".
+    std::vector<CorpusPos> matched_positions() const {
+        std::vector<CorpusPos> out;
+        for (size_t i = 0; i < positions.size(); ++i) {
+            if (positions[i] == NO_HEAD) continue;
+            CorpusPos end = (!span_ends.empty()) ? span_ends[i] : positions[i];
+            for (CorpusPos p = positions[i]; p <= end; ++p)
+                out.push_back(p);
+        }
+        std::sort(out.begin(), out.end());
+        out.erase(std::unique(out.begin(), out.end()), out.end());
+        return out;
+    }
 };
+
+// O1: Lightweight name→position resolution. Build once from query, resolve at read time.
+using NameIndexMap = std::unordered_map<std::string, size_t>;
+
+inline NameIndexMap build_name_map(const TokenQuery& query) {
+    NameIndexMap map;
+    for (size_t i = 0; i < query.tokens.size(); ++i)
+        if (!query.tokens[i].name.empty())
+            map[query.tokens[i].name] = i;
+    return map;
+}
+
+// Resolve a named token to its position in a match, using the name map.
+inline CorpusPos resolve_name(const Match& m, const NameIndexMap& names,
+                              const std::string& name) {
+    auto it = names.find(name);
+    if (it == names.end() || it->second >= m.positions.size()) return NO_HEAD;
+    return m.positions[it->second];
+}
 
 struct MatchSet {
     std::vector<Match> matches;
@@ -133,9 +184,11 @@ private:
     // Expand one seed position through all plan steps and within-clause filter.
     // Calls emit(pm) for each complete partial match vector (size 2*n).
     // emit returns true to continue expanding, false to stop early.
+    // within_hint: cursor for find_region_from (#28); updated on return.
     void expand_seed(const TokenQuery& query, const QueryPlan& plan,
                      const StructuralAttr* within_sa, CorpusPos seed_p,
-                     std::function<bool(std::vector<CorpusPos>&&)> emit) const;
+                     std::function<bool(std::vector<CorpusPos>&&)> emit,
+                     int64_t* within_hint = nullptr) const;
 
     // Expand one seed position to all full matches (for parallel execution).
     // Convenience wrapper around expand_seed that builds Match objects.
@@ -144,6 +197,10 @@ private:
                                        const StructuralAttr* within_sa,
                                        CorpusPos seed_p) const;
 
+    // #25: Pre-resolve EQ string values to LexiconIds for integer comparison in check_leaf.
+    void compile_conditions(const ConditionPtr& cond) const;
+    void compile_query(const TokenQuery& query) const;
+
     std::string normalize_attr(const std::string& attr) const;
 
     static std::vector<CorpusPos> intersect(const std::vector<CorpusPos>& a,
@@ -151,11 +208,44 @@ private:
     static std::vector<CorpusPos> unite(const std::vector<CorpusPos>& a,
                                         const std::vector<CorpusPos>& b);
 
-    // #12: Apply global filters
-    void apply_region_filters(const TokenQuery& query, MatchSet& result) const;
-    void apply_global_filters(const TokenQuery& query, MatchSet& result) const;
+    // #12: Apply global filters (name_map built from query via build_name_map)
+    void apply_region_filters(const TokenQuery& query, const NameIndexMap& name_map, MatchSet& result) const;
+    void apply_global_filters(const TokenQuery& query, const NameIndexMap& name_map, MatchSet& result) const;
+
+    // Region anchor constraint (from <s>, </s> in query)
+    struct AnchorConstraint {
+        size_t token_idx;          // index of the real token this anchor binds to
+        std::string region;        // region name (e.g. "s")
+        bool is_start;             // true = token must be at region start, false = at region end
+        std::vector<std::pair<std::string, std::string>> attrs;  // optional attr constraints
+    };
+
+    // Strip anchor tokens from a query, returning the cleaned query and constraints
+    static TokenQuery strip_anchors(const TokenQuery& query,
+                                    std::vector<AnchorConstraint>& constraints);
+
+    // Apply anchor constraints as post-filter
+    void apply_anchor_filters(const std::vector<AnchorConstraint>& constraints,
+                              MatchSet& result) const;
+
+    // Apply within-having as post-filter
+    void apply_within_having(const TokenQuery& query, MatchSet& result) const;
+
+    // Apply containing/not-containing clauses as post-filter
+    void apply_containing(const TokenQuery& query, MatchSet& result) const;
+
+    // Apply not-within as post-filter (inverts within)
+    void apply_not_within(const TokenQuery& query, MatchSet& result) const;
+
+    // Apply positional ordering constraints (:: a < b)
+    void apply_position_orders(const TokenQuery& query, const NameIndexMap& name_map, MatchSet& result) const;
 
     const Corpus& corpus_;
+
+    // Fold map cache: keyed by "attr:mode" where mode is "lc", "noacc", "lcnoacc"
+    const FoldMap& get_fold_map(const std::string& attr, bool case_fold, bool accent_fold) const;
+    mutable std::unordered_map<std::string, FoldMap> fold_map_cache_;
+    mutable std::mutex fold_map_mutex_;
 
 #ifdef PANDO_USE_RE2
     // RE2 objects are thread-safe for matching once constructed.

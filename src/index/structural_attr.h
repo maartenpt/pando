@@ -29,6 +29,13 @@ public:
     Region get(size_t idx) const;
 
     int64_t find_region(CorpusPos pos) const;
+
+    // #28: Cursor-based find_region — start search from hint index.
+    // When iterating sorted positions, pass the last returned region index
+    // as hint; advances linearly from there, falling back to binary search
+    // when the hint is stale. Returns -1 if pos is not in any region.
+    int64_t find_region_from(CorpusPos pos, int64_t hint) const;
+
     bool same_region(CorpusPos a, CorpusPos b) const;
 
     bool has_values() const { return val_.valid(); }

@@ -42,6 +42,12 @@ private:
     // Returns true and fills `rel` if a relation is found.
     bool try_parse_relation(QueryRelation& rel);
 
+    // Parse the within clause: "within s", "within s_tuid='X'", "within s having [cond]"
+    void parse_within_clause(TokenQuery& tq);
+
+    // Parse "containing s", "containing subtree [cond]"
+    void parse_containing_clause(TokenQuery& tq, bool negated);
+
     // #12: Parse :: global_region_filter and/or global_alignment_filter [ & ... ]*
     void parse_global_filters(TokenQuery& tq);
 

@@ -7,6 +7,7 @@
 #include <iostream>
 #include <numeric>
 #include <stdexcept>
+#include <unordered_set>
 
 #include <sys/mman.h>
 #include <fcntl.h>
@@ -148,7 +149,8 @@ void StreamingBuilder::add_token(
 
 // ── end_sentence ────────────────────────────────────────────────────────
 
-void StreamingBuilder::end_sentence() {
+void StreamingBuilder::end_sentence(
+        const std::vector<std::pair<std::string, std::string>>& sent_region_attrs) {
     if (sent_buf_.empty()) return;
 
     int sent_len = static_cast<int>(sent_buf_.size());
@@ -157,6 +159,7 @@ void StreamingBuilder::end_sentence() {
     // Write sentence region
     Region rgn{sent_start_, sent_end};
     fwrite(&rgn, sizeof(Region), 1, sent_rgn_file_);
+    sentence_region_attr_rows_.push_back(sent_region_attrs);
 
     // Check if any token has dependency info
     bool any_deps = false;
@@ -299,6 +302,43 @@ void StreamingBuilder::finalize() {
 
     // Collect region_attrs for corpus.info (#8)
     std::vector<std::string> region_attrs_list;
+
+    // Sentence structural attributes (s_<name>.val), parallel to s.rgn
+    {
+        FILE* probe = fopen((output_dir_ + "/s.rgn").c_str(), "rb");
+        if (probe) {
+            fseek(probe, 0, SEEK_END);
+            long sz = ftell(probe);
+            fclose(probe);
+            size_t n_sents = (sz > 0) ? static_cast<size_t>(sz) / sizeof(Region) : 0;
+            if (n_sents != sentence_region_attr_rows_.size())
+                throw std::runtime_error("s.rgn / sentence_region_attr_rows_ size mismatch");
+        }
+        if (!sentence_region_attr_rows_.empty()) {
+            std::unordered_set<std::string> sent_attr_keys;
+            for (const auto& row : sentence_region_attr_rows_)
+                for (const auto& kv : row)
+                    sent_attr_keys.insert(kv.first);
+            for (const auto& key : sent_attr_keys) {
+                std::vector<std::string> values;
+                values.reserve(sentence_region_attr_rows_.size());
+                for (const auto& row : sentence_region_attr_rows_) {
+                    std::string val = "_";
+                    for (const auto& kv : row)
+                        if (kv.first == key) {
+                            val = kv.second;
+                            break;
+                        }
+                    values.push_back(std::move(val));
+                }
+                std::string attr_base = output_dir_ + "/s_" + key;
+                std::vector<int64_t> offsets;
+                write_strings(attr_base + ".val", values, offsets);
+                write_vec(attr_base + ".val.idx", offsets);
+                region_attrs_list.push_back("s_" + key);
+            }
+        }
+    }
 
     // Write non-sentence structural regions (and optional values)
     for (const auto& [type, regions] : regions_) {

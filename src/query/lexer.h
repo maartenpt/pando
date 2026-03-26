@@ -39,6 +39,9 @@ enum class TokType {
     PLUS,        // +
     STAR,        // *
     QUESTION,    // ?
+    PERCENT,     // %
+    REGION_START,// <s>, <text>, <np> etc.
+    REGION_END,  // </s>, </text> etc.
 };
 
 inline const char* toktype_name(TokType t) {
@@ -73,8 +76,11 @@ inline const char* toktype_name(TokType t) {
         case TokType::LBRACE:    return "'{'";
         case TokType::RBRACE:    return "'}'";
         case TokType::PLUS:      return "'+'";
-        case TokType::STAR:      return "'*'";
-        case TokType::QUESTION:  return "'?'";
+        case TokType::STAR:         return "'*'";
+        case TokType::QUESTION:     return "'?'";
+        case TokType::PERCENT:      return "'%'";
+        case TokType::REGION_START: return "region_start";
+        case TokType::REGION_END:   return "region_end";
     }
     return "unknown";
 }

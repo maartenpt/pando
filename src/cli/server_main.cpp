@@ -53,6 +53,86 @@ int main(int argc, char* argv[]) {
         res.set_content(to_info_json(corpus), "application/json");
     });
 
+    // GET /values/:attr — unique values + counts for a positional or region attribute
+    svr.Get(R"(/values/(\w+))", [&corpus](const httplib::Request& req, httplib::Response& res) {
+        std::string attr_name = req.matches[1];
+        size_t limit = 0;
+        if (req.has_param("limit"))
+            limit = static_cast<size_t>(std::strtoull(req.get_param_value("limit").c_str(), nullptr, 10));
+        std::string json = to_values_json(corpus, attr_name, limit);
+        if (json.empty()) {
+            res.status = 404;
+            res.set_content("{\"ok\":false,\"error\":\"Unknown attribute: " + attr_name + "\"}\n",
+                            "application/json");
+        } else {
+            res.set_content(json, "application/json");
+        }
+    });
+
+    // GET /regions/:type — list all regions of a given type with their attributes
+    svr.Get(R"(/regions/(\w+))", [&corpus](const httplib::Request& req, httplib::Response& res) {
+        std::string type_name = req.matches[1];
+        size_t limit = 0;
+        if (req.has_param("limit"))
+            limit = static_cast<size_t>(std::strtoull(req.get_param_value("limit").c_str(), nullptr, 10));
+        std::string json = to_regions_json(corpus, type_name, limit);
+        if (json.empty()) {
+            res.status = 404;
+            res.set_content("{\"ok\":false,\"error\":\"Unknown structure type: " + type_name + "\"}\n",
+                            "application/json");
+        } else {
+            res.set_content(json, "application/json");
+        }
+    });
+
+    // POST /run — run a full CQL program (queries + commands), session-aware
+    // Body: {"cql": "...", "limit": 20, "offset": 0, ...}
+    // Maintains per-server session for named queries.
+    ProgramSession program_session;
+    svr.Post("/run", [&corpus, &program_session](const httplib::Request& req, httplib::Response& res) {
+        const std::string& body = req.body;
+        auto extract_str = [&body](const char* key) -> std::string {
+            std::string search = std::string("\"") + key + "\":\"";
+            auto pos = body.find(search);
+            if (pos == std::string::npos) return "";
+            pos += search.size();
+            std::string val;
+            while (pos < body.size()) {
+                char c = body[pos++];
+                if (c == '"') break;
+                if (c == '\\' && pos < body.size()) c = body[pos++];
+                val += c;
+            }
+            return val;
+        };
+        auto extract_num = [&body](const char* key, size_t default_val) -> size_t {
+            std::string search = std::string("\"") + key + "\":";
+            auto pos = body.find(search);
+            if (pos == std::string::npos) return default_val;
+            pos += search.size();
+            return static_cast<size_t>(std::strtoull(body.c_str() + pos, nullptr, 10));
+        };
+
+        std::string cql = extract_str("cql");
+        if (cql.empty()) cql = extract_str("query");
+        if (cql.empty()) {
+            res.status = 400;
+            res.set_content("{\"ok\":false,\"error\":\"missing 'cql' field\"}\n", "application/json");
+            return;
+        }
+
+        ProgramOptions opts;
+        opts.limit      = extract_num("limit", 20);
+        opts.offset     = extract_num("offset", 0);
+        opts.max_total  = extract_num("max_total", 0);
+        opts.context    = static_cast<int>(extract_num("context", 5));
+        opts.total      = (body.find("\"total\":true") != std::string::npos);
+        opts.group_limit = extract_num("group_limit", 1000);
+
+        std::string json = run_program_json(corpus, program_session, cql, opts);
+        res.set_content(json, "application/json");
+    });
+
     svr.Post("/query", [&corpus](const httplib::Request& req, httplib::Response& res) {
         // Expect JSON body with optional: query, limit, offset, total, max_total, context, debug
         std::string query_text = "[]";

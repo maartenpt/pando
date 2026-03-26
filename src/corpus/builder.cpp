@@ -4,11 +4,129 @@
 #include <cstdlib>
 #include <sstream>
 #include <iostream>
+#include <string_view>
 
 namespace manatree {
 
+namespace {
+
+// Every text region must supply the same named attrs (indexer requires equal-length vectors).
+static void pad_text_region_attrs(std::vector<std::pair<std::string, std::string>>& attrs) {
+    auto has = [&](const char* k) {
+        for (const auto& p : attrs)
+            if (p.first == k) return true;
+        return false;
+    };
+    if (!has("id")) attrs.push_back({"id", "_"});
+    if (!has("genre")) attrs.push_back({"genre", "_"});
+    if (!has("lang")) attrs.push_back({"lang", "_"});
+    if (!has("century")) attrs.push_back({"century", "_"});
+}
+
+static void upsert_region_attr(std::vector<std::pair<std::string, std::string>>& attrs,
+                               const std::string& key, const std::string& val) {
+    for (auto& p : attrs) {
+        if (p.first == key) {
+            p.second = val;
+            return;
+        }
+    }
+    attrs.push_back({key, val});
+}
+
+static void pad_doc_region_attrs(std::vector<std::pair<std::string, std::string>>& attrs) {
+    auto has = [&](const char* k) {
+        for (const auto& p : attrs)
+            if (p.first == k) return true;
+        return false;
+    };
+    if (!has("id")) attrs.push_back({"id", "_"});
+}
+
+static std::string trim_sv(std::string_view sv) {
+    while (!sv.empty() && (sv.front() == ' ' || sv.front() == '\t'))
+        sv.remove_prefix(1);
+    while (!sv.empty() && (sv.back() == ' ' || sv.back() == '\r' || sv.back() == '\t'))
+        sv.remove_suffix(1);
+    return std::string(sv);
+}
+
+template <class RegionStack>
+static bool close_last_region_of_type(RegionStack& stack,
+                                      const std::string& type,
+                                      CorpusPos end,
+                                      StreamingBuilder& builder) {
+    for (auto it = stack.rbegin(); it != stack.rend(); ++it) {
+        if (it->type != type) continue;
+        if (end >= it->start)
+            builder.add_region(it->type, it->start, end, it->attrs);
+        stack.erase(std::next(it).base());
+        return true;
+    }
+    return false;
+}
+
+} // namespace
+
 CorpusBuilder::CorpusBuilder(const std::string& output_dir)
     : builder_(output_dir) {}
+
+void CorpusBuilder::close_text_region_if_open() {
+    if (!has_text_region_) return;
+    CorpusPos end = builder_.corpus_size() > 0 ? builder_.corpus_size() - 1 : 0;
+    if (end >= text_region_start_) {
+        pad_text_region_attrs(text_region_attrs_);
+        builder_.add_region("text", text_region_start_, end, text_region_attrs_);
+    }
+    has_text_region_ = false;
+    text_region_attrs_.clear();
+}
+
+void CorpusBuilder::close_doc_region_if_open() {
+    if (!has_doc_region_) return;
+    CorpusPos end = builder_.corpus_size() > 0 ? builder_.corpus_size() - 1 : 0;
+    if (end >= doc_region_start_) {
+        pad_doc_region_attrs(doc_region_attrs_);
+        builder_.add_region("doc", doc_region_start_, end, doc_region_attrs_);
+    }
+    has_doc_region_ = false;
+    doc_region_attrs_.clear();
+}
+
+void CorpusBuilder::parse_misc(const std::string& misc_str,
+        std::unordered_map<std::string, std::string>& attrs) {
+    if (misc_str.empty() || misc_str == "_") return;
+    // Only index a fixed set: some corpora encode open-ended key=value MISC that would
+    // explode the attribute namespace if imported wholesale.
+    auto misc_key_allowed = [](std::string_view key) -> bool {
+        static constexpr std::string_view allowed[] = {
+            "tuid",
+            "Translit",
+            "Vform",
+            "LTranslt",
+            "Root",
+            "CorrectForm",
+            "Gloss",
+        };
+        for (std::string_view a : allowed) {
+            if (key == a) return true;
+        }
+        return false;
+    };
+    size_t start = 0;
+    while (start < misc_str.size()) {
+        size_t pipe = misc_str.find('|', start);
+        size_t end = (pipe == std::string::npos) ? misc_str.size() : pipe;
+        std::string_view piece(misc_str.data() + start, end - start);
+        auto eq = piece.find('=');
+        if (eq != std::string_view::npos) {
+            std::string key = trim_sv(piece.substr(0, eq));
+            if (!key.empty() && misc_key_allowed(key))
+                attrs[std::move(key)] = trim_sv(piece.substr(eq + 1));
+        }
+        start = end + 1;
+    }
+}
 
 void CorpusBuilder::parse_feats(const std::string& feats_str,
         std::unordered_map<std::string, std::string>& attrs) {
@@ -44,18 +162,16 @@ void CorpusBuilder::read_conllu(const std::string& path) {
     while (std::getline(in, line)) {
         if (line.empty()) {
             if (in_sentence_) {
-                builder_.end_sentence();
+                builder_.end_sentence(sent_region_attrs_);
+                sent_region_attrs_.clear();
+                pending_sent_tuid_.clear();
                 in_sentence_ = false;
             }
             continue;
         }
         if (line[0] == '#') {
-            // CoNLL-U comments: capture doc/paragraph IDs etc.
-            // Examples:
-            //   # newdoc id = zakon.iso-003
-            //   # newpar id = zakon.iso-003-p18
-            //   # sent_id = zakon.iso-003-p18s5
-            //   # text = ...
+            // CoNLL-U comments: # newdoc id (structural "doc"), # newregion text, # endregion text,
+            // CQP # text_* = …, # tuid = …, # newpar id = …
             std::string_view sv(line);
             // strip leading "# "
             if (sv.size() > 1 && sv[1] == ' ')
@@ -69,25 +185,62 @@ void CorpusBuilder::read_conllu(const std::string& path) {
                 auto pos = sv.find('=');
                 if (pos == std::string_view::npos) return {};
                 std::string_view val = sv.substr(pos + 1);
-                // trim spaces
                 while (!val.empty() && val.front() == ' ') val.remove_prefix(1);
                 while (!val.empty() && (val.back() == ' ' || val.back() == '\r')) val.remove_suffix(1);
                 return std::string(val);
             };
 
-            if (starts_with("newdoc id")) {
-                // Close previous doc region if any
-                if (has_doc_region_) {
+            // # newregion X  — open a structural region span
+            if (starts_with("newregion")) {
+                size_t j = 9; // "newregion"
+                while (j < sv.size() && (sv[j] == ' ' || sv[j] == '\t')) ++j;
+                std::string rname = trim_sv(sv.substr(j));
+                if (rname == "s") {
+                    // Sentence region is written by end_sentence(); keep extension as no-op marker.
+                } else if (rname == "text") {
+                    close_text_region_if_open();
+                    text_region_start_ = builder_.corpus_size();
+                    text_region_attrs_.clear();
+                    has_text_region_ = true;
+                } else if (!rname.empty()) {
                     CorpusPos end = builder_.corpus_size() > 0 ? builder_.corpus_size() - 1 : 0;
-                    if (end >= doc_start_)
-                        builder_.add_region("text", doc_start_, end,
-                                            std::vector<std::pair<std::string, std::string>>{{"id", doc_id_}});
+                    close_last_region_of_type(conllu_region_stack_, rname, end, builder_);
+                    OpenRegion r;
+                    r.type = rname;
+                    r.start = builder_.corpus_size();
+                    conllu_region_stack_.push_back(std::move(r));
                 }
+                continue;
+            }
+            // # endregion X  — close before the next # newregion (optional if regions chain)
+            if (starts_with("endregion")) {
+                size_t j = 8; // "endregion"
+                while (j < sv.size() && (sv[j] == ' ' || sv[j] == '\t')) ++j;
+                std::string rname = trim_sv(sv.substr(j));
+                if (rname == "text") {
+                    close_text_region_if_open();
+                } else if (!rname.empty() && rname != "s") {
+                    CorpusPos end = builder_.corpus_size() > 0 ? builder_.corpus_size() - 1 : 0;
+                    close_last_region_of_type(conllu_region_stack_, rname, end, builder_);
+                }
+                continue;
+            }
+
+            if (starts_with("newdoc id")) {
+                // CoNLL-U document boundary — structural region "doc", not "text"
+                close_text_region_if_open();
+                close_doc_region_if_open();
                 doc_id_ = parse_id_after_eq();
-                doc_start_ = builder_.corpus_size();
+                doc_region_start_ = builder_.corpus_size();
+                doc_region_attrs_.clear();
+                doc_region_attrs_.push_back({"id", doc_id_.empty() ? "_" : doc_id_});
                 has_doc_region_ = true;
+            } else if (starts_with("tuid") &&
+                       (sv.size() == 4 || sv[4] == ' ' || sv[4] == '=')) {
+                std::string t = parse_id_after_eq();
+                upsert_region_attr(sent_region_attrs_, "tuid", t);
+                pending_sent_tuid_ = t;
             } else if (starts_with("newpar id")) {
-                // Close previous paragraph if any
                 if (has_par_region_) {
                     CorpusPos end = builder_.corpus_size() > 0 ? builder_.corpus_size() - 1 : 0;
                     if (end >= par_start_)
@@ -97,16 +250,58 @@ void CorpusBuilder::read_conllu(const std::string& path) {
                 par_id_ = parse_id_after_eq();
                 par_start_ = builder_.corpus_size();
                 has_par_region_ = true;
+            } else {
+                // Generic: CQP-style region attrs (# text_genre = …), UD metadata, translations.
+                auto eqp = sv.find('=');
+                if (eqp != std::string_view::npos) {
+                    std::string key = trim_sv(sv.substr(0, eqp));
+                    std::string val = trim_sv(sv.substr(eqp + 1));
+                    if (key == "parallel_id") {
+                        // Parallel UD corpora: align sentences across treebanks → same s_tuid slot as tuid.
+                        upsert_region_attr(sent_region_attrs_, "tuid", val);
+                        pending_sent_tuid_ = val;
+                    } else if (key == "sent_id") {
+                        upsert_region_attr(sent_region_attrs_, "sent_id", val);
+                    } else if (key.size() >= 7 && key.compare(0, 5, "text_") == 0) {
+                        // UD-style translation lines: # text_en = …, # text_la = … → s_text_en, …
+                        upsert_region_attr(sent_region_attrs_, key, val);
+                    } else if (key != "tuid") {
+                        if (key == "text") {
+                            // # text = primary surface (sentence); not a structural attribute
+                        } else {
+                            size_t us = key.find('_');
+                            if (us != std::string::npos && us > 0 && us + 1 < key.size()) {
+                                std::string rname = key.substr(0, us);
+                                std::string attr = key.substr(us + 1);
+                                if (!attr.empty()) {
+                                    if (rname == "s") {
+                                        upsert_region_attr(sent_region_attrs_, attr, val);
+                                        if (attr == "tuid")
+                                            pending_sent_tuid_ = val;
+                                    } else if (rname == "text" && has_text_region_) {
+                                        upsert_region_attr(text_region_attrs_, attr, val);
+                                    } else {
+                                        for (auto it = conllu_region_stack_.rbegin(); it != conllu_region_stack_.rend(); ++it) {
+                                            if (it->type == rname) {
+                                                upsert_region_attr(it->attrs, attr, val);
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
             continue;
         }
 
-        // Fast tab-split: find the 10 CoNLL-U fields without allocating
-        // We need fields 0-7 (ID, FORM, LEMMA, UPOS, XPOS, FEATS, HEAD, DEPREL)
-        size_t tab[8];  // positions of first 8 tab characters
+        // Fast tab-split: CoNLL-U has 10 columns (ID … MISC); need 9 tabs for full row.
+        size_t tab[9];  // positions of the 9 tab characters
         size_t pos = 0;
         int found = 0;
-        while (found < 8 && pos < line.size()) {
+        while (found < 9 && pos < line.size()) {
             size_t t = line.find('\t', pos);
             if (t == std::string::npos) break;
             tab[found++] = t;
@@ -114,7 +309,7 @@ void CorpusBuilder::read_conllu(const std::string& path) {
         }
         if (found < 7) continue;  // malformed line
 
-        // Field boundaries: field[i] starts at (i==0 ? 0 : tab[i-1]+1), ends at tab[i]
+        // Field boundaries: field[i] starts at (i==0 ? 0 : tab[i-1]+1), ends at tab[i] or EOL
         auto field = [&](int i) -> std::string_view {
             size_t s = (i == 0) ? 0 : tab[i - 1] + 1;
             size_t e = (i < found) ? tab[i] : line.size();
@@ -137,6 +332,12 @@ void CorpusBuilder::read_conllu(const std::string& path) {
 
             parse_feats(std::string(field(5)), attrs);
 
+            if (!pending_sent_tuid_.empty())
+                attrs.emplace("tuid", pending_sent_tuid_);
+            // Word-level alignment (TEITOK-style): MISC column tuid=... overrides sentence default.
+            if (found >= 9)
+                parse_misc(std::string(field(9)), attrs);
+
             int head_id = 0;
             auto head_sv = field(6);
             for (char c : head_sv) {
@@ -151,7 +352,9 @@ void CorpusBuilder::read_conllu(const std::string& path) {
     }
 
     if (in_sentence_) {
-        builder_.end_sentence();
+        builder_.end_sentence(sent_region_attrs_);
+        sent_region_attrs_.clear();
+        pending_sent_tuid_.clear();
         in_sentence_ = false;
     }
     // Close any open paragraph/doc regions at end of file
@@ -162,12 +365,15 @@ void CorpusBuilder::read_conllu(const std::string& path) {
                                 std::vector<std::pair<std::string, std::string>>{{"id", par_id_}});
         has_par_region_ = false;
     }
-    if (has_doc_region_) {
+    close_text_region_if_open();
+    close_doc_region_if_open();
+    // Close any still-open generic CoNLL-U regions.
+    while (!conllu_region_stack_.empty()) {
+        OpenRegion r = std::move(conllu_region_stack_.back());
+        conllu_region_stack_.pop_back();
         CorpusPos end = builder_.corpus_size() > 0 ? builder_.corpus_size() - 1 : 0;
-        if (end >= doc_start_)
-            builder_.add_region("text", doc_start_, end,
-                                std::vector<std::pair<std::string, std::string>>{{"id", doc_id_}});
-        has_doc_region_ = false;
+        if (end >= r.start)
+            builder_.add_region(r.type, r.start, end, r.attrs);
     }
 }
 

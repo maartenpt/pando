@@ -35,6 +35,7 @@ endif()
 add_library(pando_core STATIC
     src/core/mmap_file.cpp
     src/index/lexicon.cpp
+    src/index/fold_map.cpp
     src/index/positional_attr.cpp
     src/index/structural_attr.cpp
     src/index/dependency_index.cpp
@@ -63,9 +64,6 @@ endif()
 add_executable(pando-index src/cli/index_main.cpp)
 target_link_libraries(pando-index PRIVATE pando_core)
 
-add_executable(pando src/cli/query_main.cpp)
-target_link_libraries(pando PRIVATE pando_core)
-
 add_executable(pando-check src/cli/check_main.cpp)
 target_link_libraries(pando-check PRIVATE pando_core)
 
@@ -73,9 +71,35 @@ add_executable(cwb-import src/cli/cwb_import_main.cpp)
 target_link_libraries(cwb-import PRIVATE pando_core)
 
 # API layer: query execution + JSON (used by CLI and server)
-add_library(pando_api STATIC src/api/query_json.cpp)
+add_library(pando_api STATIC src/api/query_json.cpp src/api/program_api.cpp)
 target_include_directories(pando_api PUBLIC src)
 target_link_libraries(pando_api PUBLIC pando_core)
+
+# Shared library: libpando.so / libpando.dylib (#43)
+# Packages pando_core + pando_api + C FFI wrapper for external consumers.
+# Enable with: cmake -DPANDO_BUILD_SHARED=ON ..
+option(PANDO_BUILD_SHARED "Build libpando shared library" OFF)
+
+# CLI executable
+add_executable(pando src/cli/query_main.cpp)
+target_link_libraries(pando PRIVATE pando_api)
+
+if(PANDO_BUILD_SHARED)
+    add_library(libpando SHARED src/api/pando_ffi.cpp)
+    set_target_properties(libpando PROPERTIES
+        OUTPUT_NAME "pando"           # produces libpando.so / libpando.dylib
+        VERSION ${PROJECT_VERSION}
+        SOVERSION 0
+        # Hide all symbols by default; only the C API is exported
+        C_VISIBILITY_PRESET hidden
+        CXX_VISIBILITY_PRESET hidden
+        VISIBILITY_INLINES_HIDDEN ON
+    )
+    target_link_libraries(libpando PRIVATE pando_api)
+    target_compile_definitions(libpando PRIVATE PANDO_BUILDING_SHARED)
+    install(TARGETS libpando LIBRARY DESTINATION lib)
+    install(FILES src/api/pando_ffi.h DESTINATION include)
+endif()
 
 # HTTP API server (optional: requires FetchContent to get cpp-httplib)
 add_executable(pando-server src/cli/server_main.cpp)

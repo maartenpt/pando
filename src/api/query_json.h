@@ -4,6 +4,7 @@
 #include "query/executor.h"
 #include <string>
 #include <vector>
+#include <memory>
 
 namespace manatree {
 
@@ -31,5 +32,49 @@ std::string to_query_result_json(const Corpus& corpus,
 
 // Build JSON string for corpus info (same format as pando --json with size on empty).
 std::string to_info_json(const Corpus& corpus);
+
+// Build JSON string listing unique values + counts for a positional or region attribute.
+// Returns empty string if attribute not found.
+std::string to_values_json(const Corpus& corpus, const std::string& attr_name, size_t limit = 0);
+
+// Build JSON string listing all regions of a given type with their attributes.
+// Returns empty string if structure type not found.
+std::string to_regions_json(const Corpus& corpus, const std::string& type_name, size_t limit = 0);
+
+// ── Full-program session API ──────────────────────────────────────────────
+// Run a complete CQL program (multiple statements + commands like count, coll, etc.)
+// and return the JSON output of the final command/query as a string.
+// Maintains session state (named queries, named tokens) across calls on the same
+// ProgramSession object, enabling cross-query workflows.
+
+struct ProgramSession {
+    struct Impl;
+    std::unique_ptr<Impl> impl_;
+    ProgramSession();
+    ~ProgramSession();
+    ProgramSession(ProgramSession&&) noexcept;
+    ProgramSession& operator=(ProgramSession&&) noexcept;
+};
+
+struct ProgramOptions {
+    size_t limit   = 20;
+    size_t offset  = 0;
+    size_t max_total = 0;
+    int context    = 5;
+    bool total     = false;
+    size_t group_limit = 1000;
+    std::vector<std::string> attrs;
+    // Collocation settings
+    int coll_left = 5;
+    int coll_right = 5;
+    size_t coll_min_freq = 5;
+    size_t coll_max_items = 50;
+    std::vector<std::string> coll_measures;
+};
+
+// Run a full CQL program and return the JSON output.
+// The session persists named queries across calls.
+std::string run_program_json(Corpus& corpus, ProgramSession& session,
+                             const std::string& cql, ProgramOptions opts = {});
 
 } // namespace manatree

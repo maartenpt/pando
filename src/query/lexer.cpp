@@ -26,6 +26,37 @@ Token Lexer::next() {
     size_t start = pos_;
     char c = input_[pos_];
 
+    // Region boundary hooks: <ident> or </ident>
+    // Must be checked before two-character and single-character tokens
+    // to avoid <ident> being parsed as LT + IDENT + GT.
+    if (c == '<') {
+        // Check for </ident> (region end)
+        if (pos_ + 1 < input_.size() && input_[pos_ + 1] == '/') {
+            size_t scan = pos_ + 2;
+            if (scan < input_.size() && (std::isalpha(input_[scan]) || input_[scan] == '_')) {
+                std::string name;
+                while (scan < input_.size() && (std::isalnum(input_[scan]) || input_[scan] == '_'))
+                    name += input_[scan++];
+                if (scan < input_.size() && input_[scan] == '>') {
+                    pos_ = scan + 1;
+                    return {TokType::REGION_END, name, start};
+                }
+            }
+        }
+        // Check for <ident ...> (region start, possibly with attrs) — but NOT <<, <=
+        if (pos_ + 1 < input_.size() && (std::isalpha(input_[pos_ + 1]) || input_[pos_ + 1] == '_')) {
+            // Scan everything between < and > as raw content
+            size_t scan = pos_ + 1;
+            while (scan < input_.size() && input_[scan] != '>')
+                ++scan;
+            if (scan < input_.size() && input_[scan] == '>') {
+                std::string content(input_.data() + pos_ + 1, scan - pos_ - 1);
+                pos_ = scan + 1;
+                return {TokType::REGION_START, content, start};
+            }
+        }
+    }
+
     // Two-character tokens
     if (pos_ + 1 < input_.size()) {
         char c2 = input_[pos_ + 1];
@@ -60,6 +91,7 @@ Token Lexer::next() {
         case '+': ++pos_; return {TokType::PLUS,     "+", start};
         case '*': ++pos_; return {TokType::STAR,     "*", start};
         case '?': ++pos_; return {TokType::QUESTION, "?", start};
+        case '%': ++pos_; return {TokType::PERCENT,  "%", start};
         default: break;
     }
 

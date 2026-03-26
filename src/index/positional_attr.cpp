@@ -94,7 +94,7 @@ std::vector<CorpusPos> PositionalAttr::positions_matching(
     LexiconId n = lexicon_.size();
     for (LexiconId id = 0; id < n; ++id) {
         std::string_view sv = lexicon_.get(id);
-        if (re2::RE2::FullMatch(sv, re)) {
+        if (re2::RE2::PartialMatch(sv, re)) {
             auto span = positions_of_id(id);
             result.insert(result.end(), span.begin(), span.end());
         }
@@ -110,7 +110,7 @@ std::vector<CorpusPos> PositionalAttr::positions_matching(
     for (LexiconId id = 0; id < n; ++id) {
         std::string_view sv = lexicon_.get(id);
         std::string s(sv);
-        if (std::regex_match(s, re)) {
+        if (std::regex_search(s, re)) {
             auto span = positions_of_id(id);
             result.insert(result.end(), span.begin(), span.end());
         }
