@@ -1,21 +1,19 @@
 # Pando Corpus Query Language
 
-The native query language of pando is called pando-CQL. These guidelines give a general introduction to pando-CQL (henceforth simply CQL), with example queries illustrated against the **sample corpus** shipped with this repository: `test/data/sample.conllu`.
+The native query language of pando is called pando-CQL, heavily modeled after [CWB-CQL](https://cwb.sourceforge.io/files/CQP_Manual/), with additions that are partially taken from [SketchEngine](https://www.sketchengine.eu/documentation/corpus-querying/), and partially from [PML-TQ](https://ufal.mff.cuni.cz/pmltqdoc/doc/pmltq_tutorial_web_client.html). These guidelines give a general introduction to pando-CQL (henceforth simply CQL when there is no confusion), with example queries illustrated against the **sample corpus** shipped with this repository: `test/data/sample.conllu`, which is annotated using [Universal Dependencies](https://universaldependencies.org/).
 See the documentation on how to install and use the sample corpus. 
 
 ## Token Queries
 
-The base query in CQL searches for a word, with optionally one or more restrictions. A token is represented with two square brackets, with the restrictions inside. So if we want to look for a word with the lemma "book", we express that in CQL as `[lemma="book"]`, which will find all examples of *book* and *books*, as a noun, but also *book*, *books*, *booked* and *booking* as as a verb.
+The base query in CQL searches for a token (a word or punctuation mark), with optionally one or more restrictions. A (query) token is represented with two square brackets, with any restrictions we want to place on the tokens we want to find inside the brackets. So if we want to look for a word with the lemma "book", we express that in CQL as `[lemma="book"]`, which will find all examples of *book* and *books*, as a noun, but also *book*, *books*, *booked* and *booking* as as a verb.
 
-In the sample corpus, English *book* examples live in the **book** genre (`text_genre="Book"`) and **English** (`text_lang="English"`). To narrow to that slice, combine region-style attributes with lemma: `[lemma="book" & text_genre="Book" & text_lang="English"]`.
+We can add multiple restrictions an a token, putting a **&** between the restrictions to say that all restrictions should be met (a **|** would instead match if any of the restrictions is met). So if we only want to find occurrences of the verbs *book*: `[lemma="book" & upos="VERB"]` will match only examples of *book*, *booking*, etc. as a verb. We can instead also look for either the lemma *book* or *cat*: `[lemma="book" | lemma="cat"]`.
 
-If we only want to find the verbs, we can add multiple restrictions an a token, putting a **&** between the restrictions to say that all restrictions should be met (a **|** would instead match if any of the restrictions is met). So: `[lemma="book" & upos="VERB" & text_genre="Book" & text_lang="English"]` will match only examples of *book*, *books*, etc. as a verb in that subcorpus.
-
-The original CQL is a purely sequence-based query language, in which we can look for sequences of tokens, by putting several tokens next to each other. So the query `a:[upos="DET"] [lemma="book"] :: a.text_genre = "Book" & a.text_lang = "English"` looks for any determiner in the corpus that is directly followed by the word (lemma) book, **within** English texts in the book genre, and will hence find examples like *the book*, *some books*, etc. there.
+CQL is a sequence-based query language, meaning we can look for sequences of tokens. This is done by putting several tokens in a row in our query. So if we want to only find occurrences of *book* that are preceded by a determiner, we express that as follows: `[upos="DET"] [lemma="book"]`.
 
 ## Token repetitions
 
-Since CQL is purely sequence based, the last query above will not find examples like *the green book*, which is why CQL introduces token repetitions operators, places directly after the closing bracket. For instance, `[]?` means any optional token. So the query `a:[upos="DET"] []? [lemma="book"] :: a.text_genre = "Book" & a.text_lang = "English"` will still find *the book*, but allows a single token in between the determiner and book, so *the green book*, *some interesting book*, etc. But it will also include probably unintented results like *some people book* (their hotel early).
+Since the original CQL is purely sequence based, the last query above will not find examples where there is anything between the determiner and the noun, like in *the green book*, which we probably intended to find. That is why CQL introduces token repetitions operators, that are placed directly after the closing bracket. For instance, `[]?` means any optional token (technically 0 or 1 occurrences of the token with in this case no restrictions). So the query `a:[upos="DET"] []? [lemma="book"]` will still find *the book*, but allows a single token in between the determiner and book, so *the green book*, *some interesting book*, etc. But it will also include probably unintented results like *some people book* (their hotel early). We could prevent that by tightening the query to only allow adjectives, and saying there can be multiple adjectives `a:[upos="DET"] [upos="ADJ"]* [lemma="book"]`, where the * stands for "0 or more". 
 
 There are four different repititions, depending on how many tokens are allowed or required:
 
@@ -28,9 +26,11 @@ There are four different repititions, depending on how many tokens are allowed o
 
 ## Dependency relations
 
-Our query `[upos="DET"] []* [lemma="book"]` was probably intended to look for any word *book* modified by a determiner, something that you cannot express in CWB/CQL. That is why pando-CQL introduces the option to look for dependency relations. With that, our query becomes `a:[upos="DET"] < [lemma="book"] :: a.text_genre = "Book" & a.text_lang = "English"`, which will find any determiner governed by the word *book*, so it will not longer find *some people book*, but it will find the determiner and the noun in *some ugly, and sometimes even very, very ugly, green books*. The relation can also be expressed the other way around: `[lemma="book"] > [upos="DET"] :: match.text_genre = "Book" & match.text_lang = "English"`. It will find any relation, so if we instead look for `[upos="ADJ"] < [lemma="book"] :: match.text_genre = "Book" & match.text_lang = "English"`, it will not only find *green book*, but also the same word in *The book that was on the table was green.*.
+Our query `[upos="DET"] []* [lemma="book"]` was probably intended to look for any word *book* modified by a determiner, something that you cannot really express in CWB/CQL, only approximate by expressing what exactly can occur between a determiner and a noun inside an NP. That is why pando-CQL introduces the option to look for dependency relations. Dependency relations are expressed by two query tokens with an operator in between: < or > depending on which is the head.
 
-Dependency and sequence relations can be combined, with the token being interpreted by the symbol between them, so `[upos="DET"] [upos="ADJ"] < [lemma="book"] :: match.text_genre = "Book" & match.text_lang = "English"` requires the adjective to be to the right of the determiner, as well as the adjective to be governed by the word *book*. And it is possible to negate dependencies: `[upos="DET"] !< [lemma="book"] :: match.text_genre = "Book" & match.text_lang = "English"` for occurrences of *book* without a determiner.
+With that, our query becomes `a:[upos="DET"] < [lemma="book"]`, which will find any determiner governed by the word *book*, so it will not longer find *some people book*. The relation can also be expressed the other way around: `[lemma="book"] > [upos="DET"]`. It will find any relation, so if we look for `[upos="ADJ"] < [lemma="book"]`, it will find any adjective that has a dependency relation to *book* in the corpus, so it will not only find *green book*, but also the same words in longer expressions like *some green and when it is raining also wet books*, or predicative uses as in *The book that was on the table was green.*. 
+
+Dependency and sequence relations can be combined, with the token being interpreted by the symbol between them, so `[upos="DET"] [upos="ADJ"] < [lemma="book"]` requires the adjective to be to the right of the determiner, as well as the adjective to be governed by the word *book*. And it is possible to negate dependencies: `[upos="DET"] !< [lemma="book"]` for occurrences of *book* without a determiner.
 
 Intead of using sequence notation, it is also possible to define dependency relations as token restriction, in a notation similar to that used in PML-TQ. In that case, to look for a noun modified by a determiner, we specify inside the token that we are looking for a child that is a determiner: `[upos="NOUN" & child [upos="DET"] ]`. This notation has the advantage that you can specify multiple children, and still have the option to furthermore look for words to the left or the right. And there are more option in the token-restriction notation: you can look not only for `child`, but also for `parent`, `ancestor`, `descendant`, or `sibling`.
 
@@ -38,15 +38,18 @@ Also for depenencies as token restrictions, we can use negations: `[upos="VERB" 
 
 ## Regions
 
-Like in CWB-CQL, we can also restrict our query by properties of the region it is in - the sentence, the text, the paragraph, etc. The notation for the attributes of regions is the name of the region, an underscore, and the name of the attribute, so the genre of the text is named `text_genre`, which can have values in the same way positions (token) attributes do. We can use those in a number of different ways:
+Corpora not only have tokens, but also *regions* that group several tokens into a unit like a sentence, a paragraph, a text, an utterance, etc. And like tokens, regions can have attributes, in CWB called *sattributes*. 
+
+We can restrict our query by properties of the region it is in. The notation for the attributes of regions is the name of the region, an underscore, and the name of the attribute, so the genre of the text is named `text_genre`, which can have values in the same way positions (token) attributes do. We can use those in a number of different ways:
 
 | example | type  | explanation |
 | ----- | -----  | ----- |
-| `[ text_genre="Book"]` | token-restriction | the token is in a given region+attribute |
+| `[ text_genre="Book" ]` | token-restriction | the token is in a given region+attribute |
 | `<text genre="Book"> []` | region-hook | look only for tokens directly following the start of a region+attribute (attribute is optional) |
-| `a:[] :: match.text_genre = "Book" & a.text_lang = "English"` | global condition | the named token lies in a text with those attributes |
+| `a:[] :: a.text_genre = "Book"` | global condition | the named token lies in a text with those attributes |
 | `[] within text_genre="Book"` | within restriction | the whole match has to appear inside a region+attribute (attribute is optional) |
 
+And of course, those can be combined in queries, so if we want to look for the lemma *cat* with an adjective, where *cat* has to appear in an English text, and the whole things has to be inside a text of genre *Book*, we can express that as `[lemma="cat" & text_lang="Book"] > [upos="ADJ"] within text_genre="Book"`. Since there are no texts within texts, the two restrictions in practice work in exactly the same way.
 
 ## Within and containing
 
@@ -58,44 +61,44 @@ Both within and containing can also be negated: `[] not within s`.
 
 ## Named tokens and aligned corpora
 
-You can give a name to the tokens in your query, so that you can then refer back to it: `a:[] b:[] :: a.form = b.form`. But in contrast to CWB-CQL, where the life-span of names is restricted to the query, names in pando-CQL are persistent, so that you can refer to them in subsequent grouping queries or other queries.
+You can give a name to the tokens in your query, so that you can then refer back to it: `a:[] b:[] :: a.form = b.form` will find all sequence of two identical words in a row like in *I knew that that book was yours*. In global conditions, names are required, since we always need to specify which token query we are applying the restriction to.
 
-The fact that names are persistnt also allows us to use named tokens to search through aligned corpora, if the alignment is done in the set-up used by TEITOK. That settings models alignment by having a shared attribute, in TEITOK that is `tuid` for *translation unit identifier*, although it can also be used to align version of a text in the same language. How that works is best explained with an example.
+In contrast to CWB-CQL, where the life-span of names is restricted to the query, names in pando-CQL are persistent, so that you can refer to them in subsequent grouping queries or other queries.
 
-If we have an aligned corpus English-Dutch, with a tuid on sentences, we can look for a word in our English text in the first query, say the word *property*. We do that by a regular token query, that we can then name `eng` for convenience: `eng:[lemma="property"] :: match.text_genre = "Book" & match.text_lang = "English"`. (The English demo document is in the book genre; the Dutch side is only `text_lang="Dutch"` with no book genre.) Then in a subsequent query, we can look for nouns in Dutch, but only in sentences that are translations of the English sentences we found, which we can find by making sure that the tuid attribute of the sentence that the `eng` token is in (`eng.s_tuid`) is the same as the tuid of the sentence we are using for the translation: `nld:[upos="NOUN"] :: match.text_lang = "Dutch" & eng.s_tuid = nld.s_tuid`. This way, we get the nouns in translation of the English sentences containing the word *property*.
+The fact that names are persistent allows us to use named tokens to search through aligned corpora, if the alignment is done in the set-up used by TEITOK. That settings models alignment by having a shared attribute, in TEITOK that is *tuid* for *translation unit identifier*, although it can also be used to align version of a text in the same language. How that works is best explained with an example.
 
-For **token-level** alignment (matching the Dutch word that translates a specific English word), the same `tuid` must appear on both tokens. In CoNLL-U, store that in the **MISC** column, e.g. `tuid=align-prop-01-w2` on both *property* and *eigendom* in the sample corpus, in addition to the sentence-level `# tuid` comment. You can filter the Dutch hits to the translation layer with `[text_lang="Dutch"]` or `:: match.text_lang = "Dutch"`.
+If we have an aligned corpus English-Dutch, with a tuid on sentences, we can look for a word in our English text in the first query, say the word *property*. We do that by a regular token query, that we can then name *eng* for convenience: `eng:[lemma="property"] :: eng.text_lang = "English"`. Then in a subsequent query, we can look for nouns in Dutch, but only in sentences that are translations of the English sentences we found, which we can find by making sure that the tuid attribute of the sentence that the `eng` token is in (`eng.s_tuid`) is the same as the tuid of the sentence we are using for the translation: `nld:[upos="NOUN"] :: match.text_lang = "Dutch" & eng.s_tuid = nld.s_tuid`. This way, we get the nouns in translation of the English sentences containing the word *property*.
+
+Corpora that are aligned with *tuid* there can be alignments on various levels at the same time, so for instance also at a paragraph (*p_tuid*), or a the token-level (*tuid*). So `nld:[] :: match.text_lang = "Dutch" & eng.tuid = nld.tuid` will directly give us the Dutch words that are used as translations of the English word *property*.
 
 ## Regular expressions
 
-To look for patterns in words, CQL allow regular expressions in token restrictions. In regular expressions, you can look for optional letters, repeated letters, etc. In pando-CQL, regular expressions use the format that is made popular by Python: `[form = /.*tion/]`. Contrary to CWB-CQL, regular expressions are used in their natural meaning, and not as "word-bound matches". So where in CWB, `[form = ".*tion"]` will match all and only words ending in *-tion*, in pando-CQL, `[form = /.*tion/]` will give exactly the same matches as `[form = /tion/]`, since the optional characters at the beginning do not have any effect in this particular query, and there is no requirement that the *tion* matches at the end of the word, only that it matches the word. To mimic the query behaviour of CWB, the query has to be explictly bound to the word boundaries: `[form = /^.*tion$/]`, which is more naturally expressed as `[form = /tion$/]`.
+To look for patterns inside words, CQL allows regular expressions in token restrictions. In regular expressions, you can look for optional letters, repeated letters, etc. In pando-CQL, regular expressions use the format that is made popular by Python: `[form = /pan.*tion/]`. Contrary to CWB-CQL, regular expressions are used directly, and not as "word-bound matches". So where in CWB, `[form = ".*tion"]` will match all and only words ending in *-tion*, in pando-CQL, `[form = /.*tion/]` will give an words that contain any number of characters followed by *tion*, so including *conditional*. It will have the exact same matches as `[form = /tion/]`, since the optional characters at the beginning do not have any effect in this particular query. To mimic the query behaviour of CWB, the query has to be explictly bound to the word boundaries: `[form = /^.*tion$/]`, which is more naturally expressed as `[form = /tion$/]`.
 
 
 ## Matching strategy flags
 
-It is often desirable to look for words case or diacritics insensitively. In CQL, that is done by putting a flag after the condition: `[ form = "the" %c ] :: match.text_genre = "book" & match.text_lang = "English"` will match both *the* and *The* in that subcorpus, and `[ form = "een" %d ] :: match.text_lang = "Dutch"` will match both *een* and *één* in the Dutch document. 
+It is often desirable to look for words case or diacritics insensitively. In CQL, that is done by putting a flag after the condition: `[ form = "the" %c ]` will match both *the* and *The*, and `[ form = "een" %d ] :: match.text_lang = "Dutch"` will match both *een* and *één* in Dutch texts. 
 
-The case flags only work on literal comparisons, not on regular expressions, to get a case-sensitive regular expression, you have to use regular expression flags like `/(?i)^hello/` to search for hello case-insensitive at the beginning of the word.
+The case flags only work on literal comparisons, not on regular expressions, to get a case-sensitive regular expression, you have to use regular expression flags like `/(?i)^hello/` to search for *hello* case-insensitively at the beginning of the word.
 
 ## Named queries and frequencies
 
-Like in CWB, you can name queries, so that you can later refer back to them in results:  `Matches = a:[lemma="book" & text_genre="Book" & text_lang="English"]`. In fact, pando always names each query, where if no explicit name is provided, the query will be implicitly called `Last`.
+Like in CWB, you can name queries, so that you can later refer back to them in results:  `Matches = a:[lemma="book" & text_genre="Book"]`. In fact, pando always names each query, where if no explicit name is provided, the query will be implicitly called `Last`.
 
-After a query has been executed, frequency results can be obtained from it, in which the name of the query, and the name(s) of the query tokens can be used: `Matches = a:[lemma="book" & text_genre="Book" & text_lang="English"]; count Matches by a.form;` will look for all occurences of the lemma *book*, store it as *Matches* and then provide the frequency of each form in which it is used in corpus. Counting can be done by more than one attribute: `count Matches by a.form, a.text_century` will give an overview of which form of *book* was used in which frequency in each century - and not only that, but if one of the attributes used in the grouping is not a token attribute but a region attribute, the system will futhermore return the *relative frequency*, that is to say in the example, how frequent each form is in each century, relative to the total number of tokens for that century.
-
-By using named frequencies relations, we can count English hits with `Matches = a:[lemma="property" & text_genre="Book" & text_lang="English"]; count Matches by a.form`. For the Dutch translation in the sample, the aligned lemma shares the same word-level `tuid` (see **MISC**): `b:[lemma="eigendom" & text_lang="Dutch" & tuid="align-prop-01-w2"]`. Joining those with `b.tuid=a.tuid` in a parallel query is the usual way to tabulate translation pairs.
+After a query has been executed, frequency results can be obtained from it, in which the name of the query, and the name(s) of the query tokens can be used: `Matches = a:[lemma="book" & text_genre="Book"]; count Matches by a.form;` will look for all occurences of the lemma *book*, store it as *Matches* and then provide the frequency of each form in which it is used in corpus. Counting can be done by more than one attribute: `count Matches by a.form, a.text_century` will give an overview of which form of *book* was used in which frequency in each century - and not only that, but if one of the attributes used in the grouping is not a token attribute but a region attribute, the system will futhermore return the *relative frequency*, that is to say in the example, how frequent each form is in each century, relative to the total number of tokens for that century.
 
 ## Corpus position 
 
-It is possible to use comparisons between the corpus positions of tokens to ensure that one is after the other - for sequential searches that is not that relevant, but we can look for all modifying adjectives (in Spanish or French, where both occur) that appear before a noun, by making comparing their positions: `a:[upos="NOUN" & text_lang="French"] > b:[upos="ADJ"] :: a > b` (pre-nominal adjective in the French sentence in the sample). For Spanish, noun-before-adjective order is illustrated in the same corpus with `match.text_lang = "Spanish"` and a different dependency pattern.
+It is possible to use comparisons between the corpus positions of tokens to ensure that one is after the other - for sequential searches that is not that relevant, but we can look for all modifying adjectives (in Spanish or French, where both occur) that appear before a noun, by making comparing their positions: `a:[upos="NOUN" & text_lang="French"] > b:[upos="ADJ"] :: a > b` (pre-nominal adjective in the French sentence in the sample).
 
 ## Controlling the output
 
 By default, if no futher queries are provided, pando will return results as keywords-in-context (KWIC), that is to say, the matches in the middle, with some words to the left and some words to the right of the result, which can also be explicitly triggered with the command `cat Matches`, where *Matches* is the name of the query.  
 
-To get more control over the output, we can also explicitly choose what should appear in the output: `tabulate Matches a.form, a.lemma, a.upos, a.text_century, a.text_lang`
+To get more control over the output, we can also explicitly choose what should appear in the output: `tabulate Matches a.form, a.lemma, a.upos, a.text_genre, a.text_lang`
 
-will give a table with those columns for query token *a* in a query named *Matches*, including the **text** region’s language and century when exposed as `text_lang` / `text_century` on tokens.
+will give a table with those columns for query token *a* in a query named *Matches*: the form, lemma, and upos of the token, and the genre and the language of the text it is in.
 
 ## Collocations
 
@@ -115,7 +118,7 @@ Keyness identifies words that are statistically overrepresented in a subcorpus c
 
 For example, to find keywords in the French subcorpus compared to the rest of the corpus: `[text_lang="French"]; keyness by lemma`. Without an explicit reference, the comparison is against the complement — all corpus positions not in the target query.
 
-To compare two specific subcorpora, use the `vs` keyword: `Fr = [text_lang="French"]; En = [text_lang="English"]; keyness Fr vs En by upos`. This would show which parts of speech are statistically more common in French than in English — e.g. French might show overuse of `DET` (more articles) while English might show more `PART` (infinitival *to*).
+To compare two specific subcorpora, use the `vs` keyword: `Fr = [text_lang="French"]; En = [text_lang="English"]; keyness Fr vs En by upos`. This would show which parts of speech are statistically more common in French than in English — e.g. French might show overuse of `DET` (more articles) while English might show more `PART` (infinitival *to*). A more typical use would be to look for lemmas that are more frequent in one text genre versus another.
 
 Like collocations, the keyness measure (log-likelihood, log-ratio, chi-squared, etc.) and output settings are controlled via command-line flags.
 
