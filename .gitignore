@@ -1,5 +1,10 @@
 ## Build artifacts
 /build/
+# Multiple out-of-tree CMake build directories (e.g. build-pmltq2/)
+build-*/
+
+## Cursor / local IDE state
+.cursor/
 /CMakeFiles/
 /CMakeCache.txt
 /cmake_install.cmake

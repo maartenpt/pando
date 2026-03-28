@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
 project(pando VERSION 0.1.0 LANGUAGES CXX)
 
+include(CTest)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_OSX_DEPLOYMENT_TARGET "14.0" CACHE STRING "Minimum macOS version")
@@ -19,6 +21,13 @@ FetchContent_MakeAvailable(httplib)
 # Requires: libre2-dev (apt) or re2 (brew)
 option(PANDO_USE_RE2 "Use Google RE2 instead of std::regex" OFF)
 
+# CWB/CQP dialect: optional static library (GPL-2+ if derived from IMS CWB sources). Can be
+# disabled for minimal builds or shipped separately; see dev/CQL-DIALECT-LICENSING.md.
+option(PANDO_CWB_DIALECT "Build CWB/CQP lexer, parser, and translate_cwb_program" ON)
+
+# PML-TQ dialect: lexer/parser scaffold + translate_pmltq_program (see dev/PMLTQ-ROADMAP.md).
+option(PANDO_PMLTQ_DIALECT "Build PML-TQ lexer, parser stub, and translate_pmltq_program" ON)
+
 if(PANDO_USE_RE2)
     find_package(re2 QUIET)
     if(NOT re2_FOUND)
@@ -31,6 +40,45 @@ if(PANDO_USE_RE2)
         endif()
     endif()
 endif()
+
+if(PANDO_CWB_DIALECT)
+    add_library(pando_cwb_dialect STATIC
+        src/query/dialect/cwb/cwb_translate.cpp
+        src/query/dialect/cwb/cwb_lexer.cpp
+        src/query/dialect/cwb/cwb_parser.cpp
+    )
+else()
+    add_library(pando_cwb_dialect STATIC
+        src/query/dialect/cwb/cwb_translate_stub.cpp
+    )
+endif()
+target_include_directories(pando_cwb_dialect PUBLIC src)
+
+# Default path to interim PEG bridge script (dev/pmltq-gold/parse_ast_sql.js); override with PMLTQ_GOLD_SCRIPT at runtime.
+set(PMLTQ_GOLD_SCRIPT_PATH "${CMAKE_SOURCE_DIR}/dev/pmltq-gold/parse_ast_sql.js")
+configure_file(
+    "${CMAKE_SOURCE_DIR}/cmake/pmltq_gold_paths.cpp.in"
+    "${CMAKE_BINARY_DIR}/pmltq_gold_paths.cpp"
+    @ONLY)
+
+if(PANDO_PMLTQ_DIALECT)
+    add_library(pando_pmltq_dialect STATIC
+        "${CMAKE_BINARY_DIR}/pmltq_gold_paths.cpp"
+        src/query/dialect/pmltq/pmltq_lexer.cpp
+        src/query/dialect/pmltq/pmltq_parser.cpp
+        src/query/dialect/pmltq/pmltq_test_lower.cpp
+        src/query/dialect/pmltq/pmltq_native_lower.cpp
+        src/query/dialect/pmltq/pmltq_gold_json.cpp
+        src/query/dialect/pmltq/pmltq_gold_bridge.cpp
+        src/query/dialect/pmltq/pmltq_gold_lower.cpp
+        src/query/dialect/pmltq/pmltq_translate.cpp
+    )
+else()
+    add_library(pando_pmltq_dialect STATIC
+        src/query/dialect/pmltq/pmltq_translate_stub.cpp
+    )
+endif()
+target_include_directories(pando_pmltq_dialect PUBLIC src)
 
 add_library(pando_core STATIC
     src/core/mmap_file.cpp
@@ -48,6 +96,7 @@ add_library(pando_core STATIC
     src/api/index_api.cpp
 )
 target_include_directories(pando_core PUBLIC src)
+target_link_libraries(pando_core PUBLIC pando_cwb_dialect pando_pmltq_dialect)
 
 if(PANDO_USE_RE2)
     target_compile_definitions(pando_core PUBLIC PANDO_USE_RE2)
@@ -83,6 +132,28 @@ option(PANDO_BUILD_SHARED "Build libpando shared library" OFF)
 # CLI executable
 add_executable(pando src/cli/query_main.cpp)
 target_link_libraries(pando PRIVATE pando_api)
+if(PANDO_CWB_DIALECT)
+    target_compile_definitions(pando PRIVATE PANDO_WITH_CWB_DIALECT=1)
+endif()
+
+if(BUILD_TESTING AND PANDO_CWB_DIALECT)
+    add_executable(cwb_dialect_test src/query/dialect/cwb/cwb_dialect_test.cpp)
+    target_link_libraries(cwb_dialect_test PRIVATE pando_core)
+    add_test(NAME cwb_dialect COMMAND cwb_dialect_test)
+endif()
+
+if(BUILD_TESTING AND PANDO_PMLTQ_DIALECT)
+    add_executable(pmltq_dialect_test src/query/dialect/pmltq/pmltq_dialect_test.cpp)
+    target_link_libraries(pmltq_dialect_test PRIVATE pando_pmltq_dialect)
+    add_test(NAME pmltq_dialect COMMAND pmltq_dialect_test)
+endif()
+
+install(TARGETS pando_cwb_dialect
+    ARCHIVE DESTINATION lib
+    COMPONENT cwb_dialect)
+install(TARGETS pando_pmltq_dialect
+    ARCHIVE DESTINATION lib
+    COMPONENT pmltq_dialect)
 
 if(PANDO_BUILD_SHARED)
     add_library(libpando SHARED src/api/pando_ffi.cpp)

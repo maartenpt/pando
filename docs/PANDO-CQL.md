@@ -1,7 +1,7 @@
 # Pando Corpus Query Language
 
 The native query language of pando is called pando-CQL, heavily modeled after [CWB-CQL](https://cwb.sourceforge.io/files/CQP_Manual/), with additions that are partially taken from [SketchEngine](https://www.sketchengine.eu/documentation/corpus-querying/), and partially from [PML-TQ](https://ufal.mff.cuni.cz/pmltqdoc/doc/pmltq_tutorial_web_client.html). These guidelines give a general introduction to pando-CQL (henceforth simply CQL when there is no confusion), with example queries illustrated against the **sample corpus** shipped with this repository: `test/data/sample.conllu`, which is annotated using [Universal Dependencies](https://universaldependencies.org/).
-See the documentation on how to install and use the sample corpus. 
+See [SAMPLE-CORPUS.md](SAMPLE-CORPUS.md) for how to build an index from `test/data/sample.conllu` and run queries locally. 
 
 ## Token Queries
 
@@ -35,6 +35,11 @@ Dependency and sequence relations can be combined, with the token being interpre
 Intead of using sequence notation, it is also possible to define dependency relations as token restriction, in a notation similar to that used in PML-TQ. In that case, to look for a noun modified by a determiner, we specify inside the token that we are looking for a child that is a determiner: `[upos="NOUN" & child [upos="DET"] ]`. This notation has the advantage that you can specify multiple children, and still have the option to furthermore look for words to the left or the right. And there are more option in the token-restriction notation: you can look not only for `child`, but also for `parent`, `ancestor`, `descendant`, or `sibling`.
 
 Also for depenencies as token restrictions, we can use negations: `[upos="VERB" & not child [deprel="nsubj"]]` to look for any verbs without a nominal subject. 
+
+## Zero-width and overlapping regions
+
+Pando explicitly allows for zero-width regions: regions that have no tokens inside. Those are helpful in for instance spoken corpora, where pauses are often very relevant, but are between tokens, not tokens themselves. By treating pauses as zero-width regions, we can use them in corpus queries, so `[form="the" ] <pause>` will look for the word *the* followed by the beginning (as well as the end) of a pause "region".
+
 
 ## Regions
 

@@ -1,0 +1,15 @@
+{
+  "_comment": "Optional manifest for build_ud_corpus.py --manifest. All keys in overrides must start with text_.",
+  "overrides_by_folder": {
+    "UD_Some-EdgeCase": {
+      "text_langcode": "qaa",
+      "text_treebank": "x"
+    }
+  },
+  "overrides_by_basename": {
+    "weird-file.conllu": {
+      "text_langcode": "en",
+      "text_treebank": "ewt"
+    }
+  }
+}

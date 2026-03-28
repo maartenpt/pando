@@ -1,0 +1,17 @@
+#pragma once
+
+#include "query/ast.h"
+#include <string>
+
+namespace manatree {
+
+// Translate a CWB/CQP-style query subset into native pando Program.
+// When trace_out is non-null and debug_level > 0, append a human-readable
+// interpretation (literal vs regex per pattern, resulting structure).
+//
+// Throws std::runtime_error with a clear message for unsupported constructs
+// (e.g. merge, unclosed bracket).
+Program translate_cwb_program(const std::string& input, int debug_level,
+                              std::string* trace_out);
+
+} // namespace manatree

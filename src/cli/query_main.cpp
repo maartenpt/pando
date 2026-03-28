@@ -2,6 +2,9 @@
 #include "core/json_utils.h"
 #include "query/ast.h"
 #include "query/parser.h"
+#include "query/dialect/cwb/cwb_translate.h"
+#include "query/dialect/pmltq/pmltq_translate.h"
+#include <cctype>
 #include "query/executor.h"
 #include <iostream>
 #include <string>
@@ -15,6 +18,7 @@
 #include <unistd.h>  // isatty
 #include <cmath>
 #include <unordered_map>
+#include <unordered_set>
 #include <set>
 
 using namespace manatree;
@@ -31,6 +35,7 @@ static bool use_color() {
 struct Options {
     std::string corpus_dir;
     std::string query;
+    std::string cql_dialect = "native";  // native | cwb | pmltq
     bool json    = false;
     // Debug verbosity: 0 = off, 1 = basic (plan, timing), 2+ = more detail in future
     int  debug_level = 0;
@@ -52,6 +57,10 @@ struct Options {
     size_t group_limit = 1000;
     // API mode: like --json but with cleaner, single-object responses for programmatic use
     bool api = false;
+    // PML-TQ: emit ClickPMLTQ reference SQL (for DB-backed data); do not open corpus or run search
+    bool pmltq_export_sql = false;
+    // Text hits: emit full sentence CoNLL-U (requires sentence structure `s` in the index)
+    bool conllu = false;
     // Collocation settings (--window, --left, --right, --min-freq, --measures, --max-items)
     int coll_left = 5;
     int coll_right = 5;
@@ -294,6 +303,132 @@ static std::string build_match_span(const Corpus& corpus, const Match& m,
     return text;
 }
 
+static std::string conllu_esc_field(std::string_view s) {
+    std::string r(s);
+    for (char& c : r) {
+        if (c == '\t' || c == '\n' || c == '\r')
+            c = ' ';
+    }
+    return r;
+}
+
+static std::string conllu_cell(const Corpus& corpus, const char* attr, CorpusPos p) {
+    if (!corpus.has_attr(attr))
+        return "_";
+    std::string_view v = corpus.attr(attr).value_at(p);
+    if (v.empty() || v == "_")
+        return "_";
+    return conllu_esc_field(v);
+}
+
+static void emit_conllu(const Corpus& corpus, const MatchSet& ms, const Options& opts) {
+    if (!corpus.has_structure("s")) {
+        std::cerr << "Error: --conllu requires sentence structure 's' (build from CoNLL-U / UD index).\n";
+        return;
+    }
+    const StructuralAttr& sent = corpus.structure("s");
+    const bool has_deps = corpus.has_deps();
+
+    size_t stored = ms.matches.size();
+    size_t start = std::min(opts.offset, stored);
+    size_t end = std::min(start + opts.limit, stored);
+    std::unordered_set<size_t> seen_sent;
+
+    if (opts.debug_level > 0) {
+        std::cerr << "Plan: seed=token[" << ms.seed_token << "]";
+        for (size_t i = 0; i < ms.cardinalities.size(); ++i)
+            std::cerr << (i == 0 ? " cardinalities=[" : ", ") << ms.cardinalities[i];
+        if (!ms.cardinalities.empty())
+            std::cerr << "]";
+        std::cerr << "\n";
+    }
+
+    for (size_t i = start; i < end; ++i) {
+        const auto& m = ms.matches[i];
+        CorpusPos fp = m.first_pos();
+        int64_t ri = sent.find_region(fp);
+        if (ri < 0) {
+            std::cerr << "Warning: match at position " << fp
+                      << " not inside any sentence region; skipping\n";
+            continue;
+        }
+        size_t riu = static_cast<size_t>(ri);
+        if (!seen_sent.insert(riu).second)
+            continue;
+
+        Region rgn = sent.get(riu);
+
+        if (sent.has_region_attr("sent_id")) {
+            std::string_view sid = sent.region_value("sent_id", riu);
+            if (!sid.empty())
+                std::cout << "# sent_id = " << sid << "\n";
+        }
+        if (corpus.has_attr("form")) {
+            std::string text_line;
+            for (CorpusPos p = rgn.start; p <= rgn.end; ++p) {
+                if (!text_line.empty())
+                    text_line += ' ';
+                text_line += conllu_esc_field(corpus.attr("form").value_at(p));
+            }
+            if (!text_line.empty())
+                std::cout << "# text = " << text_line << "\n";
+        }
+
+        std::vector<CorpusPos> matched = m.matched_positions();
+        std::cout << "# pando_match_tokens =";
+        bool first_m = true;
+        for (CorpusPos p : matched) {
+            if (p < rgn.start || p > rgn.end)
+                continue;
+            if (!first_m)
+                std::cout << ',';
+            first_m = false;
+            std::cout << (p - rgn.start + 1);
+        }
+        std::cout << "\n";
+
+        for (CorpusPos p = rgn.start; p <= rgn.end; ++p) {
+            int tid = static_cast<int>(p - rgn.start + 1);
+            std::string form = conllu_cell(corpus, "form", p);
+            std::string lemma = conllu_cell(corpus, "lemma", p);
+            std::string upos = conllu_cell(corpus, "upos", p);
+            std::string xpos = conllu_cell(corpus, "xpos", p);
+            std::string feats = conllu_cell(corpus, "feats", p);
+
+            std::string head_col;
+            std::string deprel = "_";
+            if (has_deps) {
+                CorpusPos h = corpus.deps().head(p);
+                if (h == NO_HEAD)
+                    head_col = "0";
+                else
+                    head_col = std::to_string(static_cast<int>(h - rgn.start + 1));
+                deprel = conllu_cell(corpus, "deprel", p);
+            } else {
+                head_col = "_";
+            }
+
+            std::string misc = "_";
+            if (corpus.has_attr("tuid")) {
+                std::string_view tv = corpus.attr("tuid").value_at(p);
+                if (!tv.empty())
+                    misc = conllu_esc_field(tv);
+            }
+
+            std::cout << tid << '\t' << form << '\t' << lemma << '\t' << upos << '\t' << xpos << '\t'
+                      << feats << '\t' << head_col << '\t' << deprel << "\t_\t" << misc << "\n";
+        }
+        std::cout << "\n";
+    }
+
+    if (end < stored) {
+        if (ms.total_exact)
+            std::cout << "# (" << ms.total_count << " matches, " << (ms.total_count - end) << " more)\n";
+        else
+            std::cout << "# (" << ms.total_count << "+ matches, use --total for exact count)\n";
+    }
+}
+
 static void emit_kwic(const Corpus& corpus, const std::string& query_text,
                       const MatchSet& ms, const Options& opts,
                       double elapsed_ms) {
@@ -350,6 +485,21 @@ static void emit_kwic(const Corpus& corpus, const std::string& query_text,
         else
             std::cout << "(" << ms.total_count << "+ matches, use --total for exact count)\n";
     }
+}
+
+static void emit_hits_text(const Corpus& corpus, const std::string& query_text,
+                           const MatchSet& ms, const Options& opts, double elapsed_ms) {
+    if (opts.conllu) {
+        if (!ms.parallel_matches.empty()) {
+            std::cerr << "CoNLL-U output is not supported for parallel (Source | Target) queries; "
+                         "using KWIC.\n";
+            emit_kwic(corpus, query_text, ms, opts, elapsed_ms);
+            return;
+        }
+        emit_conllu(corpus, ms, opts);
+        return;
+    }
+    emit_kwic(corpus, query_text, ms, opts, elapsed_ms);
 }
 
 // ── Command handling ────────────────────────────────────────────────────
@@ -545,7 +695,7 @@ static void emit_sort(const Corpus& corpus, MatchSet& ms,
                   return make_key(corpus, a, name_map, cmd.fields) < make_key(corpus, b, name_map, cmd.fields);
               });
 
-    emit_kwic(corpus, "(sorted)", ms, opts, 0);
+    emit_hits_text(corpus, "(sorted)", ms, opts, 0);
 }
 
 static void emit_size(const MatchSet& ms, const Options& opts) {
@@ -1179,8 +1329,30 @@ struct Session {
 
 static void run_query(const Corpus& corpus, const std::string& input,
                       Options& opts, Session& session, QueryTiming* out_timing = nullptr) {
-    Parser parser(input);
-    Program prog = parser.parse();
+    Program prog;
+    std::string d = opts.cql_dialect;
+    for (char& c : d)
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    if (d.empty())
+        d = "native";
+    if (d == "native") {
+        Parser parser(input);
+        prog = parser.parse();
+    } else if (d == "cwb") {
+        std::string cwb_trace;
+        prog = translate_cwb_program(input, opts.debug_level,
+                                       opts.debug_level > 0 ? &cwb_trace : nullptr);
+        if (opts.debug_level > 0 && !cwb_trace.empty())
+            std::cerr << cwb_trace;
+    } else if (d == "pmltq") {
+        std::string pmltq_trace;
+        prog = translate_pmltq_program(input, opts.debug_level,
+                                       opts.debug_level > 0 ? &pmltq_trace : nullptr);
+        if (opts.debug_level > 0 && !pmltq_trace.empty())
+            std::cerr << pmltq_trace;
+    } else {
+        throw std::runtime_error("Unknown --cql dialect: " + opts.cql_dialect);
+    }
 
     // Apply --max-gap: clamp unbounded repetition to user-configured cap
     if (opts.max_gap != REPEAT_UNBOUNDED) {
@@ -1256,14 +1428,14 @@ static void run_query(const Corpus& corpus, const std::string& input,
                     if (opts.json)
                         emit_json(corpus, input, session.last_ms, opts, query_ms);
                     else
-                        emit_kwic(corpus, input, session.last_ms, opts, query_ms);
+                        emit_hits_text(corpus, input, session.last_ms, opts, query_ms);
                     auto t3 = std::chrono::high_resolution_clock::now();
                     out_timing->fetch_sec = std::chrono::duration<double, std::milli>(t3 - t2).count() / 1000.0;
                 } else {
                     if (opts.json)
                         emit_json(corpus, input, session.last_ms, opts, query_ms);
                     else
-                        emit_kwic(corpus, input, session.last_ms, opts, query_ms);
+                        emit_hits_text(corpus, input, session.last_ms, opts, query_ms);
                 }
             }
         }
@@ -1802,7 +1974,34 @@ static Options parse_args(int argc, char* argv[]) {
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         if (arg == "--json")        { opts.json = true; }
+        else if (arg == "--conllu") { opts.conllu = true; }
         else if (arg == "--api")    { opts.api = true; opts.json = true; }
+        else if (arg == "--format" && i + 1 < argc) {
+            std::string f = argv[++i];
+            for (char& c : f)
+                c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+            if (f == "conllu")
+                opts.conllu = true;
+            else if (f == "json")
+                opts.json = true;
+            else {
+                std::cerr << "Unknown --format value: " << f << " (expected json or conllu)\n";
+                std::exit(1);
+            }
+        }
+        else if (arg.rfind("--format=", 0) == 0) {
+            std::string f = arg.substr(9);
+            for (char& c : f)
+                c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+            if (f == "conllu")
+                opts.conllu = true;
+            else if (f == "json")
+                opts.json = true;
+            else {
+                std::cerr << "Unknown --format value: " << f << " (expected json or conllu)\n";
+                std::exit(1);
+            }
+        }
         // --debug  (optional level), e.g. --debug, --debug 2, or --debug=2
         else if (arg == "--debug")  {
             // bare --debug → level 1 (unless already higher)
@@ -1834,7 +2033,13 @@ static Options parse_args(int argc, char* argv[]) {
         else if (arg == "--sample" && i + 1 < argc) { opts.sample = std::stoul(argv[++i]); }
         else if (arg == "--seed" && i + 1 < argc)  { opts.sample_seed = static_cast<uint32_t>(std::stoul(argv[++i])); }
         else if (arg == "--threads" && i + 1 < argc) { opts.threads = static_cast<unsigned>(std::stoul(argv[++i])); }
-        else if (arg == "--preload") { opts.preload = true; }
+        else if (arg == "--cql" && i + 1 < argc) {
+            opts.cql_dialect = argv[++i];
+        }
+        else if (arg == "--pmltq-export-sql") {
+            opts.pmltq_export_sql = true;
+        }
+                else if (arg == "--preload") { opts.preload = true; }
         else if (arg == "--max-gap" && i + 1 < argc) { opts.max_gap = std::stoi(argv[++i]); }
         else if (arg == "--window" && i + 1 < argc) {
             int w = std::stoi(argv[++i]);
@@ -1879,10 +2084,22 @@ static Options parse_args(int argc, char* argv[]) {
 
     if (positional.empty()) {
         std::cerr << "Usage: pando [options] <corpus_dir> [query]\n\n"
+                  << "If [query] is omitted, CQL is read from stdin. With a terminal (stdin is a TTY), "
+                     "an interactive REPL runs with a pando> prompt; with a pipe, queries are read "
+                     "line by line with no prompt.\n\n"
                   << "Options:\n"
                   << "  --json           Output as JSON (human-/tool-friendly)\n"
+                  << "  --conllu         Text hits: full sentence per match as CoNLL-U (needs sentence structure s)\n"
+                  << "  --format json|conllu  Same as --json / --conllu\n"
                   << "  --api            API mode: JSON only, single-object responses\n"
                   << "  --debug[=N]      Include debug info (plan, timing, cardinalities); N>=1 for verbosity\n"
+#if defined(PANDO_WITH_CWB_DIALECT)
+                  << "  --cql native|cwb|pmltq  Query language front-end (default: native; cwb=CWB/CQP, pmltq=PML-TQ)\n"
+#else
+                  << "  --cql native|pmltq  Query language front-end (default: native; pmltq=PML-TQ; cwb: -DPANDO_CWB_DIALECT=ON)\n"
+#endif
+                  << "  --pmltq-export-sql  With --cql pmltq: print ClickPMLTQ SQL only (needs PMLTQ_GOLD_JS_DIR + "
+                     "pmltq2sql-optimized.js); skips corpus load; use corpus path '-' or any placeholder\n"
                   << "  --total          Compute exact total match count even with --limit\n"
                   << "  --max-total N    Cap total count at N when using --total (fast UI total)\n"
                   << "  --limit N        Max hits to return (default: 20)\n"
@@ -1922,6 +2139,40 @@ static Options parse_args(int argc, char* argv[]) {
 
 int main(int argc, char* argv[]) {
     Options opts = parse_args(argc, argv);
+
+    if (opts.json && opts.conllu) {
+        std::cerr << "Error: --json and --conllu are mutually exclusive.\n";
+        return 1;
+    }
+
+    if (opts.pmltq_export_sql) {
+        std::string d = opts.cql_dialect;
+        for (char& c : d)
+            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        if (d != "pmltq") {
+            std::cerr << "Error: --pmltq-export-sql requires --cql pmltq\n";
+            return 1;
+        }
+        if (opts.interactive || opts.query.empty()) {
+            std::cerr << "Error: --pmltq-export-sql requires a query on the command line\n";
+            return 1;
+        }
+        std::string sql;
+        std::string err;
+        if (!translate_pmltq_export_click_sql(opts.query, &sql, &err)) {
+            if (opts.json || opts.api)
+                std::cout << "{\"ok\": false, \"error\": {\"stage\": \"pmltq_sql\", \"message\": "
+                          << jstr(err) << "}}\n";
+            else
+                std::cerr << "PML-TQ SQL export: " << err << "\n";
+            return 1;
+        }
+        if (opts.json || opts.api)
+            std::cout << "{\"ok\": true, \"sql\": " << jstr(sql) << "}\n";
+        else
+            std::cout << sql << "\n";
+        return 0;
+    }
 
     QueryTiming timing;
     if (opts.timing)
@@ -1967,8 +2218,12 @@ int main(int argc, char* argv[]) {
             return 1;
         }
     } else {
+        // Print REPL prompts only when stdin is a TTY. For pipes (echo query | pando .)
+        // prompts add noise and a trailing prompt after EOF.
         std::string line;
-        std::cout << "manatree> " << std::flush;
+        const bool stdin_tty = isatty(STDIN_FILENO);
+        if (stdin_tty && !opts.json && !opts.api)
+            std::cout << "pando> " << std::flush;
         while (std::getline(std::cin, line)) {
             if (line.empty() || line == "quit" || line == "exit") break;
             try {
@@ -1981,7 +2236,8 @@ int main(int argc, char* argv[]) {
                     std::cerr << "Error: " << e.what() << "\n";
                 }
             }
-            if (!opts.json && !opts.api) std::cout << "manatree> " << std::flush;
+            if (stdin_tty && !opts.json && !opts.api)
+                std::cout << "pando> " << std::flush;
         }
     }
 

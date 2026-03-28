@@ -48,6 +48,8 @@ Exact binary names and options may evolve; run each with `--help` for the curren
 
 ## Running a simple query
 
+To index and query the bundled UD sample (`test/data/sample.conllu`) on your machine, see [`docs/SAMPLE-CORPUS.md`](docs/SAMPLE-CORPUS.md).
+
 Assuming you already have a Pando-formatted corpus at `/path/to/corpus` and have built the project:
 
 ```bash
@@ -85,6 +87,8 @@ Useful design and integration notes live in `dev/`:
 - `dev/PANDO-INDEX-INTEGRATION.md` – how Pando’s index layout integrates with other tools.
 - `dev/PANDO-SEGMENTS.md` – segment-level structure and design.
 - `dev/QUERY-COMPAT.md` – query language compatibility notes vs. other engines.
+- `dev/CQL-DIALECT-ROADMAP.md` – implementation roadmap for optional CWB / Manatee / PML-TQ dialect front-ends.
+- `dev/CQL-DIALECT-LICENSING.md` – GPL / packaging / `PANDO_CWB_DIALECT` for the CWB dialect module.
 - `dev/CLICKCQL-TODO.md` – internal notes on possible ClickHouse / CQL integration.
 
 These documents reflect the current state of thinking and may lag behind the code slightly.
