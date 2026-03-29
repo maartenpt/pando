@@ -155,8 +155,12 @@ size_t QueryExecutor::estimate_leaf(const AttrCondition& ac) const {
             if (corpus_.has_structure(struct_name)) {
                 const auto& sa = corpus_.structure(struct_name);
                 if (sa.has_region_attr(region_attr)) {
-                    // Conservative estimate: we don't have a reverse index for region attrs,
-                    // so return the corpus size as upper bound
+                    if (ac.op == CompOp::EQ && sa.has_region_value_reverse(region_attr)) {
+                        size_t spans = sa.token_span_sum_for_attr_eq(region_attr, ac.value);
+                        if (spans == SIZE_MAX)
+                            return static_cast<size_t>(corpus_.size());
+                        return std::min(spans, static_cast<size_t>(corpus_.size()));
+                    }
                     return static_cast<size_t>(corpus_.size());
                 }
             }
@@ -875,6 +879,38 @@ bool QueryExecutor::match_survives_post_filters_for_aggregate(
     return !scratch.matches.empty();
 }
 
+// `:: text_langcode="nld"` is not part of token cardinality — without this check we would
+// still enumerate every token matching [] and reject each in pass_region_filters.
+// For EQ, if no region of that type ever carries the value, the result is necessarily empty.
+static bool global_region_eq_unsatisfiable(const Corpus& corpus,
+                                          const std::vector<GlobalRegionFilter>& filters) {
+    for (const auto& gf : filters) {
+        if (gf.op != CompOp::EQ) continue;
+        size_t us = gf.region_attr.find('_');
+        if (us == std::string::npos || us + 1 >= gf.region_attr.size()) continue;
+        std::string struct_name = gf.region_attr.substr(0, us);
+        std::string attr_name = gf.region_attr.substr(us + 1);
+        if (!corpus.has_structure(struct_name)) return true;
+        const auto& sa = corpus.structure(struct_name);
+        if (!sa.has_region_attr(attr_name)) return true;
+        if (sa.has_region_value_reverse(attr_name)) {
+            if (sa.count_regions_with_attr_eq(attr_name, gf.value) == 0)
+                return true;
+            continue;
+        }
+        bool any = false;
+        for (size_t ri = 0; ri < sa.region_count(); ++ri) {
+            std::string rval(sa.region_value(attr_name, ri));
+            if (rval == gf.value) {
+                any = true;
+                break;
+            }
+        }
+        if (!any) return true;
+    }
+    return false;
+}
+
 MatchSet QueryExecutor::execute(const TokenQuery& query,
                                 size_t max_matches,
                                 bool count_total,
@@ -901,6 +937,11 @@ MatchSet QueryExecutor::execute(const TokenQuery& query,
 
     // #25: Pre-resolve EQ values to LexiconIds for fast integer comparison
     compile_query(q);
+
+    if (global_region_eq_unsatisfiable(corpus_, q.global_region_filters)) {
+        result.total_exact = true;
+        return result;
+    }
 
     std::shared_ptr<AggregateBucketData> agg_storage;
     AggregateBucketData* agg_ptr = nullptr;
@@ -959,6 +1000,11 @@ MatchSet QueryExecutor::execute(const TokenQuery& query,
             }
             int64_t rgn = sa.find_region(pos);
             if (rgn < 0) return false;
+            if (gf.op == CompOp::EQ && sa.has_region_value_reverse(attr_name)) {
+                if (!sa.region_matches_attr_eq_rev(attr_name, static_cast<size_t>(rgn), gf.value))
+                    return false;
+                continue;
+            }
             std::string rval(sa.region_value(attr_name, static_cast<size_t>(rgn)));
             if (!compare_value(gf.op, rval, gf.value)) return false;
         }
@@ -1501,6 +1547,13 @@ void QueryExecutor::apply_region_filters(const TokenQuery& query, const NameInde
             }
             int64_t rgn = sa.find_region(pos);
             if (rgn < 0) { pass = false; break; }
+            if (gf.op == CompOp::EQ && sa.has_region_value_reverse(attr_name)) {
+                if (!sa.region_matches_attr_eq_rev(attr_name, static_cast<size_t>(rgn), gf.value)) {
+                    pass = false;
+                    break;
+                }
+                continue;
+            }
             std::string rval(sa.region_value(attr_name, static_cast<size_t>(rgn)));
             if (!compare_value(gf.op, rval, gf.value)) { pass = false; break; }
         }

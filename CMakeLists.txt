@@ -82,6 +82,7 @@ target_include_directories(pando_pmltq_dialect PUBLIC src)
 
 add_library(pando_core STATIC
     src/core/mmap_file.cpp
+    src/core/count_hierarchy_json.cpp
     src/index/lexicon.cpp
     src/index/fold_map.cpp
     src/index/positional_attr.cpp

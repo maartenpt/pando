@@ -52,7 +52,10 @@ We can restrict our query by properties of the region it is in. The notation for
 | `[ text_genre="Book" ]` | token-restriction | the token is in a given region+attribute |
 | `<text genre="Book"> []` | region-hook | look only for tokens directly following the start of a region+attribute (attribute is optional) |
 | `a:[] :: a.text_genre = "Book"` | global condition | the named token lies in a text with those attributes |
+| `[] :: text_lang = "Dutch"` | global condition | shorthand for `:: match.text_lang = "Dutch"` (the attribute token must contain `_`, e.g. `text_lang`, `s_tuid`) |
 | `[] within text_genre="Book"` | within restriction | the whole match has to appear inside a region+attribute (attribute is optional) |
+
+When the corpus is indexed with **`pando-index`**, region-attribute columns can carry optional **reverse index** sidecars (next to the `.val` files). That speeds up equality on global `::` filters and improves query planning for region-attribute token restrictions, without changing which strings match. Older index directories without those files keep the same semantics with slower paths.
 
 And of course, those can be combined in queries, so if we want to look for the lemma *cat* with an adjective, where *cat* has to appear in an English text, and the whole things has to be inside a text of genre *Book*, we can express that as `[lemma="cat" & text_lang="Book"] > [upos="ADJ"] within text_genre="Book"`. Since there are no texts within texts, the two restrictions in practice work in exactly the same way.
 
@@ -66,7 +69,7 @@ Both within and containing can also be negated: `[] not within s`.
 
 ## Named tokens and aligned corpora
 
-You can give a name to the tokens in your query, so that you can then refer back to it: `a:[] b:[] :: a.form = b.form` will find all sequence of two identical words in a row like in *I knew that that book was yours*. In global conditions, names are required, since we always need to specify which token query we are applying the restriction to.
+You can give a name to the tokens in your query, so that you can then refer back to it: `a:[] b:[] :: a.form = b.form` will find all sequence of two identical words in a row like in *I knew that that book was yours*. When a global condition refers to a named token (`eng.text_lang`, alignment, etc.), that name is required; restrictions that only concern the match as a whole can use `match.` or the `struct_attr = value` shorthand (`text_lang = "Dutch"`).
 
 In contrast to CWB-CQL, where the life-span of names is restricted to the query, names in pando-CQL are persistent, so that you can refer to them in subsequent grouping queries or other queries.
 

@@ -77,6 +77,8 @@ int main(int argc, char* argv[]) {
                   << "  input: .conllu file(s), directory (recursive), or '-' for JSONL stdin;\n"
                   << "         with --format vertical: .vrt/.vert/.txt files;\n"
                   << "         with --format jsonl: JSONL events as in dev/PANDO-INDEX-INTEGRATION.md\n\n"
+                  << "  For each region attribute (e.g. text_langcode.val), the indexer also writes\n"
+                  << "  .lex / .rev / .rev.idx (value → region ids) for fast :: metadata filters.\n\n"
                   << "  --split-feats     Split FEATS into feats_X (default: combined)\n"
                   << "  --format vertical Read CWB-style vertical (one token/line, <s> </s>)\n"
                   << "  --format jsonl    Read streaming JSONL events (tokens/regions)\n";

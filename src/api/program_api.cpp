@@ -4,6 +4,7 @@
 
 #include "api/query_json.h"
 #include "core/json_utils.h"
+#include "core/count_hierarchy_json.h"
 #include "query/parser.h"
 #include "query/executor.h"
 #include "index/positional_attr.h"
@@ -198,14 +199,20 @@ static void emit_count_json(std::ostream& out, const Corpus& corpus, const Match
     out << "  \"groups_returned\": " << g_end << ",\n";
     out << "  \"fields\": [";
     for (size_t i = 0; i < cmd.fields.size(); ++i) { if (i > 0) out << ", "; out << jstr(cmd.fields[i]); }
-    out << "],\n  \"rows\": [\n";
-    for (size_t i = 0; i < g_end; ++i) {
-        if (i > 0) out << ",\n";
-        double pct = 100.0 * static_cast<double>(sorted[i].second) / static_cast<double>(total);
-        out << "    {\"key\": " << jstr(sorted[i].first) << ", \"count\": " << sorted[i].second
-            << ", \"pct\": " << pct << "}";
+    out << "],\n";
+    if (cmd.fields.size() >= 2) {
+        emit_count_result_hierarchy_json(out, cmd.fields, counts, total, group_limit);
+        out << "\n}}\n";
+    } else {
+        out << "  \"rows\": [\n";
+        for (size_t i = 0; i < g_end; ++i) {
+            if (i > 0) out << ",\n";
+            double pct = 100.0 * static_cast<double>(sorted[i].second) / static_cast<double>(total);
+            out << "    {\"key\": " << jstr(sorted[i].first) << ", \"count\": " << sorted[i].second
+                << ", \"pct\": " << pct << "}";
+        }
+        out << "\n  ]\n}}\n";
     }
-    out << "\n  ]\n}}\n";
 }
 
 static void emit_freq_json(std::ostream& out, const Corpus& corpus, const MatchSet& ms,

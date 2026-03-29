@@ -1,4 +1,6 @@
 #include "index/structural_attr.h"
+#include <algorithm>
+#include <cstddef>
 #include <fstream>
 
 namespace manatree {
@@ -6,6 +8,7 @@ namespace manatree {
 void StructuralAttr::open(const std::string& rgn_path, bool preload) {
     file_ = MmapFile::open(rgn_path, preload);
     region_attrs_.clear();
+    region_value_rev_.clear();
     region_attr_names_.clear();
 
     // Try to load optional default region values (.val + .val.idx)
@@ -27,6 +30,22 @@ void StructuralAttr::add_region_attr(const std::string& attr_name,
     MmapFile i = MmapFile::open(idx_path, preload);
     region_attrs_[attr_name] = std::make_pair(std::move(v), std::move(i));
     region_attr_names_.push_back(attr_name);
+
+    std::string base = val_path;
+    if (base.size() >= 4 && base.compare(base.size() - 4, 4, ".val") == 0)
+        base.resize(base.size() - 4);
+    else
+        return;
+    std::ifstream probe(base + ".rev.idx");
+    if (!probe.good()) return;
+    probe.close();
+
+    RegionValueRev rv;
+    rv.lex.open(base, preload);
+    rv.rev = MmapFile::open(base + ".rev", preload);
+    rv.rev_idx = MmapFile::open(base + ".rev.idx", preload);
+    if (rv.rev.valid() && rv.rev_idx.valid())
+        region_value_rev_[attr_name] = std::move(rv);
 }
 
 bool StructuralAttr::has_region_attr(const std::string& attr_name) const {
@@ -105,6 +124,61 @@ std::string_view StructuralAttr::region_value(size_t idx) const {
     const char* base = static_cast<const char*>(val_.data());
     return std::string_view(base + off[idx],
                             static_cast<size_t>(off[idx + 1] - off[idx] - 1));
+}
+
+bool StructuralAttr::has_region_value_reverse(const std::string& attr_name) const {
+    return region_value_rev_.count(attr_name) != 0;
+}
+
+size_t StructuralAttr::count_regions_with_attr_eq(const std::string& attr_name,
+                                                    const std::string& value) const {
+    auto it = region_value_rev_.find(attr_name);
+    if (it == region_value_rev_.end()) return SIZE_MAX;
+    const RegionValueRev& rv = it->second;
+    LexiconId id = rv.lex.lookup(value);
+    if (id == UNKNOWN_LEX) return 0;
+    const auto* idx = rv.rev_idx.as<int64_t>();
+    return static_cast<size_t>(idx[static_cast<size_t>(id) + 1] - idx[static_cast<size_t>(id)]);
+}
+
+bool StructuralAttr::region_matches_attr_eq_rev(const std::string& attr_name, size_t region_idx,
+                                                  const std::string& value) const {
+    auto it = region_value_rev_.find(attr_name);
+    if (it == region_value_rev_.end()) return false;
+    const RegionValueRev& rv = it->second;
+    LexiconId vid = rv.lex.lookup(value);
+    if (vid == UNKNOWN_LEX) return false;
+    const auto* idx = rv.rev_idx.as<int64_t>();
+    size_t vi = static_cast<size_t>(vid);
+    if (vi + 1 >= rv.rev_idx.count<int64_t>()) return false;
+    int64_t lo = idx[vi];
+    int64_t hi = idx[vi + 1];
+    const int64_t* p = rv.rev.as<int64_t>() + lo;
+    size_t n = static_cast<size_t>(hi - lo);
+    int64_t key = static_cast<int64_t>(region_idx);
+    return std::binary_search(p, p + n, key);
+}
+
+size_t StructuralAttr::token_span_sum_for_attr_eq(const std::string& attr_name,
+                                                    const std::string& value) const {
+    auto it = region_value_rev_.find(attr_name);
+    if (it == region_value_rev_.end()) return SIZE_MAX;
+    const RegionValueRev& rv = it->second;
+    LexiconId vid = rv.lex.lookup(value);
+    if (vid == UNKNOWN_LEX) return 0;
+    const auto* idx = rv.rev_idx.as<int64_t>();
+    size_t vi = static_cast<size_t>(vid);
+    if (vi + 1 >= rv.rev_idx.count<int64_t>()) return 0;
+    int64_t lo = idx[vi];
+    int64_t hi = idx[vi + 1];
+    const int64_t* p = rv.rev.as<int64_t>() + lo;
+    size_t sum = 0;
+    for (int64_t k = 0; k < hi - lo; ++k) {
+        size_t ri = static_cast<size_t>(p[k]);
+        Region r = get(ri);
+        sum += static_cast<size_t>(r.end - r.start + 1);
+    }
+    return sum;
 }
 
 } // namespace manatree

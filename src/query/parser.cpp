@@ -908,10 +908,35 @@ void Parser::parse_global_filters(TokenQuery& tq) {
             tq.global_region_filters.push_back(std::move(gf));
         } else {
             // Look ahead: "a < b" (position order), "a.attr op value" (anchored region),
-            // or "a.attr = b.attr" (alignment)
+            // "a.attr = b.attr" (alignment), or shorthand "text_lang = \"Dutch\"" (same as
+            // match.text_lang — struct_attr must contain '_').
             Token next = lexer_.peek();
-            if (next.type == TokType::LT || next.type == TokType::GT) {
-                // Positional ordering: :: a < b or :: a > b
+            if ((next.type == TokType::EQ || next.type == TokType::NEQ ||
+                 next.type == TokType::LT || next.type == TokType::GT ||
+                 next.type == TokType::LTE || next.type == TokType::GTE)
+                && t.text.find('_') != std::string::npos) {
+                // Shorthand region filter on match start (implicit anchor)
+                GlobalRegionFilter gf;
+                gf.region_attr = t.text;
+                Token op = lexer_.next();
+                switch (op.type) {
+                    case TokType::EQ:   gf.op = CompOp::EQ;  break;
+                    case TokType::NEQ:  gf.op = CompOp::NEQ; break;
+                    case TokType::LT:   gf.op = CompOp::LT;  break;
+                    case TokType::GT:   gf.op = CompOp::GT;  break;
+                    case TokType::LTE:  gf.op = CompOp::LTE; break;
+                    case TokType::GTE:  gf.op = CompOp::GTE; break;
+                    default: throw std::runtime_error("Expected comparison in global region shorthand");
+                }
+                if (lexer_.peek().type == TokType::STRING)
+                    gf.value = lexer_.next().text;
+                else if (lexer_.peek().type == TokType::NUMBER)
+                    gf.value = lexer_.next().text;
+                else
+                    gf.value = lexer_.expect(TokType::IDENT).text;
+                tq.global_region_filters.push_back(std::move(gf));
+            } else if (next.type == TokType::LT || next.type == TokType::GT) {
+                // Positional ordering: :: a < b or :: a > b (no '_' in first name — not struct_attr)
                 CompOp op = (next.type == TokType::LT) ? CompOp::LT : CompOp::GT;
                 lexer_.consume();
                 Token name2 = lexer_.expect(TokType::IDENT);

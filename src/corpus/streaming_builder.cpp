@@ -8,6 +8,7 @@
 #include <numeric>
 #include <stdexcept>
 #include <unordered_set>
+#include <unordered_map>
 
 #include <sys/mman.h>
 #include <fcntl.h>
@@ -17,6 +18,73 @@ namespace manatree {
 namespace fs = std::filesystem;
 
 static constexpr size_t IO_CHUNK = 4 * 1024 * 1024; // 4M elements per chunk
+
+// Reverse index for region attribute values: same basename as .val → adds .lex, .rev, .rev.idx
+// (value lexicon + sorted region indices per distinct value). Used for fast :: filters and counts.
+static void build_region_attr_reverse_index(const std::string& base) {
+    std::string val_path = base + ".val";
+    std::string idx_path = base + ".val.idx";
+    MmapFile v = MmapFile::open(val_path, false);
+    MmapFile i = MmapFile::open(idx_path, false);
+    if (!v.valid() || !i.valid()) return;
+
+    const auto* off = i.as<int64_t>();
+    size_t n_idx = i.count<int64_t>();
+    if (n_idx < 2) return;
+    const size_t n_regions = n_idx - 1;
+    const char* vbase = static_cast<const char*>(v.data());
+
+    std::vector<std::string> region_vals;
+    region_vals.reserve(n_regions);
+    for (size_t ri = 0; ri < n_regions; ++ri) {
+        int64_t a = off[ri];
+        int64_t b = off[ri + 1];
+        if (b <= a) continue;
+        region_vals.emplace_back(vbase + a, static_cast<size_t>(b - a - 1));
+    }
+    if (region_vals.empty()) return;
+
+    std::vector<std::string> sorted = region_vals;
+    std::sort(sorted.begin(), sorted.end());
+    sorted.erase(std::unique(sorted.begin(), sorted.end()), sorted.end());
+
+    std::vector<int64_t> lex_offsets;
+    write_strings(base + ".lex", sorted, lex_offsets);
+    write_vec(base + ".lex.idx", lex_offsets);
+
+    std::unordered_map<std::string, LexiconId> to_id;
+    to_id.reserve(sorted.size() * 2);
+    for (LexiconId id = 0; id < static_cast<LexiconId>(sorted.size()); ++id)
+        to_id[sorted[static_cast<size_t>(id)]] = id;
+
+    const LexiconId nlex = static_cast<LexiconId>(sorted.size());
+    std::vector<int64_t> cnt(static_cast<size_t>(nlex), 0);
+    for (const auto& s : region_vals)
+        ++cnt[static_cast<size_t>(to_id.at(s))];
+
+    std::vector<int64_t> rev_idx(static_cast<size_t>(nlex) + 1);
+    rev_idx[0] = 0;
+    for (LexiconId id = 0; id < nlex; ++id)
+        rev_idx[static_cast<size_t>(id) + 1] =
+            rev_idx[static_cast<size_t>(id)] + cnt[static_cast<size_t>(id)];
+
+    int64_t total = rev_idx[static_cast<size_t>(nlex)];
+    std::vector<int64_t> cur = rev_idx;
+    std::vector<int64_t> rev_flat(static_cast<size_t>(total));
+    for (size_t ri = 0; ri < region_vals.size(); ++ri) {
+        LexiconId id = to_id.at(region_vals[ri]);
+        int64_t slot = cur[static_cast<size_t>(id)]++;
+        rev_flat[static_cast<size_t>(slot)] = static_cast<int64_t>(ri);
+    }
+    for (LexiconId id = 0; id < nlex; ++id) {
+        int64_t lo = rev_idx[static_cast<size_t>(id)];
+        int64_t hi = rev_idx[static_cast<size_t>(id) + 1];
+        std::sort(rev_flat.begin() + lo, rev_flat.begin() + hi);
+    }
+
+    write_file(base + ".rev", rev_flat.data(), rev_flat.size() * sizeof(int64_t));
+    write_vec(base + ".rev.idx", rev_idx);
+}
 
 // ── AttrState ───────────────────────────────────────────────────────────
 
@@ -387,6 +455,11 @@ void StreamingBuilder::finalize() {
                 write_vec(base + ".val.idx", offsets);
             }
         }
+    }
+
+    for (const auto& ra : region_attrs_list) {
+        std::cerr << "  region reverse index " << ra << " ...\n";
+        build_region_attr_reverse_index(output_dir_ + "/" + ra);
     }
 
     // Write corpus.info

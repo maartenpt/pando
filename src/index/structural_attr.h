@@ -2,6 +2,7 @@
 
 #include "core/types.h"
 #include "core/mmap_file.h"
+#include "index/lexicon.h"
 #include <string>
 #include <string_view>
 #include <vector>
@@ -46,11 +47,31 @@ public:
     std::string_view region_value(const std::string& attr_name, size_t idx) const;
     const std::vector<std::string>& region_attr_names() const { return region_attr_names_; }
 
+    // Optional reverse index (pando-index): value → sorted region ids in .rev / .lex next to .val.
+    bool has_region_value_reverse(const std::string& attr_name) const;
+    // O(1) count of regions with this attribute value; 0 if unknown value; SIZE_MAX if no rev index.
+    size_t count_regions_with_attr_eq(const std::string& attr_name, const std::string& value) const;
+
+    // When a reverse index exists: O(log K) check that region_idx is in the posting for value.
+    // If value is not in the .lex or region_idx is not listed, returns false.
+    bool region_matches_attr_eq_rev(const std::string& attr_name, size_t region_idx,
+                                   const std::string& value) const;
+
+    // Sum of inclusive token spans for regions with attr == value. 0 if value not in .lex.
+    // SIZE_MAX if there is no reverse index for this attr (caller uses a conservative bound).
+    size_t token_span_sum_for_attr_eq(const std::string& attr_name, const std::string& value) const;
+
 private:
+    struct RegionValueRev {
+        Lexicon lex;       // distinct values (.lex)
+        MmapFile rev;      // int64_t region indices
+        MmapFile rev_idx;  // cumulative offsets per lex id
+    };
     MmapFile file_;       // .rgn: Region pairs
     MmapFile val_;        // .val: default (unnamed) region value strings
     MmapFile val_idx_;    // .val.idx: int64 byte offsets into .val
     std::unordered_map<std::string, std::pair<MmapFile, MmapFile>> region_attrs_;
+    std::unordered_map<std::string, RegionValueRev> region_value_rev_;
     std::vector<std::string> region_attr_names_;
 };
 

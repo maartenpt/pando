@@ -1,5 +1,6 @@
 #include "corpus/corpus.h"
 #include "core/json_utils.h"
+#include "core/count_hierarchy_json.h"
 #include "query/ast.h"
 #include "query/parser.h"
 #include "query/dialect/cwb/cwb_translate.h"
@@ -664,15 +665,21 @@ static void emit_count(const Corpus& corpus, const MatchSet& ms,
             if (i > 0) std::cout << ", ";
             std::cout << jstr(cmd.fields[i]);
         }
-        std::cout << "],\n  \"rows\": [\n";
-        for (size_t i = g_start; i < g_end; ++i) {
-            if (i > g_start) std::cout << ",\n";
-            double pct = 100.0 * static_cast<double>(sorted[i].second) / static_cast<double>(total);
-            std::cout << "    {\"key\": " << jstr(sorted[i].first)
-                      << ", \"count\": " << sorted[i].second
-                      << ", \"pct\": " << pct << "}";
+        std::cout << "],\n";
+        if (cmd.fields.size() >= 2) {
+            emit_count_result_hierarchy_json(std::cout, cmd.fields, counts, total, opts.group_limit);
+            std::cout << "\n}}\n";
+        } else {
+            std::cout << "  \"rows\": [\n";
+            for (size_t i = g_start; i < g_end; ++i) {
+                if (i > g_start) std::cout << ",\n";
+                double pct = 100.0 * static_cast<double>(sorted[i].second) / static_cast<double>(total);
+                std::cout << "    {\"key\": " << jstr(sorted[i].first)
+                          << ", \"count\": " << sorted[i].second
+                          << ", \"pct\": " << pct << "}";
+            }
+            std::cout << "\n  ]\n}}\n";
         }
-        std::cout << "\n  ]\n}}\n";
     } else {
         // Header
         for (const auto& f : cmd.fields)
