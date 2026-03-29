@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-Download Universal Dependencies treebanks, inject # text_* metadata from filenames
-({lang}_{treebank}-ud-{split}.conllu), optionally merge JSON overrides, then run pando-index.
+Download Universal Dependencies treebanks, prepend # newregion text and # text_* lines
+(filename → text_id, text_langcode, text_treebank; optional JSON overrides), then run pando-index.
+Tokens then resolve text_lang (etc.) from the open text region.
 
 Example:
   ./build_ud_corpus.py --data-dir ~/ud-data \\
@@ -76,6 +77,32 @@ def ud_treebank_folder_for(path: Path, ud_root: Path) -> str | None:
         if part.startswith("UD_"):
             return part
     return None
+
+
+def file_header_lines(text_attrs: dict[str, str]) -> list[str]:
+    """
+    Lines to prepend so pando-index opens a `text` region before # newdoc / sentences.
+    Each token then resolves text_lang, text_langcode, text_id, etc. via that region.
+    """
+    out = ["# newregion text\n"]
+    for k, v in sorted(text_attrs.items()):
+        if not k.startswith("text_"):
+            continue
+        out.append(f"# {k} = {v}\n")
+    return out
+
+
+def looks_like_pando_text_header(lines: list[str]) -> bool:
+    """True if file already starts with # newregion text (avoid duplicate injection)."""
+    for line in lines[:120]:
+        s = line.strip()
+        if not s:
+            continue
+        if not s.startswith("#"):
+            return False
+        if re.match(r"^#\s*newregion\s+text\s*$", s):
+            return True
+    return False
 
 
 def sentence_blocks(lines: list[str]) -> list[tuple[int, int]]:
@@ -179,6 +206,8 @@ def attrs_for_file(
                 f"Manifest keys must start with text_ (got {k!r}) in {path}"
             )
         out[k] = str(v)
+    if "text_id" not in out:
+        out["text_id"] = base
     return out
 
 
@@ -189,13 +218,14 @@ def inject_tree(
     skip_unknown: bool,
     force: bool,
     dry_run: bool,
-) -> tuple[int, int]:
+) -> tuple[int, int, int]:
     files = sorted(ud_root.rglob("*.conllu"))
     if not files:
         raise FileNotFoundError(f"No .conllu under {ud_root}")
 
     n_files = 0
     n_blocks = 0
+    n_file_headers = 0
     for f in files:
         try:
             text_attrs = attrs_for_file(f, ud_root, manifest, force=force)
@@ -217,6 +247,13 @@ def inject_tree(
         except UnicodeDecodeError:
             text = raw.decode("latin-1")
         lines = text.splitlines(keepends=True)
+
+        prepended = False
+        if not looks_like_pando_text_header(lines):
+            lines = file_header_lines(text_attrs) + lines
+            prepended = True
+            n_file_headers += 1
+
         blocks = sentence_blocks(lines)
         new_lines: list[str] = []
         prev = 0
@@ -224,7 +261,8 @@ def inject_tree(
         for start, end in blocks:
             new_lines.extend(lines[prev:start])
             block = lines[start:end]
-            inj = inject_into_block(block, text_attrs, skip_existing=not force)
+            # File-level text_* lives in the header; per-sentence inject only for extra keys.
+            inj = inject_into_block(block, {}, skip_existing=not force)
             if inj != block:
                 cb += 1
             new_lines.extend(inj)
@@ -233,10 +271,10 @@ def inject_tree(
 
         n_files += 1
         n_blocks += cb
-        if not dry_run and cb:
+        if not dry_run and (prepended or cb > 0):
             f.write_text("".join(new_lines), encoding="utf-8", newline="")
 
-    return n_files, n_blocks
+    return n_files, n_blocks, n_file_headers
 
 
 def find_ud_subdirs(root: Path) -> list[Path]:
@@ -621,14 +659,17 @@ def main() -> int:
         if args.dry_run:
             print("[dry-run] skipping inject (no file writes)")
         else:
-            nf, nb = inject_tree(
+            nf, nb, nh = inject_tree(
                 ud_root,
                 manifest,
                 skip_unknown=args.skip_unknown_filename,
                 force=args.force,
                 dry_run=False,
             )
-            print(f"Injected metadata: {nf} file(s), {nb} sentence block(s) updated.")
+            print(
+                f"Injected metadata: {nf} file(s), {nh} file header(s) (# newregion text + text_*), "
+                f"{nb} sentence block(s) updated."
+            )
 
         if args.inject_only:
             return 0

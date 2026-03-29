@@ -1,7 +1,8 @@
 {
-  "_comment": "Optional manifest for build_ud_corpus.py --manifest. All keys in overrides must start with text_.",
+  "_comment": "Optional manifest for build_ud_corpus.py --manifest. All keys in overrides must start with text_. text_id defaults to the .conllu basename if omitted. Injection prepends # newregion text and # text_* lines at the top of each file so pando-index records text_lang / text_langcode / text_id per token.",
   "overrides_by_folder": {
     "UD_Some-EdgeCase": {
+      "text_id": "custom-id.conllu",
       "text_langcode": "qaa",
       "text_treebank": "x"
     }

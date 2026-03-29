@@ -5,10 +5,59 @@
 #include <sstream>
 #include <iostream>
 #include <string_view>
+#include <cctype>
+#include <unordered_set>
 
 namespace manatree {
 
 namespace {
+
+// Keys become corpus.info / s_<key>.* — must be a single identifier token.
+static bool is_region_attr_key_token(std::string_view s) {
+    if (s.empty()) return false;
+    for (unsigned char c : s) {
+        if (std::isalnum(c) || c == '_') continue;
+        return false;
+    }
+    return true;
+}
+
+// Structural region values for generic # key = val (skip UD translation sentences).
+static bool is_simple_region_value(std::string_view s) {
+    if (s.empty()) return false;
+    for (unsigned char c : s) {
+        if (c == ' ' || c == '\t' || c == '\r' || c == '\n') return false;
+    }
+    return true;
+}
+
+// Full comment keys that always mean VRT-style text region metadata (not UD text_<lang> translation).
+static bool is_reserved_text_structural_key(const std::string& key) {
+    static const std::unordered_set<std::string> k{
+        "text_id",       "text_lang",     "text_langcode", "text_treebank",
+        "text_genre",    "text_century",
+    };
+    return k.count(key) > 0;
+}
+
+// UD sentence comment # text_en = … / # text_cs = … (translation), not text-region attribute "en".
+// Only in sentence comment context: before the first token line in the file, or after a blank until tokens.
+// Outside that zone, text_xx = … is VRT-style (region text, attribute xx).
+static bool is_ud_sentence_translation_key(const std::string& key) {
+    if (is_reserved_text_structural_key(key)) return false;
+    if (key.size() < 8 || key.compare(0, 5, "text_") != 0) return false;
+    std::string suf = key.substr(5);
+    // 2–3 letter lowercase language codes (en, cs, got, la, …); exclude a few non-lang triples.
+    if (suf.size() < 2 || suf.size() > 3) return false;
+    for (char c : suf) {
+        if (c < 'a' || c > 'z') return false;
+    }
+    static const std::unordered_set<std::string> not_lang{
+        "src", "ref", "dom", "uri", "url", "num", "cat", "new", "old",
+    };
+    if (not_lang.count(suf)) return false;
+    return true;
+}
 
 // Every text region must supply the same named attrs (indexer requires equal-length vectors).
 static void pad_text_region_attrs(std::vector<std::pair<std::string, std::string>>& attrs) {
@@ -20,6 +69,8 @@ static void pad_text_region_attrs(std::vector<std::pair<std::string, std::string
     if (!has("id")) attrs.push_back({"id", "_"});
     if (!has("genre")) attrs.push_back({"genre", "_"});
     if (!has("lang")) attrs.push_back({"lang", "_"});
+    if (!has("langcode")) attrs.push_back({"langcode", "_"});
+    if (!has("treebank")) attrs.push_back({"treebank", "_"});
     if (!has("century")) attrs.push_back({"century", "_"});
 }
 
@@ -41,6 +92,8 @@ static void pad_doc_region_attrs(std::vector<std::pair<std::string, std::string>
         return false;
     };
     if (!has("id")) attrs.push_back({"id", "_"});
+    if (!has("lang")) attrs.push_back({"lang", "_"});
+    if (!has("langcode")) attrs.push_back({"langcode", "_"});
 }
 
 static std::string trim_sv(std::string_view sv) {
@@ -159,6 +212,11 @@ void CorpusBuilder::read_conllu(const std::string& path) {
     std::unordered_map<std::string, std::string> attrs;
     attrs.reserve(32);
 
+    // Sentence-level # comments: after a blank line, or before the first token line in the file (CoNLL-U
+    // often has no blank before the first sentence). UD # text_en = … is translation here, not VRT text_en.
+    bool pending_sentence_comments = false;
+    bool seen_any_token_line = false;
+
     while (std::getline(in, line)) {
         if (line.empty()) {
             if (in_sentence_) {
@@ -167,9 +225,12 @@ void CorpusBuilder::read_conllu(const std::string& path) {
                 pending_sent_tuid_.clear();
                 in_sentence_ = false;
             }
+            pending_sentence_comments = true;
             continue;
         }
         if (line[0] == '#') {
+            const bool sentence_comment_context =
+                !seen_any_token_line || pending_sentence_comments;
             // CoNLL-U comments: # newdoc id (structural "doc"), # newregion text, # endregion text,
             // CQP # text_* = …, # tuid = …, # newpar id = …
             std::string_view sv(line);
@@ -227,8 +288,9 @@ void CorpusBuilder::read_conllu(const std::string& path) {
             }
 
             if (starts_with("newdoc id")) {
-                // CoNLL-U document boundary — structural region "doc", not "text"
-                close_text_region_if_open();
+                // CoNLL-U document boundary — structural region "doc", not "text".
+                // Do not close "text": file-level # newregion text can span the same tokens as doc
+                // so queries can use text_lang (etc.) alongside doc_id.
                 close_doc_region_if_open();
                 doc_id_ = parse_id_after_eq();
                 doc_region_start_ = builder_.corpus_size();
@@ -251,35 +313,52 @@ void CorpusBuilder::read_conllu(const std::string& path) {
                 par_start_ = builder_.corpus_size();
                 has_par_region_ = true;
             } else {
-                // Generic: CQP-style region attrs (# text_genre = …), UD metadata, translations.
-                auto eqp = sv.find('=');
+                // Generic: CQP-style region attrs (# text_genre = …), UD metadata.
+                // Split on first '=' or ':' so # text_en: … is not misparsed when '=' appears in the value.
+                auto eqp = sv.find_first_of("=:");
                 if (eqp != std::string_view::npos) {
                     std::string key = trim_sv(sv.substr(0, eqp));
                     std::string val = trim_sv(sv.substr(eqp + 1));
-                    if (key == "parallel_id") {
-                        // Parallel UD corpora: align sentences across treebanks → same s_tuid slot as tuid.
-                        upsert_region_attr(sent_region_attrs_, "tuid", val);
-                        pending_sent_tuid_ = val;
+                    if (!is_region_attr_key_token(key))
+                        ;
+                    else if (key == "parallel_id") {
+                        if (is_simple_region_value(val)) {
+                            upsert_region_attr(sent_region_attrs_, "tuid", val);
+                            pending_sent_tuid_ = val;
+                        }
                     } else if (key == "sent_id") {
-                        upsert_region_attr(sent_region_attrs_, "sent_id", val);
-                    } else if (key.size() >= 7 && key.compare(0, 5, "text_") == 0) {
-                        // UD-style translation lines: # text_en = …, # text_la = … → s_text_en, …
-                        upsert_region_attr(sent_region_attrs_, key, val);
+                        if (is_simple_region_value(val))
+                            upsert_region_attr(sent_region_attrs_, "sent_id", val);
                     } else if (key != "tuid") {
                         if (key == "text") {
                             // # text = primary surface (sentence); not a structural attribute
+                        } else if (sentence_comment_context
+                                   && is_ud_sentence_translation_key(key)) {
+                            // UD: translation line for this sentence — not VRT text_<lang> = region attr.
+                            // Does not require # newregion text (bare UD corpora).
+                            upsert_region_attr(sent_region_attrs_, key, val);
+                        } else if (!is_simple_region_value(val)) {
+                            // Skip non-token structural values (long prose) except handled above.
                         } else {
                             size_t us = key.find('_');
                             if (us != std::string::npos && us > 0 && us + 1 < key.size()) {
                                 std::string rname = key.substr(0, us);
                                 std::string attr = key.substr(us + 1);
-                                if (!attr.empty()) {
+                                if (!attr.empty() && is_region_attr_key_token(rname)
+                                    && is_region_attr_key_token(attr)) {
                                     if (rname == "s") {
                                         upsert_region_attr(sent_region_attrs_, attr, val);
                                         if (attr == "tuid")
                                             pending_sent_tuid_ = val;
-                                    } else if (rname == "text" && has_text_region_) {
-                                        upsert_region_attr(text_region_attrs_, attr, val);
+                                    } else if (rname == "text") {
+                                        if (has_text_region_) {
+                                            // VRT text_xx = … unless UD # text_<lang> = in sentence comment block.
+                                            if (!(sentence_comment_context
+                                                  && is_ud_sentence_translation_key(key)))
+                                                upsert_region_attr(text_region_attrs_, attr, val);
+                                        }
+                                    } else if (rname == "doc" && has_doc_region_) {
+                                        upsert_region_attr(doc_region_attrs_, attr, val);
                                     } else {
                                         for (auto it = conllu_region_stack_.rbegin(); it != conllu_region_stack_.rend(); ++it) {
                                             if (it->type == rname) {
@@ -347,6 +426,8 @@ void CorpusBuilder::read_conllu(const std::string& path) {
 
             builder_.add_token(attrs, head_id);
             in_sentence_ = true;
+            pending_sentence_comments = false;
+            seen_any_token_line = true;
         }
         next_line:;
     }

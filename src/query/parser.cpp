@@ -252,30 +252,67 @@ GroupCommand Parser::parse_command() {
     else if (kw == "raw") cmd.type = CommandType::RAW;
     else if (kw == "tabulate") {
         cmd.type = CommandType::TABULATE;
-        // tabulate [QueryName] field1[, field2, ...]   (no "by" keyword)
-        // Heuristic: if first IDENT is followed by DOT → it's a field, not a query name.
+        // CWB-style: tabulate [QueryName] offset limit field1[, field2, ...]
+        // offset/limit optional; default limit 1000 when omitted (see ast.h).
+        cmd.tabulate_offset = 0;
+        cmd.tabulate_limit = 1000;
+
+        auto parse_field_tail = [&]() {
+            while (lexer_.peek().type == TokType::IDENT || lexer_.peek().type == TokType::COMMA) {
+                if (lexer_.peek().type == TokType::COMMA) lexer_.consume();
+                if (lexer_.peek().type != TokType::IDENT) break;
+                std::string field = lexer_.next().text;
+                if (lexer_.peek().type == TokType::DOT) {
+                    lexer_.consume();
+                    field += "." + lexer_.expect(TokType::IDENT).text;
+                }
+                cmd.fields.push_back(field);
+            }
+        };
+
+        // tabulate 0 100 a.form  (implicit Last)
+        if (lexer_.peek().type == TokType::NUMBER) {
+            cmd.tabulate_offset = std::stoull(lexer_.next().text);
+            cmd.tabulate_limit = std::stoull(lexer_.expect(TokType::NUMBER).text);
+            parse_field_tail();
+            return cmd;
+        }
+
         if (lexer_.peek().type == TokType::IDENT) {
             std::string first = lexer_.next().text;
             if (lexer_.peek().type == TokType::DOT) {
-                // First ident is start of a dotted field (e.g. a.text_genre)
                 lexer_.consume();
                 cmd.fields.push_back(first + "." + lexer_.expect(TokType::IDENT).text);
-            } else {
-                // First ident is a query name
+                parse_field_tail();
+                return cmd;
+            }
+            if (lexer_.peek().type == TokType::NUMBER) {
                 cmd.query_name = first;
+                cmd.tabulate_offset = std::stoull(lexer_.next().text);
+                cmd.tabulate_limit = std::stoull(lexer_.expect(TokType::NUMBER).text);
+                parse_field_tail();
+                return cmd;
             }
-        }
-        // Parse remaining fields: comma or space separated IDENT[.IDENT]
-        while (lexer_.peek().type == TokType::IDENT || lexer_.peek().type == TokType::COMMA) {
-            if (lexer_.peek().type == TokType::COMMA) lexer_.consume();
-            if (lexer_.peek().type != TokType::IDENT) break;
-            std::string field = lexer_.next().text;
-            if (lexer_.peek().type == TokType::DOT) {
-                lexer_.consume();
-                field += "." + lexer_.expect(TokType::IDENT).text;
+            if (lexer_.peek().type == TokType::IDENT) {
+                std::string second = lexer_.next().text;
+                if (lexer_.peek().type == TokType::DOT) {
+                    cmd.query_name = first;
+                    lexer_.consume();
+                    cmd.fields.push_back(second + "." + lexer_.expect(TokType::IDENT).text);
+                    parse_field_tail();
+                    return cmd;
+                }
+                cmd.fields.push_back(first);
+                cmd.fields.push_back(second);
+                parse_field_tail();
+                return cmd;
             }
-            cmd.fields.push_back(field);
+            cmd.fields.push_back(first);
+            parse_field_tail();
+            return cmd;
         }
+
+        parse_field_tail();
         return cmd;
     }
     else if (kw == "set") {

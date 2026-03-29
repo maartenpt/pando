@@ -9,6 +9,7 @@
 #include <unordered_map>
 #include <functional>
 #include <memory>
+#include <cstdint>
 
 #include "index/fold_map.h"
 
@@ -80,6 +81,46 @@ inline CorpusPos resolve_name(const Match& m, const NameIndexMap& names,
     return m.positions[it->second];
 }
 
+class PositionalAttr;
+class StructuralAttr;
+
+// Streaming aggregation (group/count/freq): integer-keyed buckets, decode for display.
+struct AggregateBucketData {
+    struct VecHash {
+        size_t operator()(const std::vector<int64_t>& v) const noexcept;
+    };
+    struct VecEq {
+        bool operator()(const std::vector<int64_t>& a, const std::vector<int64_t>& b) const noexcept {
+            return a == b;
+        }
+    };
+
+    struct Column {
+        enum class Kind { Positional, Region } kind = Kind::Positional;
+        const PositionalAttr* pa = nullptr;
+        const StructuralAttr* sa = nullptr;
+        std::string region_attr_name;
+        /// Named token for field anchor; empty = match start (first_pos).
+        std::string named_anchor;
+    };
+
+    size_t total_hits = 0;
+    bool total_exact = true;
+    std::vector<Column> columns;
+    std::unordered_map<std::vector<int64_t>, size_t, VecHash, VecEq> counts;
+
+    struct RegionInternCol {
+        std::unordered_map<std::string, int64_t> str_to_id;
+        std::vector<std::string> id_to_str;
+    };
+    /// Parallel to columns; only used when column.kind == Region.
+    std::vector<RegionInternCol> region_intern;
+};
+
+/// Decode one bucket key to the same tab-separated string as make_key/read_field.
+std::string decode_aggregate_bucket_key(const AggregateBucketData& data,
+                                          const std::vector<int64_t>& key);
+
 struct MatchSet {
     std::vector<Match> matches;
     size_t num_tokens = 0;
@@ -89,6 +130,9 @@ struct MatchSet {
 
     // #16: Source | Target: pairs (source_match, target_match) when parallel query
     std::vector<std::pair<Match, Match>> parallel_matches;
+
+    /// When set, group/count/freq used streaming buckets (matches may be empty).
+    std::shared_ptr<AggregateBucketData> aggregate_buckets;
 
     // Debug info (always populated)
     size_t seed_token = 0;
@@ -122,7 +166,8 @@ public:
                      size_t max_total_cap = 0,
                      size_t sample_size = 0,
                      uint32_t random_seed = 0,
-                     unsigned num_threads = 1);
+                     unsigned num_threads = 1,
+                     const std::vector<std::string>* aggregate_by_fields = nullptr);
 
     // #16: Source | Target: run source and target queries, join on source_query.global_alignment_filters.
     // Returns MatchSet with parallel_matches filled; matches is empty.
@@ -239,6 +284,12 @@ private:
 
     // Apply positional ordering constraints (:: a < b)
     void apply_position_orders(const TokenQuery& query, const NameIndexMap& name_map, MatchSet& result) const;
+
+    bool match_survives_post_filters_for_aggregate(const TokenQuery& query,
+                                                   const NameIndexMap& name_map,
+                                                   const std::vector<AnchorConstraint>& anchor_constraints,
+                                                   MatchSet& scratch,
+                                                   const Match& m) const;
 
     const Corpus& corpus_;
 

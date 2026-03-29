@@ -96,6 +96,14 @@ static std::string make_key(const Corpus& corpus, const Match& m,
     return key;
 }
 
+static bool aggregate_command_targets_stmt(const Statement& stmt, const GroupCommand& ncmd) {
+    if (ncmd.query_name.empty())
+        return true;
+    if (!stmt.name.empty())
+        return ncmd.query_name == stmt.name;
+    return ncmd.query_name == "Last";
+}
+
 // ── Association measures ────────────────────────────────────────────────
 
 struct CollEntry {
@@ -173,10 +181,15 @@ static void emit_count_json(std::ostream& out, const Corpus& corpus, const Match
         return;
     }
     std::map<std::string, size_t> counts;
-    for (const auto& m : ms.matches) ++counts[make_key(corpus, m, name_map, cmd.fields)];
+    if (ms.aggregate_buckets) {
+        for (const auto& [k, c] : ms.aggregate_buckets->counts)
+            counts[decode_aggregate_bucket_key(*ms.aggregate_buckets, k)] += c;
+    } else {
+        for (const auto& m : ms.matches) ++counts[make_key(corpus, m, name_map, cmd.fields)];
+    }
     std::vector<std::pair<std::string, size_t>> sorted(counts.begin(), counts.end());
     std::sort(sorted.begin(), sorted.end(), [](const auto& a, const auto& b) { return a.second > b.second; });
-    size_t total = ms.matches.size();
+    size_t total = ms.aggregate_buckets ? ms.aggregate_buckets->total_hits : ms.matches.size();
     size_t g_end = (group_limit > 0 && group_limit < sorted.size()) ? group_limit : sorted.size();
 
     out << "{\"ok\": true, \"operation\": \"count\", \"result\": {\n";
@@ -202,28 +215,39 @@ static void emit_freq_json(std::ostream& out, const Corpus& corpus, const MatchS
         return;
     }
     std::map<std::string, size_t> counts;
-    for (const auto& m : ms.matches) ++counts[make_key(corpus, m, name_map, cmd.fields)];
+    if (ms.aggregate_buckets) {
+        for (const auto& [k, c] : ms.aggregate_buckets->counts)
+            counts[decode_aggregate_bucket_key(*ms.aggregate_buckets, k)] += c;
+    } else {
+        for (const auto& m : ms.matches) ++counts[make_key(corpus, m, name_map, cmd.fields)];
+    }
     std::vector<std::pair<std::string, size_t>> sorted(counts.begin(), counts.end());
     std::sort(sorted.begin(), sorted.end(), [](const auto& a, const auto& b) { return a.second > b.second; });
     double corpus_size = static_cast<double>(corpus.size());
+    size_t total_matches = ms.aggregate_buckets ? ms.aggregate_buckets->total_hits : ms.matches.size();
 
     out << "{\"ok\": true, \"operation\": \"freq\", \"result\": {\n";
     out << "  \"corpus_size\": " << corpus.size() << ",\n";
-    out << "  \"total_matches\": " << ms.matches.size() << ",\n";
+    out << "  \"total_matches\": " << total_matches << ",\n";
     out << "  \"fields\": [";
     for (size_t i = 0; i < cmd.fields.size(); ++i) { if (i > 0) out << ", "; out << jstr(cmd.fields[i]); }
     out << "],\n  \"rows\": [\n";
     for (size_t i = 0; i < sorted.size(); ++i) {
         if (i > 0) out << ",\n";
         double ipm = 1e6 * static_cast<double>(sorted[i].second) / corpus_size;
+        double pct = total_matches > 0
+            ? 100.0 * static_cast<double>(sorted[i].second) / static_cast<double>(total_matches)
+            : 0.0;
         out << "    {\"key\": " << jstr(sorted[i].first) << ", \"count\": " << sorted[i].second
+            << ", \"pct\": " << pct
             << ", \"ipm\": " << std::fixed << std::setprecision(2) << ipm << "}";
     }
     out << "\n  ]\n}}\n";
 }
 
 static void emit_size_json(std::ostream& out, const MatchSet& ms) {
-    out << "{\"ok\": true, \"operation\": \"size\", \"result\": " << ms.matches.size() << "}\n";
+    size_t n = ms.aggregate_buckets ? ms.aggregate_buckets->total_hits : ms.matches.size();
+    out << "{\"ok\": true, \"operation\": \"size\", \"result\": " << n << "}\n";
 }
 
 static void emit_tabulate_json(std::ostream& out, const Corpus& corpus, const MatchSet& ms,
@@ -232,12 +256,19 @@ static void emit_tabulate_json(std::ostream& out, const Corpus& corpus, const Ma
         out << "{\"ok\": false, \"error\": \"tabulate requires at least one field\"}\n";
         return;
     }
+    const size_t n = ms.matches.size();
+    const size_t start = std::min(cmd.tabulate_offset, n);
+    const size_t end = std::min(start + cmd.tabulate_limit, n);
+    const size_t total_hits = ms.total_count > 0 ? ms.total_count : n;
     out << "{\"ok\": true, \"operation\": \"tabulate\", \"result\": {\n";
     out << "  \"fields\": [";
     for (size_t i = 0; i < cmd.fields.size(); ++i) { if (i > 0) out << ", "; out << jstr(cmd.fields[i]); }
-    out << "],\n  \"total\": " << ms.matches.size() << ",\n  \"rows\": [\n";
-    for (size_t i = 0; i < ms.matches.size(); ++i) {
-        if (i > 0) out << ",\n";
+    out << "],\n  \"total_matches\": " << total_hits << ",\n";
+    out << "  \"offset\": " << cmd.tabulate_offset << ",\n";
+    out << "  \"limit\": " << cmd.tabulate_limit << ",\n";
+    out << "  \"rows_returned\": " << (end - start) << ",\n  \"rows\": [\n";
+    for (size_t i = start; i < end; ++i) {
+        if (i > start) out << ",\n";
         out << "    [";
         for (size_t f = 0; f < cmd.fields.size(); ++f) {
             if (f > 0) out << ", ";
@@ -609,11 +640,22 @@ std::string run_program_json(Corpus& corpus, ProgramSession& ps,
                 max_total_cap = (opts.total && opts.max_total > 0) ? opts.max_total : 0;
             }
 
+            const std::vector<std::string>* aggregate_by = nullptr;
+            if (next_is_command && !stmt.is_parallel) {
+                const GroupCommand& ncmd = prog[si + 1].command;
+                if (!ncmd.fields.empty()
+                    && (ncmd.type == CommandType::COUNT || ncmd.type == CommandType::GROUP
+                        || ncmd.type == CommandType::FREQ)
+                    && aggregate_command_targets_stmt(stmt, ncmd))
+                    aggregate_by = &ncmd.fields;
+            }
+
             auto t0 = std::chrono::high_resolution_clock::now();
             if (stmt.is_parallel)
                 S.last_ms = executor.execute_parallel(stmt.query, stmt.target_query, max_m, count_t);
             else
-                S.last_ms = executor.execute(stmt.query, max_m, count_t, max_total_cap);
+                S.last_ms = executor.execute(stmt.query, max_m, count_t, max_total_cap, 0, 0, 1,
+                                             aggregate_by);
             auto t1 = std::chrono::high_resolution_clock::now();
             double query_ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
 

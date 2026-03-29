@@ -233,6 +233,10 @@ struct GroupCommand {
     // set: setting name and value for "set <name> <value>"
     std::string set_name;
     std::string set_value;
+
+    // tabulate: CWB-style optional window [offset limit] before fields (default limit 1000)
+    size_t tabulate_offset = 0;
+    size_t tabulate_limit = 1000;
 };
 
 // ── Top-level statement ─────────────────────────────────────────────────

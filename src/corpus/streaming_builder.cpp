@@ -253,8 +253,31 @@ void StreamingBuilder::add_region(const std::string& type,
                                   CorpusPos start, CorpusPos end,
                                   const std::vector<std::pair<std::string, std::string>>& attrs) {
     add_region(type, start, end);
+    const size_t n = regions_[type].size();
+    if (n == 0) return;
+
+    auto& type_map = region_attr_values_[type];
+    std::unordered_set<std::string> present;
+    present.reserve(attrs.size());
     for (const auto& [k, v] : attrs)
-        region_attr_values_[type][k].push_back(v);
+        present.insert(k);
+
+    // Each region row must contribute one value per attribute column. Sparse attrs (e.g. # doc_info on
+    // only some documents) otherwise leave shorter vectors than regions_[type].size().
+    for (const auto& [k, v] : attrs) {
+        auto& vec = type_map[k];
+        while (vec.size() < n - 1)
+            vec.push_back("_");
+        if (vec.size() == n - 1)
+            vec.push_back(v);
+        else
+            vec.back() = v;
+    }
+    for (auto& [k, vec] : type_map) {
+        if (present.count(k)) continue;
+        while (vec.size() < n)
+            vec.push_back("_");
+    }
 }
 
 // ── finalize ────────────────────────────────────────────────────────────

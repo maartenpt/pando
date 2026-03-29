@@ -1,11 +1,13 @@
 #include "query/executor.h"
 #include <algorithm>
+#include <cstdint>
 #include <iostream>
 #include <queue>
 #include <random>
 #include <stdexcept>
 #include <thread>
 #include <unordered_set>
+#include <functional>
 
 #ifndef PANDO_USE_RE2
 #include <mutex>
@@ -738,13 +740,149 @@ static bool compare_value(CompOp op, const std::string& a, const std::string& b)
 
 // ── Main execution ──────────────────────────────────────────────────────
 
+namespace {
+
+bool build_aggregate_plan(const Corpus& corpus, const std::vector<std::string>& fields,
+                          AggregateBucketData& out) {
+    out.columns.clear();
+    out.region_intern.clear();
+    out.counts.clear();
+    out.total_hits = 0;
+    out.columns.reserve(fields.size());
+    out.region_intern.resize(fields.size());
+    for (const std::string& field : fields) {
+        AggregateBucketData::Column col;
+        std::string attr_spec = field;
+        if (field.rfind("match.", 0) == 0 && field.size() > 6) {
+            attr_spec = field.substr(6);
+        } else {
+            auto dot = field.find('.');
+            if (dot != std::string::npos && dot > 0) {
+                col.named_anchor = field.substr(0, dot);
+                attr_spec = field.substr(dot + 1);
+            }
+        }
+        std::string attr = attr_spec;
+        if (attr.size() > 5 && attr.substr(0, 5) == "feats" && attr.find('.') != std::string::npos)
+            attr[attr.find('.')] = '_';
+        if (corpus.has_attr(attr)) {
+            col.kind = AggregateBucketData::Column::Kind::Positional;
+            col.pa = &corpus.attr(attr);
+            out.columns.push_back(std::move(col));
+            continue;
+        }
+        bool found_reg = false;
+        for (const auto& ra_name : corpus.region_attr_names()) {
+            if (ra_name != attr_spec) continue;
+            auto us = ra_name.find('_');
+            if (us == std::string::npos || us + 1 >= ra_name.size()) return false;
+            std::string sn = ra_name.substr(0, us);
+            std::string ran = ra_name.substr(us + 1);
+            if (!corpus.has_structure(sn)) return false;
+            const auto& sa = corpus.structure(sn);
+            if (!sa.has_region_attr(ran)) return false;
+            col.kind = AggregateBucketData::Column::Kind::Region;
+            col.sa = &sa;
+            col.region_attr_name = std::move(ran);
+            out.columns.push_back(std::move(col));
+            found_reg = true;
+            break;
+        }
+        if (!found_reg) return false;
+    }
+    return true;
+}
+
+bool fill_aggregate_key(AggregateBucketData& data, const Match& m, const NameIndexMap& nm,
+                        std::vector<int64_t>& key_out) {
+    key_out.resize(data.columns.size());
+    for (size_t i = 0; i < data.columns.size(); ++i) {
+        const auto& col = data.columns[i];
+        CorpusPos pos = col.named_anchor.empty() ? m.first_pos()
+                                                 : resolve_name(m, nm, col.named_anchor);
+        if (pos == NO_HEAD) return false;
+        if (col.kind == AggregateBucketData::Column::Kind::Positional) {
+            key_out[i] = static_cast<int64_t>(col.pa->id_at(pos));
+        } else {
+            int64_t rgn = col.sa->find_region(pos);
+            if (rgn < 0) return false;
+            std::string val(col.sa->region_value(col.region_attr_name, static_cast<size_t>(rgn)));
+            auto& st = data.region_intern[i];
+            auto it = st.str_to_id.find(val);
+            if (it != st.str_to_id.end()) {
+                key_out[i] = it->second;
+            } else {
+                int64_t id = static_cast<int64_t>(st.id_to_str.size() + 1);
+                st.str_to_id.emplace(val, id);
+                st.id_to_str.push_back(std::move(val));
+                key_out[i] = id;
+            }
+        }
+    }
+    return true;
+}
+
+} // namespace
+
+size_t AggregateBucketData::VecHash::operator()(const std::vector<int64_t>& v) const noexcept {
+    size_t h = v.size();
+    for (int64_t x : v) {
+        uint64_t ux = static_cast<uint64_t>(x);
+        h ^= std::hash<uint64_t>{}(ux + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2));
+    }
+    return h;
+}
+
+std::string decode_aggregate_bucket_key(const AggregateBucketData& data,
+                                          const std::vector<int64_t>& key) {
+    std::string out;
+    for (size_t i = 0; i < key.size() && i < data.columns.size(); ++i) {
+        if (i > 0) out += '\t';
+        const auto& col = data.columns[i];
+        if (col.kind == AggregateBucketData::Column::Kind::Positional) {
+            LexiconId lid = static_cast<LexiconId>(key[i]);
+            out += col.pa->lexicon().get(lid);
+        } else {
+            int64_t id = key[i];
+            const auto& st = data.region_intern[i];
+            if (id >= 1 && static_cast<size_t>(id) <= st.id_to_str.size())
+                out += st.id_to_str[static_cast<size_t>(id - 1)];
+        }
+    }
+    return out;
+}
+
+bool QueryExecutor::match_survives_post_filters_for_aggregate(
+        const TokenQuery& query,
+        const NameIndexMap& name_map,
+        const std::vector<AnchorConstraint>& anchor_constraints,
+        MatchSet& scratch,
+        const Match& m) const {
+    scratch.matches.clear();
+    scratch.matches.push_back(m);
+    scratch.total_count = 1;
+    apply_anchor_filters(anchor_constraints, scratch);
+    if (scratch.matches.empty()) return false;
+    apply_within_having(query, scratch);
+    if (scratch.matches.empty()) return false;
+    apply_not_within(query, scratch);
+    if (scratch.matches.empty()) return false;
+    apply_containing(query, scratch);
+    if (scratch.matches.empty()) return false;
+    apply_position_orders(query, name_map, scratch);
+    if (scratch.matches.empty()) return false;
+    apply_global_filters(query, name_map, scratch);
+    return !scratch.matches.empty();
+}
+
 MatchSet QueryExecutor::execute(const TokenQuery& query,
                                 size_t max_matches,
                                 bool count_total,
                                 size_t max_total_cap,
                                 size_t sample_size,
                                 uint32_t random_seed,
-                                unsigned num_threads) {
+                                unsigned num_threads,
+                                const std::vector<std::string>* aggregate_by_fields) {
     // Strip region anchors (<s>, </s>) from query, recording constraints
     std::vector<AnchorConstraint> anchor_constraints;
     bool has_anchors = false;
@@ -763,6 +901,32 @@ MatchSet QueryExecutor::execute(const TokenQuery& query,
 
     // #25: Pre-resolve EQ values to LexiconIds for fast integer comparison
     compile_query(q);
+
+    std::shared_ptr<AggregateBucketData> agg_storage;
+    AggregateBucketData* agg_ptr = nullptr;
+    MatchSet post_scratch;
+    bool agg_capped = false;
+    if (aggregate_by_fields && !aggregate_by_fields->empty() && sample_size == 0) {
+        agg_storage = std::make_shared<AggregateBucketData>();
+        if (build_aggregate_plan(corpus_, *aggregate_by_fields, *agg_storage))
+            agg_ptr = agg_storage.get();
+        else
+            agg_storage.reset();
+    }
+    if (agg_ptr)
+        post_scratch.matches.reserve(1);
+
+    // Per-match post-filter pass is expensive at millions of hits; skip when only
+    // inline :: region filters apply (handled above) and no other post-filters exist.
+    const bool agg_per_match_post =
+        agg_ptr
+        && (!anchor_constraints.empty()
+            || (q.within_having && !q.within.empty() && corpus_.has_structure(q.within))
+            || (q.not_within && !q.within.empty() && corpus_.has_structure(q.within))
+            || !q.containing_clauses.empty() || !q.position_orders.empty()
+            || !q.global_alignment_filters.empty());
+
+    unsigned eff_threads = (agg_ptr && num_threads > 1) ? 1u : num_threads;
 
     std::vector<Match> reservoir;
     if (sample_size > 0) reservoir.reserve(sample_size);
@@ -806,6 +970,22 @@ MatchSet QueryExecutor::execute(const TokenQuery& query,
         // Apply :: region filters inline so rejected matches don't consume the limit
         if (!q.global_region_filters.empty() && !pass_region_filters(m))
             return;
+        if (agg_ptr) {
+            if (agg_per_match_post &&
+                !match_survives_post_filters_for_aggregate(q, name_map, anchor_constraints,
+                                                          post_scratch, m))
+                return;
+            std::vector<int64_t> akey;
+            if (!fill_aggregate_key(*agg_ptr, m, name_map, akey))
+                return;
+            if (max_total_cap > 0 && agg_ptr->total_hits >= max_total_cap) {
+                agg_capped = true;
+                return;
+            }
+            ++agg_ptr->total_hits;
+            ++agg_ptr->counts[std::move(akey)];
+            return;
+        }
         ++result.total_count;
         if (sample_size > 0) {
             if (reservoir.size() < sample_size) {
@@ -824,10 +1004,12 @@ MatchSet QueryExecutor::execute(const TokenQuery& query,
 
     auto reached_limit = [&]() {
         if (sample_size > 0) return false;  // sampling needs full enumeration
+        if (agg_ptr) return false;
         return max_matches > 0 && result.total_count >= max_matches
                && !count_total;
     };
     auto reached_total_cap = [&]() {
+        if (agg_ptr) return agg_capped;
         return count_total && max_total_cap > 0 && result.total_count >= max_total_cap;
     };
 
@@ -883,6 +1065,13 @@ MatchSet QueryExecutor::execute(const TokenQuery& query,
                 return try_spans_from(p);
             });
         }
+        if (agg_ptr) {
+            result.matches.clear();
+            result.total_count = agg_ptr->total_hits;
+            result.total_exact = !agg_capped;
+            result.aggregate_buckets = std::move(agg_storage);
+            return result;
+        }
         apply_anchor_filters(anchor_constraints, result);
         apply_within_having(q, result);
         apply_not_within(q, result);
@@ -908,7 +1097,7 @@ MatchSet QueryExecutor::execute(const TokenQuery& query,
         ? &corpus_.structure(effective_within) : nullptr;
 
     // Parallel path: materialize seeds and process chunks in parallel (multi-token only)
-    if (num_threads > 1 && n > 1) {
+    if (eff_threads > 1 && n > 1) {
         std::vector<CorpusPos> seeds = resolve_conditions(q.tokens[plan.seed].conditions);
         // #24: Pre-filter seeds that fall outside any within-region (parallel path).
         // Seeds are sorted, so cursor-based scan is efficient.
@@ -924,7 +1113,7 @@ MatchSet QueryExecutor::execute(const TokenQuery& query,
             }), seeds.end());
         }
         if (!seeds.empty()) {
-            size_t nw = std::min(static_cast<size_t>(num_threads), seeds.size());
+            size_t nw = std::min(static_cast<size_t>(eff_threads), seeds.size());
             size_t chunk_sz = (seeds.size() + nw - 1) / nw;
             std::vector<std::vector<Match>> thread_matches(nw);
             std::vector<std::thread> workers;
@@ -988,6 +1177,13 @@ MatchSet QueryExecutor::execute(const TokenQuery& query,
 
     if (sample_size > 0 && !reservoir.empty())
         result.matches = std::move(reservoir);
+    if (agg_ptr) {
+        result.matches.clear();
+        result.total_count = agg_ptr->total_hits;
+        result.total_exact = !agg_capped;
+        result.aggregate_buckets = std::move(agg_storage);
+        return result;
+    }
     apply_anchor_filters(anchor_constraints, result);
     apply_within_having(q, result);
     apply_not_within(q, result);
