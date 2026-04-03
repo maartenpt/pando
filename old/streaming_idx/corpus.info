@@ -1,3 +1,0 @@
-size=40
-positional=deprel,feats_Case,feats_Definite,feats_Degree,feats_Gender,feats_Mood,feats_Number,feats_Person,feats_PronType,feats_Tense,feats_VerbForm,form,lemma,upos,xpos
-structural=s

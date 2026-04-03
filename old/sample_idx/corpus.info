@@ -1,4 +1,0 @@
-size=1152
-positional=deprel,feats,form,lemma,tuid,upos,xpos
-structural=p,s,text
-region_attrs=s_tuid,text_century,text_id,text_genre,text_lang,p_tuid
