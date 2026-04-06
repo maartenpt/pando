@@ -80,6 +80,39 @@ int main() {
         assert(p[0].command.fields[1] == "form");
     }
 
+    {
+        auto p = manatree::translate_cwb_program("[lemma=\"the\"]; size", 0, nullptr);
+        assert(p.size() == 2);
+        assert(p[1].has_command);
+        assert(p[1].command.type == manatree::CommandType::SIZE);
+    }
+
+    {
+        auto p = manatree::translate_cwb_program("[lemma=\"the\"]; sort by lemma", 0, nullptr);
+        assert(p.size() == 2);
+        assert(p[1].command.type == manatree::CommandType::SORT);
+        assert(p[1].command.fields.size() == 1);
+        assert(p[1].command.fields[0] == "lemma");
+    }
+
+    {
+        auto p = manatree::translate_cwb_program("[lemma=\"the\"]; tabulate 0 5 lemma", 0, nullptr);
+        assert(p.size() == 2);
+        assert(p[1].command.type == manatree::CommandType::TABULATE);
+        assert(p[1].command.tabulate_offset == 0);
+        assert(p[1].command.tabulate_limit == 5);
+        assert(p[1].command.fields.size() == 1);
+        assert(p[1].command.fields[0] == "lemma");
+    }
+
+    {
+        auto p = manatree::translate_cwb_program("tabulate lemma", 0, nullptr);
+        assert(p.size() == 1);
+        assert(p[0].command.tabulate_offset == 0);
+        assert(p[0].command.tabulate_limit == 1000);
+        assert(p[0].command.fields[0] == "lemma");
+    }
+
     expect_throw("count by lemma.sub");
     expect_throw("count by match");
 

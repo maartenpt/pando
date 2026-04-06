@@ -6,6 +6,7 @@
 #include <cctype>
 #include <sstream>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 namespace manatree {
@@ -97,12 +98,10 @@ std::vector<std::string> split_cwb_segments(const std::string& input) {
 static bool is_cqp_shell_keyword(CwbTok k) {
     switch (k) {
     case CwbTok::GROUP_SYM:
-    case CwbTok::SORT_SYM:
     case CwbTok::CAT_SYM:
     case CwbTok::SAVE_SYM:
     case CwbTok::SHOW_SYM:
     case CwbTok::SET_SYM:
-    case CwbTok::TABULATE_SYM:
     case CwbTok::DISCARD_SYM:
     case CwbTok::INTER_SYM:
     case CwbTok::UNION_SYM:
@@ -112,7 +111,6 @@ static bool is_cqp_shell_keyword(CwbTok k) {
     case CwbTok::INFO_SYM:
     case CwbTok::DUMP_SYM:
     case CwbTok::UNDUMP_SYM:
-    case CwbTok::SIZE_SYM:
     case CwbTok::CUT_SYM:
     case CwbTok::MU_SYM:
     case CwbTok::TAB_SYM:
@@ -140,8 +138,8 @@ static bool is_cqp_shell_keyword(CwbTok k) {
     throw std::runtime_error(
         "CQP command '" + name +
         "' is not implemented in the CWB dialect yet (offset " + std::to_string(off) +
-        "). Supported CWB-style commands here include `count by <attr>` and `group by <field>[, ...]` "
-        "(see IMS SortCmd). "
+        "). Supported CWB-style commands include `count by`, `group by`, `sort by`, `size`, "
+        "`tabulate`, and token patterns (see IMS SortCmd). "
         "Use `--cql native` for full pando commands.");
 }
 
@@ -149,6 +147,12 @@ CwbTok peek2_kind(const TokStream& ts) {
     if (ts.i + 1 >= ts.v->size())
         return CwbTok::END;
     return (*ts.v)[ts.i + 1].kind;
+}
+
+static CwbTok peek_kind_at(const TokStream& ts, std::size_t rel) {
+    if (ts.v == nullptr || ts.i + rel >= ts.v->size())
+        return CwbTok::END;
+    return (*ts.v)[ts.i + rel].kind;
 }
 
 void expect_tok(TokStream& ts, CwbTok k, const char* ctx) {
@@ -712,6 +716,142 @@ Statement parse_cwb_group_cmd(TokStream& ts, std::ostringstream* trace) {
     return stmt;
 }
 
+Statement parse_cwb_size_cmd(TokStream& ts, std::ostringstream* trace) {
+    expect_tok(ts, CwbTok::SIZE_SYM, "size");
+
+    Statement stmt;
+    stmt.has_command = true;
+    stmt.command.type = CommandType::SIZE;
+
+    if (!ts.eof() && ts.peek().kind == CwbTok::ID && peek2_kind(ts) != CwbTok::BY_SYM) {
+        stmt.command.query_name = ts.peek().text;
+        ts.bump();
+    }
+
+    parse_cwb_sort_cmd_tail(ts, trace, "size");
+
+    if (trace) {
+        *trace << "  statement: CWB size";
+        if (!stmt.command.query_name.empty())
+            *trace << " " << stmt.command.query_name;
+        *trace << "\n";
+    }
+
+    return stmt;
+}
+
+Statement parse_cwb_sort_cmd(TokStream& ts, std::ostringstream* trace) {
+    expect_tok(ts, CwbTok::SORT_SYM, "sort");
+
+    if (!ts.eof() && ts.peek().kind == CwbTok::ID && peek2_kind(ts) == CwbTok::BY_SYM) {
+        if (trace)
+            *trace << "  (CWB sort: corpus id '" << ts.peek().text
+                   << "' skipped — pando uses the open corpus)\n";
+        ts.bump();
+    }
+
+    expect_tok(ts, CwbTok::BY_SYM, "'by' after sort");
+
+    Statement stmt;
+    stmt.has_command = true;
+    stmt.command.type = CommandType::SORT;
+    stmt.command.fields.push_back(parse_cwb_by_field(ts, "after 'sort by'"));
+
+    while (!ts.eof() && ts.peek().kind == CwbTok::COMMA) {
+        ts.bump();
+        stmt.command.fields.push_back(parse_cwb_by_field(ts, "after ',' in sort by"));
+    }
+
+    parse_cwb_sort_cmd_tail(ts, trace, "sort");
+
+    if (trace) {
+        *trace << "  statement: CWB sort by";
+        for (const std::string& f : stmt.command.fields)
+            *trace << " " << f;
+        *trace << "\n";
+    }
+
+    return stmt;
+}
+
+Statement parse_cwb_tabulate_cmd(TokStream& ts, std::ostringstream* trace) {
+    expect_tok(ts, CwbTok::TABULATE_SYM, "tabulate");
+
+    Statement stmt;
+    stmt.has_command = true;
+    stmt.command.type = CommandType::TABULATE;
+    stmt.command.tabulate_offset = 0;
+    stmt.command.tabulate_limit = 1000;
+
+    auto parse_field_tail = [&]() {
+        if (ts.eof() || ts.peek().kind == CwbTok::END || ts.peek().kind == CwbTok::SEMI)
+            throw std::runtime_error("tabulate requires at least one field");
+        stmt.command.fields.push_back(parse_cwb_by_field(ts, "in tabulate"));
+        while (!ts.eof() && ts.peek().kind == CwbTok::COMMA) {
+            ts.bump();
+            stmt.command.fields.push_back(parse_cwb_by_field(ts, "after ',' in tabulate"));
+        }
+    };
+
+    if (ts.peek().kind == CwbTok::INTEGER && peek_kind_at(ts, 1) == CwbTok::INTEGER) {
+        stmt.command.tabulate_offset = static_cast<std::size_t>(std::stoull(ts.peek().text));
+        ts.bump();
+        stmt.command.tabulate_limit = static_cast<std::size_t>(std::stoull(ts.peek().text));
+        ts.bump();
+        parse_field_tail();
+    } else if (ts.peek().kind == CwbTok::ID && peek_kind_at(ts, 1) == CwbTok::INTEGER &&
+               peek_kind_at(ts, 2) == CwbTok::INTEGER) {
+        stmt.command.query_name = ts.peek().text;
+        ts.bump();
+        stmt.command.tabulate_offset = static_cast<std::size_t>(std::stoull(ts.peek().text));
+        ts.bump();
+        stmt.command.tabulate_limit = static_cast<std::size_t>(std::stoull(ts.peek().text));
+        ts.bump();
+        parse_field_tail();
+    } else {
+        parse_field_tail();
+    }
+
+    parse_cwb_sort_cmd_tail(ts, trace, "tabulate");
+
+    if (trace) {
+        *trace << "  statement: CWB tabulate";
+        if (stmt.command.tabulate_offset != 0 || stmt.command.tabulate_limit != 1000)
+            *trace << " offset=" << stmt.command.tabulate_offset << " limit=" << stmt.command.tabulate_limit;
+        if (!stmt.command.query_name.empty())
+            *trace << " query=" << stmt.command.query_name;
+        for (const std::string& f : stmt.command.fields)
+            *trace << " " << f;
+        *trace << "\n";
+    }
+
+    return stmt;
+}
+
+// Query-only statement after count/group/shell dispatch (named assignment or anonymous RegWordfExpr).
+static Statement parse_cwb_query_statement_after_keywords(TokStream& ts, std::ostringstream* trace) {
+    Statement stmt;
+    if (ts.peek().kind == CwbTok::ID && ts.i + 1 < ts.v->size() &&
+        (*ts.v)[ts.i + 1].kind == CwbTok::EQ) {
+        stmt.name = ts.peek().text;
+        ts.bump();
+        ts.bump();
+        if (trace)
+            *trace << "  statement: named query \"" << stmt.name << "\"\n";
+        stmt.has_query = true;
+        stmt.query = parse_reg_wordf_expr(ts, trace);
+        parse_search_pattern_tail(ts);
+        return stmt;
+    }
+
+    if (trace)
+        *trace << "  statement: anonymous token query\n";
+    stmt.has_query = true;
+    stmt.query = parse_reg_wordf_expr(ts, trace);
+    parse_search_pattern_tail(ts);
+    return stmt;
+}
+
 Statement parse_statement_tokens(std::vector<CwbToken>& toks, std::ostringstream* trace) {
     TokStream ts;
     ts.v = &toks;
@@ -733,30 +873,31 @@ Statement parse_statement_tokens(std::vector<CwbToken>& toks, std::ostringstream
         return st;
     }
 
+    if (ts.peek().kind == CwbTok::SIZE_SYM) {
+        Statement st = parse_cwb_size_cmd(ts, trace);
+        if (!ts.eof() && ts.peek().kind != CwbTok::END && ts.peek().kind != CwbTok::SEMI)
+            throw std::runtime_error("Unexpected tokens after CWB size command");
+        return st;
+    }
+
+    if (ts.peek().kind == CwbTok::SORT_SYM) {
+        Statement st = parse_cwb_sort_cmd(ts, trace);
+        if (!ts.eof() && ts.peek().kind != CwbTok::END && ts.peek().kind != CwbTok::SEMI)
+            throw std::runtime_error("Unexpected tokens after CWB sort command");
+        return st;
+    }
+
+    if (ts.peek().kind == CwbTok::TABULATE_SYM) {
+        Statement st = parse_cwb_tabulate_cmd(ts, trace);
+        if (!ts.eof() && ts.peek().kind != CwbTok::END && ts.peek().kind != CwbTok::SEMI)
+            throw std::runtime_error("Unexpected tokens after CWB tabulate command");
+        return st;
+    }
+
     if (is_cqp_shell_keyword(ts.peek().kind))
         shell_keyword_error(ts.peek().text, ts.peek().offset);
 
-    Statement stmt;
-    if (ts.peek().kind == CwbTok::ID && ts.i + 1 < toks.size() &&
-        toks[ts.i + 1].kind == CwbTok::EQ) {
-        stmt.name = ts.peek().text;
-        ts.bump();
-        ts.bump();
-        if (trace)
-            *trace << "  statement: named query \"" << stmt.name << "\"\n";
-        stmt.has_query = true;
-        stmt.query = parse_reg_wordf_expr(ts, trace);
-        parse_search_pattern_tail(ts);
-        if (!ts.eof() && ts.peek().kind != CwbTok::END && ts.peek().kind != CwbTok::SEMI)
-            throw std::runtime_error("Unexpected tokens after CWB query pattern");
-        return stmt;
-    }
-
-    if (trace)
-        *trace << "  statement: anonymous token query\n";
-    stmt.has_query = true;
-    stmt.query = parse_reg_wordf_expr(ts, trace);
-    parse_search_pattern_tail(ts);
+    Statement stmt = parse_cwb_query_statement_after_keywords(ts, trace);
     if (!ts.eof() && ts.peek().kind != CwbTok::END && ts.peek().kind != CwbTok::SEMI)
         throw std::runtime_error("Unexpected tokens after CWB query pattern");
     return stmt;

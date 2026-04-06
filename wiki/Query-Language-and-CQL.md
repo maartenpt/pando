@@ -30,7 +30,7 @@ To disable a dialect: configure with **`-DPANDO_CWB_DIALECT=OFF`** or **`-DPANDO
 
 ## CWB / CQP (`--cql cwb`)
 
-**Intent:** A **partial** CWB/CQP-style front-end (lexer + recursive descent) that turns **token query** text into Pando’s `Program`: **named** assignments (`Name = pattern`), **anonymous** search patterns, and restricted **`count by <attr>`** / **`group by <field>[, …]`** commands. Multi-statement input is split on **`;`** (outside quoted strings).
+**Intent:** A **partial** CWB/CQP-style front-end (lexer + recursive descent) that turns **token query** text into Pando’s `Program`: **named** assignments (`Name = pattern`), **anonymous** search patterns, and selected **shell-style** commands mapped to native `GroupCommand` (e.g. **`count by`**, **`group by`**, **`sort by`**, **`size`**, **`tabulate`**). Multi-statement input is split on **`;`** (outside quoted strings). Output formatting is **Pando’s**, not CQP’s.
 
 **Well supported relative to other dialects** because pando-CQL is modelled on CWB-style token patterns and attribute tests. Quoted-string behaviour for **`=`** inside **`[ ]`** follows the same **literal vs regex** heuristic as native CQL when **`--strict-quoted-strings`** is off (see [PANDO-CQL.md](PANDO-CQL.md)).
 
@@ -39,13 +39,16 @@ To disable a dialect: configure with **`-DPANDO_CWB_DIALECT=OFF`** or **`-DPANDO
 - **Named and anonymous** `RegWordfExpr`-style token sequences with **`[ attr op value ]`**, **`[]`**, repetition **`? * + {m,n}`**, sequence concatenation.
 - **`count by <attribute>`** with basic forms (see trace output for ignored modifiers).
 - **`group by <field>[, <field> …]`** mapped to the native **`group`** command. Fields use Pando’s **`name.attribute`** form; CWB-style **`name attribute`** (space instead of a dot) is accepted and normalized (e.g. `match lemma` → `match.lemma`). **`match.lemma`** is also accepted as a single dotted token.
+- **`sort by <field>[, …]`** → native **`sort`** (optional corpus id before **`by`** is skipped).
+- **`size`** → native **`size`** (optional query name).
+- **`tabulate`** → native **`tabulate`**: `tabulate [offset limit] field[, …]`, `tabulate QueryName offset limit field[, …]`, or `tabulate field[, …]` (default offset `0`, limit `1000`).
 
 **Not supported in this dialect** (the parser throws with a specific message; use **`--cql native`** for full Pando):
 
-- **CQP shell commands** at statement start: `sort`, `cat`, `save`, `show`, `set`, `tabulate`, `discard`, **`intersect` / `union` / `diff` / `join` / `subset`**, `meet`, `info`, `dump`, `size`, `cut`, `mu`, `tab`, `exec`, macros, and similar keywords.
+- **CQP shell commands** at statement start: `cat`, `save`, `show`, `set`, `discard`, **`intersect` / `union` / `diff` / `join` / `subset`**, `meet`, `info`, `dump`, `cut`, `mu`, `tab`, `exec`, macros, and similar keywords.
 - **`meet` / `join` on named query results** (same class as shell combinators above).
 - **Pattern features** not mapped to the native condition AST, including: **`within` / `containing`** after the pattern; **global `::`** constraints after the pattern; **alternation `|`** between full token-sequence patterns at the top level; **parenthesised groups** with repetition in some forms; **lookahead** `[: … :]` / `[::]`; **boolean `!`** and **`->`** inside **`[ ]`**; **MU** / **TAB** query forms; **XML/anchor tags** in the pattern; **region append `<<`**; **`cut` / `show match …`** tails; **redirection** / **`into outfile`** (Pando has no query-directed file output).
-- **`count` / `group`**: `on match` / anchor boundaries, **`cut`**, shell-style **`>`** redirection.
+- **`count` / `group` / `sort` / `size` / `tabulate`**: `on match` / anchor boundaries, **`cut`**, shell-style **`>`** redirection.
 
 **Security / I/O:** There is no **`into outfile`** or other query-driven disk write; use shell redirection on the CLI if you need a file.
 

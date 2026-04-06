@@ -2418,8 +2418,8 @@ static Options parse_args(int argc, char* argv[]) {
                   << "  --api            API mode: JSON only, single-object responses\n"
                   << "  --debug[=N]      Include debug info (plan, timing, cardinalities); N>=1 for verbosity\n"
 #if defined(PANDO_WITH_CWB_DIALECT)
-                  << "  --cql native|cwb|pmltq|tiger  Query language front-end (default: native; cwb=CWB/CQP, "
-                     "pmltq=PML-TQ, tiger=TIGERSearch-style macros for constituency)\n"
+                  << "  --cql native|cwb|pmltq|tiger  Query language front-end (default: native; "
+                     "cwb=CWB/CQP subset, pmltq=PML-TQ, tiger=TIGERSearch-style macros for constituency)\n"
 #else
                   << "  --cql native|pmltq|tiger  Query language front-end (default: native; pmltq=PML-TQ, "
                      "tiger=TIGERSearch-style macros; cwb: -DPANDO_CWB_DIALECT=ON)\n"
