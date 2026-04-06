@@ -19,7 +19,7 @@ Types listed under **`zerowidth`** (e.g. `del` for editorial marks) can have `st
 | Overlapping `hi` | Token matches if **any** overlapping region satisfies the predicate |
 | `within` | Match span must fit **inside** a region satisfying the constraint |
 
-For the exact table of region-attribute restrictions, see [../docs/PANDO-CQL.md](../docs/PANDO-CQL.md) (Regions / Within).
+For the exact table of region-attribute restrictions, see [PANDO-CQL.md](PANDO-CQL.md) (Regions / Within).
 
 ## See also
 

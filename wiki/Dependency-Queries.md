@@ -13,7 +13,7 @@ Operators between tokens include:
 - **`>>` / `<<`**: transitive descendants / ancestors (tree traversal)
 - Negated forms (e.g. `!<`) where supported
 
-See [../docs/PANDO-CQL.md](../docs/PANDO-CQL.md) for the full operator set and examples.
+See [PANDO-CQL.md](PANDO-CQL.md) for the full operator set and examples.
 
 ## Inside-token restrictions
 

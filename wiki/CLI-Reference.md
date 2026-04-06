@@ -20,7 +20,7 @@ Interactive REPL supports `set`, `show settings`, etc.
 
 ## `pando-index`
 
-Builds or updates a corpus directory from input (JSONL). See `dev/` and `docs/SAMPLE-CORPUS.md`.
+Builds or updates a corpus directory from input (JSONL). See `dev/` and [Sample corpora](Sample-Corpora.md).
 
 ## `pando-check`
 

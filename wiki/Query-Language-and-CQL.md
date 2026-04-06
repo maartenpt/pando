@@ -6,7 +6,7 @@ Pando’s native language is **Pando CQL**, modeled on CWB-CQP with extensions (
 
 The full specification and tutorial live in the repo as a single long document:
 
-**[../docs/PANDO-CQL.md](../docs/PANDO-CQL.md)**
+**[PANDO-CQL.md](PANDO-CQL.md)**
 
 Keep that file as the source of truth for syntax tables, examples, and edge cases.
 

@@ -49,11 +49,11 @@ TEITOK models **parallel texts** with shared identifiers. In Universal Dependenc
 - **Sentence-level `tuid`**: from sentence comments (e.g. CQP-style `# tuid = …` / TEITOK conventions). The value is stored on the **`s`** region and copied onto each token in that sentence as a positional attribute **`tuid`** until the sentence ends.
 - **Word-level override**: if the **MISC** column (field 10) contains `tuid=…`, that value overrides the sentence default for that token (TEITOK-style word alignment).
 
-After indexing, CQL can relate named tokens across languages via those attributes, e.g. `eng.s_tuid = nld.s_tuid` or token-level `eng.tuid = nld.tuid`. For **many-to-many** alignment, ids are often **pipe-separated multivalues**; see the detailed guide [Aligned corpora and parallel queries](Aligned-Corpora-and-Parallel-Queries.md) and the CQL tutorial in [../docs/PANDO-CQL.md](../docs/PANDO-CQL.md) (“Named tokens and aligned corpora”).
+After indexing, CQL can relate named tokens across languages via those attributes, e.g. `eng.s_tuid = nld.s_tuid` or token-level `eng.tuid = nld.tuid`. For **many-to-many** alignment, ids are often **pipe-separated multivalues**; see the detailed guide [Aligned corpora and parallel queries](Aligned-Corpora-and-Parallel-Queries.md) and the CQL tutorial in [PANDO-CQL.md](PANDO-CQL.md) (“Named tokens and aligned corpora”).
 
 ## Contractions and multiword tokens
 
-TEITOK and UD often represent **contractions** with multiple analysis layers. Pando does **not** duplicate that layered token graph: it indexes **surface tokens** and can emit a reserved **`contr`** region spanning sub-tokens with a **`form`** attribute (surface string). Shorthand **`"word"`** expands to **`[form="word" | contr_form="word"]+`** (see [../docs/PANDO-CQL.md](../docs/PANDO-CQL.md) — “Raw queries and contractions”); **`+`** matches a **maximal** contiguous run of satisfying tokens (including the full contraction span).
+TEITOK and UD often represent **contractions** with multiple analysis layers. Pando does **not** duplicate that layered token graph: it indexes **surface tokens** and can emit a reserved **`contr`** region spanning sub-tokens with a **`form`** attribute (surface string). Shorthand **`"word"`** expands to **`[form="word" | contr_form="word"]+`** (see [PANDO-CQL.md](PANDO-CQL.md) — “Raw queries and contractions”); **`+`** matches a **maximal** contiguous run of satisfying tokens (including the full contraction span).
 
 ## Default `within` and text structure
 

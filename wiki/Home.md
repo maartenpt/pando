@@ -2,7 +2,7 @@
 
 **Pando** is a C++ corpus query engine related to Manatee, CWB/CQP, and similar tools: positional and structural (region) attributes, dependency-aware search, multivalue fields, overlapping regions where declared, and parallel / aligned-corpus queries.
 
-**Beta:** Pando is under active development. This wiki and [PANDO-CQL.md](../docs/PANDO-CQL.md) describe **intended** behavior. If something does not match the specification, treat it as a bug and report it. Implementation gaps and priorities are tracked in the repository’s `dev/` roadmaps, not here.
+**Beta:** Pando is under active development. This wiki and [PANDO-CQL.md](PANDO-CQL.md) describe **intended** behavior. If something does not match the specification, treat it as a bug and report it. Implementation gaps and priorities are tracked in the repository’s `dev/` roadmaps, not here.
 
 If you build from source, the main binaries are `pando` (query CLI), `pando-index` (build corpora), `pando-check`, and `pando-server` (HTTP API). See [Installation](Installation.md).
 
@@ -19,7 +19,7 @@ Use `pando --help` for the current option list. Important query options include 
 
 ## Key features
 
-- **Pando CQL**: CWB-style token sequences and region constraints, extended with dependencies, named tokens, global `::` filters, `within` / `containing`, collocations, keyness, and more. Full tutorial: [../docs/PANDO-CQL.md](../docs/PANDO-CQL.md). Short guides: [Collocations and keyness](Collocations-and-Keyness.md).
+- **Pando CQL**: CWB-style token sequences and region constraints, extended with dependencies, named tokens, global `::` filters, `within` / `containing`, collocations, keyness, and more. Full tutorial: [PANDO-CQL.md](PANDO-CQL.md). Short guides: [Collocations and keyness](Collocations-and-Keyness.md).
 - **Dependency index**: When the corpus has sentence structure `s` and dependency data, queries can use governors/dependents, `child`/`parent`/tree restrictions, and `dcoll`. See [Dependency queries](Dependency-Queries.md).
 - **Multivalue attributes**: Pipe-separated values at index time; EQ/NEQ match any component; reverse indexes for components (RG-5f). See [Multivalue attributes](Multivalue-Attributes.md).
 - **Structural regions**: Texts, sentences, docs, and custom region types; optional nested vs overlapping behavior per type. See [Overlapping and nested regions](Overlapping-and-Nested-Regions.md). Phrase-structure (constituency) trees as nested regions: [Constituency grammar and nested regions](Constituency-and-Nested-Regions.md).
@@ -30,6 +30,7 @@ Use `pando --help` for the current option list. Important query options include 
 ## Wiki pages
 
 - [Installation](Installation.md)
+- [Sample corpora](Sample-Corpora.md) — CoNLL-U, JSONL fixture, full UD via `build_ud_corpus.py`
 - [Quick Start](Quick-Start.md)
 - [Query language (Pando CQL)](Query-Language-and-CQL.md)
 - [Multivalue attributes](Multivalue-Attributes.md)

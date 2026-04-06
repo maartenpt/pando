@@ -9,7 +9,7 @@ Pando is a C++ corpus query engine in the same family as Manatee and CWB/CQP: it
 
 This README is intentionally minimal and documents how to build and run the current prototype for private/use-at-your-own-risk purposes.
 
-**Documentation:** see [docs/PANDO.md](docs/PANDO.md) for a short overview, [docs/PANDO-CQL.md](docs/PANDO-CQL.md) for the query language, and the **[wiki/](wiki/README.md)** for topic pages (same layout as flexipipe/flexiconv). Preview the wiki locally: `python scripts/serve-wiki-preview.py` → http://localhost:8765/
+**Documentation:** see [wiki/Home.md](wiki/Home.md) for an overview, [wiki/PANDO-CQL.md](wiki/PANDO-CQL.md) for the query language, and **[wiki/README.md](wiki/README.md)** for topic pages (same layout as flexipipe/flexiconv). Preview the wiki locally: `python scripts/serve-wiki-preview.py` → http://localhost:8765/
 
 ## Status
 
@@ -50,7 +50,7 @@ Exact binary names and options may evolve; run each with `--help` for the curren
 
 ## Running a simple query
 
-To index and query the bundled UD sample (`test/data/sample.conllu`) on your machine, see [`docs/SAMPLE-CORPUS.md`](docs/SAMPLE-CORPUS.md).
+For sample corpora (bundled CoNLL-U, JSONL fixture, and the full-UD download script), see [`wiki/Sample-Corpora.md`](wiki/Sample-Corpora.md).
 
 Assuming you already have a Pando-formatted corpus at `/path/to/corpus` and have built the project:
 

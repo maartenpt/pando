@@ -7,7 +7,7 @@ Multivalue (MV) attributes store **sets** of atomic values as a single string us
 - **Equality / inequality**: `[wsd="artist"]` matches if the token’s `wsd` field contains **artist** as a component (not only the full string `artist|writer`). The same logic applies to region attributes like `text_genre` when declared multivalue: comparisons use component membership, not exact string equality.
 - **Main lexicon vs components**: Stored token values may be the full pipe-joined string. The engine uses a **component lexicon** and **`.mv.rev`** postings (RG-5f) for efficient seed resolution on EQ queries.
 - **Reverse indexes**: For positional MV attrs, optional `attr.mv.lex`, `attr.mv.rev`, … speed up “find all positions with component X”.
-- **`nvals(attr)`**: In token conditions, **`[nvals(wsd)>1]`** compares the number of non-empty `|`-separated components to an integer (see [PANDO-CQL.md](../docs/PANDO-CQL.md)). Equality uses a single **`=`** (e.g. **`nvals(wsd)=2`**), not `==`.
+- **`nvals(attr)`**: In token conditions, **`[nvals(wsd)>1]`** compares the number of non-empty `|`-separated components to an integer (see [PANDO-CQL.md](PANDO-CQL.md)). Equality uses a single **`=`** (e.g. **`nvals(wsd)=2`**), not `==`.
 
 ## Indexing
 
@@ -28,5 +28,5 @@ For **single-column** `count` / `freq` on a **multivalue** positional attribute,
 
 ## See also
 
-- [../docs/PANDO-CQL.md](../docs/PANDO-CQL.md) — “Multivalue fields and overlapping regions”
+- [PANDO-CQL.md](PANDO-CQL.md) — “Multivalue fields and overlapping regions”
 - [CLI reference](CLI-Reference.md) — `pando` flags

@@ -2,7 +2,7 @@
 
 Pando-CQL can run **collocation** analysis (words typical in the **window** or **dependency** neighbourhood of a hit set) and **keyness** (items statistically over- or under-represented in a **focus** subcorpus vs a **reference**). Both follow the same pattern as `count` / `freq`: define a **named query** (or use `Last`), then issue a **`coll`**, **`dcoll`**, or **`keyness`** command.
 
-The full tutorial, syntax, and edge cases are in [../docs/PANDO-CQL.md](../docs/PANDO-CQL.md) — sections [Collocations](../docs/PANDO-CQL.md#collocations) and [Keyness](../docs/PANDO-CQL.md#keyness).
+The full tutorial, syntax, and edge cases are in [PANDO-CQL.md](PANDO-CQL.md) — sections [Collocations](PANDO-CQL.md#collocations) and [Keyness](PANDO-CQL.md#keyness).
 
 ---
 
@@ -64,6 +64,6 @@ The grouping attribute (`lemma`, `upos`, …) is the dimension along which over-
 
 ## See also
 
-- [../docs/PANDO-CQL.md](../docs/PANDO-CQL.md) — [Collocations](../docs/PANDO-CQL.md#collocations), [Keyness](../docs/PANDO-CQL.md#keyness), [Named queries and frequencies](../docs/PANDO-CQL.md#named-queries-and-frequencies)
+- [PANDO-CQL.md](PANDO-CQL.md) — [Collocations](PANDO-CQL.md#collocations), [Keyness](PANDO-CQL.md#keyness), [Named queries and frequencies](PANDO-CQL.md#named-queries-and-frequencies)
 - [CLI reference](CLI-Reference.md) — `pando` flags for windows, measures, limits
 - [Dependency queries](Dependency-Queries.md) — `dcoll` prerequisites

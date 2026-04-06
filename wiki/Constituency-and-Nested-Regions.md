@@ -32,7 +32,7 @@ With `nested`, lookups at a token position use the **innermost** region that con
 
 ## Query patterns
 
-Normative syntax and the multivalue / region table is in [../docs/PANDO-CQL.md](../docs/PANDO-CQL.md) (“Multivalue fields and overlapping regions”). Typical constituency-style patterns:
+Normative syntax and the multivalue / region table is in [PANDO-CQL.md](PANDO-CQL.md) (“Multivalue fields and overlapping regions”). Typical constituency-style patterns:
 
 | Pattern | Meaning |
 | --- | --- |
@@ -53,7 +53,7 @@ A corpus can carry **both**: UD tokens + `deprel`/`head` for syntax-as-graph, an
 
 ## Modeling scope
 
-- **`nvals(node_type)`** (see [PANDO-CQL.md](../docs/PANDO-CQL.md)) reports the number of distinct pipe-separated **components** across covering `node` regions at a token when the structure is nested or overlapping. For **geometric** containment (“inside an NP”), `within` / `containing` over region spans match how Pando represents constituency.
+- **`nvals(node_type)`** (see [PANDO-CQL.md](PANDO-CQL.md)) reports the number of distinct pipe-separated **components** across covering `node` regions at a token when the structure is nested or overlapping. For **geometric** containment (“inside an NP”), `within` / `containing` over region spans match how Pando represents constituency.
 
 - **Discontinuous constituents** (one logical node over non-adjacent tokens) are not a single contiguous span in the index; model them with **multiple** regions or another annotation layer that fits your pipeline.
 

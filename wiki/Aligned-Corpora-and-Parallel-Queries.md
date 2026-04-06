@@ -1,6 +1,6 @@
 # Aligned corpora and parallel queries
 
-This page explains **how to model parallel / bitext data** in Pando, how **translation unit ids (`tuid`)** work, and how **n:n (many-to-many) alignment** is represented. It complements [TEITOK integration](TEITOK-Integration.md) (CoNLL-U comments, MISC) and the CQL tutorial in [../docs/PANDO-CQL.md](../docs/PANDO-CQL.md) (“Named tokens and aligned corpora”, “Named queries and frequencies”).
+This page explains **how to model parallel / bitext data** in Pando, how **translation unit ids (`tuid`)** work, and how **n:n (many-to-many) alignment** is represented. It complements [TEITOK integration](TEITOK-Integration.md) (CoNLL-U comments, MISC) and the CQL tutorial in [PANDO-CQL.md](PANDO-CQL.md) (“Named tokens and aligned corpora”, “Named queries and frequencies”).
 
 ---
 
@@ -45,12 +45,12 @@ s001|s002|s007
 
 ### Semantics (query side)
 
-For attributes declared **multivalue**, Pando-CQL uses **set-style** interpretation for many constructs (see [../docs/PANDO-CQL.md](../docs/PANDO-CQL.md), “Multivalue fields and overlapping regions”):
+For attributes declared **multivalue**, Pando-CQL uses **set-style** interpretation for many constructs (see [PANDO-CQL.md](PANDO-CQL.md), “Multivalue fields and overlapping regions”):
 
 - `[s_tuid="s001"]` — the sentence’s `tuid` **set** contains `s001`.
 - For comparisons **between** two bindings `a.X` and `b.Y` on multivalue fields, the engine uses **non-empty intersection** of component sets. So `a.s_tuid = b.s_tuid` holds when the two sides share at least one translation-unit id.
 
-**Scalar** attributes remain single-valued. For attributes declared **`multivalue`**, leaf conditions, `::` filters, aggregates, and parallel / `with` alignment all follow the same **multivalue table** in [PANDO-CQL.md](../docs/PANDO-CQL.md) (set / component semantics).
+**Scalar** attributes remain single-valued. For attributes declared **`multivalue`**, leaf conditions, `::` filters, aggregates, and parallel / `with` alignment all follow the same **multivalue table** in [PANDO-CQL.md](PANDO-CQL.md) (set / component semantics).
 
 ---
 
@@ -124,7 +124,7 @@ For **sentence-aligned** search without naming tokens, you can write:
 [form="property"] with [form="bezit"]
 ```
 
-The parser builds a **parallel** query; the engine runs **source** and **target** subqueries and **pairs** matches subject to **`::`** alignment constraints (typically equality on `tuid` / `s_tuid` or other attrs — see [PANDO-CQL.md](../docs/PANDO-CQL.md) and `pando --help`).
+The parser builds a **parallel** query; the engine runs **source** and **target** subqueries and **pairs** matches subject to **`::`** alignment constraints (typically equality on `tuid` / `s_tuid` or other attrs — see [PANDO-CQL.md](PANDO-CQL.md) and `pando --help`).
 
 Use **`with`** for straightforward sentence-aligned search. For **n:n** graphs, **named tokens** and explicit `::` conditions over `s_tuid` / `tuid` (multivalue intersection as usual) express the alignment you need.
 
@@ -134,7 +134,7 @@ Use **`with`** for straightforward sentence-aligned search. For **n:n** graphs, 
 
 ## 5. Aggregations: `count`, `freq`, and translation equivalents
 
-As in [Named queries and frequencies](../docs/PANDO-CQL.md#named-queries-and-frequencies), **query names persist** across statements in a session, so you can anchor an **English (source) slice** and then **aggregate over aligned Dutch (target) tokens**—the same idea as `Matches = …; count Matches by a.form;`, but with `eng` / `nld` and `s_tuid` / `tuid` alignment.
+As in [Named queries and frequencies](PANDO-CQL.md#named-queries-and-frequencies), **query names persist** across statements in a session, so you can anchor an **English (source) slice** and then **aggregate over aligned Dutch (target) tokens**—the same idea as `Matches = …; count Matches by a.form;`, but with `eng` / `nld` and `s_tuid` / `tuid` alignment.
 
 **Sentence alignment** — after you have run a query that binds the name `eng` to English hits for *property*, count **how often each Dutch form** appears in sentences that share a `tuid` with those English sentences:
 
@@ -176,5 +176,5 @@ DutchAligned = nld:[] :: match.text_lang = "Dutch" & eng.tuid = nld.tuid; count 
 
 - [TEITOK integration](TEITOK-Integration.md) — TEITOK layout, flexicorp, CoNLL-U ingestion
 - [Multivalue attributes](Multivalue-Attributes.md) — pipe semantics, indexes, `count` / `freq`
-- [../docs/PANDO-CQL.md](../docs/PANDO-CQL.md) — full CQL, multivalue table, [named queries and frequencies](../docs/PANDO-CQL.md#named-queries-and-frequencies)
+- [PANDO-CQL.md](PANDO-CQL.md) — full CQL, multivalue table, [named queries and frequencies](PANDO-CQL.md#named-queries-and-frequencies)
 - [Index and corpus layout](Index-and-Corpus-Layout.md) — `corpus.info`, region attrs
