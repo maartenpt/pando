@@ -89,12 +89,13 @@ std::vector<CorpusPos> PositionalAttr::positions_of_id(LexiconId id) const {
 
 #ifdef PANDO_USE_RE2
 std::vector<CorpusPos> PositionalAttr::positions_matching(
-        const re2::RE2& re) const {
+        const re2::RE2& re, bool full_match) const {
     std::vector<CorpusPos> result;
     LexiconId n = lexicon_.size();
     for (LexiconId id = 0; id < n; ++id) {
         std::string_view sv = lexicon_.get(id);
-        if (re2::RE2::PartialMatch(sv, re)) {
+        bool ok = full_match ? re2::RE2::FullMatch(sv, re) : re2::RE2::PartialMatch(sv, re);
+        if (ok) {
             auto span = positions_of_id(id);
             result.insert(result.end(), span.begin(), span.end());
         }
@@ -104,13 +105,14 @@ std::vector<CorpusPos> PositionalAttr::positions_matching(
 }
 #else
 std::vector<CorpusPos> PositionalAttr::positions_matching(
-        const std::regex& re) const {
+        const std::regex& re, bool full_match) const {
     std::vector<CorpusPos> result;
     LexiconId n = lexicon_.size();
     for (LexiconId id = 0; id < n; ++id) {
         std::string_view sv = lexicon_.get(id);
         std::string s(sv);
-        if (std::regex_search(s, re)) {
+        bool ok = full_match ? std::regex_match(s, re) : std::regex_search(s, re);
+        if (ok) {
             auto span = positions_of_id(id);
             result.insert(result.end(), span.begin(), span.end());
         }

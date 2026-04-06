@@ -1,3 +1,4 @@
+#include "pando_version.h"
 #include "corpus/corpus.h"
 #include "api/query_json.h"
 #include "core/json_utils.h"
@@ -6,6 +7,7 @@
 #include "query/parser.h"
 #include "query/dialect/cwb/cwb_translate.h"
 #include "query/dialect/pmltq/pmltq_translate.h"
+#include "query/dialect/tiger/tiger_translate.h"
 #include <cctype>
 #include "query/executor.h"
 #include <iostream>
@@ -52,7 +54,7 @@ static bool use_color() {
 struct Options {
     std::string corpus_dir;
     std::string query;
-    std::string cql_dialect = "native";  // native | cwb | pmltq
+    std::string cql_dialect = "native";  // native | cwb | pmltq | tiger
     bool json    = false;
     // Debug verbosity: 0 = off, 1 = basic (plan, timing), 2+ = more detail in future
     int  debug_level = 0;
@@ -70,6 +72,8 @@ struct Options {
     unsigned threads = 1;    // parallel seed processing when > 1 (multi-token queries)
     bool preload    = false; // load all mmap'd pages into RAM at open (slower open, faster first query)
     int  max_gap    = REPEAT_UNBOUNDED; // cap for + and * quantifiers (--max-gap)
+    // When true: only /.../ is regex; "..." in [attr="..."] is always literal (legacy behavior).
+    bool strict_quoted_strings = false;
     // For aggregation commands (count/group/freq), cap number of output rows; 0 = no cap.
     size_t group_limit = 1000;
     // When true, count/freq keep pipe-joined multivalue keys (lexicon strings) instead of RG-5f explode.
@@ -80,6 +84,7 @@ struct Options {
     bool pmltq_export_sql = false;
     // Text hits: emit full sentence CoNLL-U (requires sentence structure `s` in the index)
     bool conllu = false;
+    bool print_version = false;
     // Collocation settings (--window, --left, --right, --min-freq, --measures, --max-items)
     int coll_left = 5;
     int coll_right = 5;
@@ -1622,8 +1627,9 @@ static void run_query(const Corpus& corpus, const std::string& input,
         c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
     if (d.empty())
         d = "native";
+    ParserOptions parse_opts{opts.strict_quoted_strings};
     if (d == "native") {
-        Parser parser(input);
+        Parser parser(input, parse_opts);
         prog = parser.parse();
     } else if (d == "cwb") {
         std::string cwb_trace;
@@ -1637,6 +1643,12 @@ static void run_query(const Corpus& corpus, const std::string& input,
                                        opts.debug_level > 0 ? &pmltq_trace : nullptr);
         if (opts.debug_level > 0 && !pmltq_trace.empty())
             std::cerr << pmltq_trace;
+    } else if (d == "tiger") {
+        std::string tiger_trace;
+        prog = translate_tiger_program(input, opts.debug_level,
+                                       opts.debug_level > 0 ? &tiger_trace : nullptr, parse_opts);
+        if (opts.debug_level > 0 && !tiger_trace.empty())
+            std::cerr << tiger_trace;
     } else {
         throw std::runtime_error("Unknown --cql dialect: " + opts.cql_dialect);
     }
@@ -2333,9 +2345,13 @@ static Options parse_args(int argc, char* argv[]) {
         else if (arg == "--pmltq-export-sql") {
             opts.pmltq_export_sql = true;
         }
+        else if (arg == "--version" || arg == "-V") {
+            opts.print_version = true;
+        }
                 else if (arg == "--preload") { opts.preload = true; }
         else if (arg == "--no-mv-explode") { opts.no_mv_explode = true; }
         else if (arg == "--max-gap" && i + 1 < argc) { opts.max_gap = std::stoi(argv[++i]); }
+        else if (arg == "--strict-quoted-strings") { opts.strict_quoted_strings = true; }
         else if (arg == "--window" && i + 1 < argc) {
             int w = std::stoi(argv[++i]);
             opts.coll_left = w; opts.coll_right = w;
@@ -2377,6 +2393,11 @@ static Options parse_args(int argc, char* argv[]) {
         }
     }
 
+    if (opts.print_version) {
+        std::cout << "pando " << PANDO_VERSION << "\n";
+        std::exit(0);
+    }
+
     if (positional.empty()) {
         std::cerr << "Usage: pando [options] <corpus_dir> [query]\n\n"
                   << "If the first argument is not a corpus directory but ./pando/ contains corpus.info "
@@ -2390,15 +2411,18 @@ static Options parse_args(int argc, char* argv[]) {
                   << "  ./pando CORP \"[form=\\\"can't\\\" | contr_form=\\\"can't\\\"]+\"\n"
                   << "Avoid nesting single quotes like '\"can''t\"' — the shell drops the apostrophe.\n\n"
                   << "Options:\n"
+                  << "  --version, -V    Print version and exit\n"
                   << "  --json           Output as JSON (human-/tool-friendly)\n"
                   << "  --conllu         Text hits: full sentence per match as CoNLL-U (needs sentence structure s)\n"
                   << "  --format json|conllu  Same as --json / --conllu\n"
                   << "  --api            API mode: JSON only, single-object responses\n"
                   << "  --debug[=N]      Include debug info (plan, timing, cardinalities); N>=1 for verbosity\n"
 #if defined(PANDO_WITH_CWB_DIALECT)
-                  << "  --cql native|cwb|pmltq  Query language front-end (default: native; cwb=CWB/CQP, pmltq=PML-TQ)\n"
+                  << "  --cql native|cwb|pmltq|tiger  Query language front-end (default: native; cwb=CWB/CQP, "
+                     "pmltq=PML-TQ, tiger=TIGERSearch-style macros for constituency)\n"
 #else
-                  << "  --cql native|pmltq  Query language front-end (default: native; pmltq=PML-TQ; cwb: -DPANDO_CWB_DIALECT=ON)\n"
+                  << "  --cql native|pmltq|tiger  Query language front-end (default: native; pmltq=PML-TQ, "
+                     "tiger=TIGERSearch-style macros; cwb: -DPANDO_CWB_DIALECT=ON)\n"
 #endif
                   << "  --pmltq-export-sql  With --cql pmltq: print ClickPMLTQ SQL only (needs PMLTQ_GOLD_JS_DIR + "
                      "pmltq2sql-optimized.js); skips corpus load; use corpus path '-' or any placeholder\n"
@@ -2414,6 +2438,7 @@ static Options parse_args(int argc, char* argv[]) {
                   << "  --seed N         RNG seed for --sample (reproducible runs)\n"
                   << "  --threads N      Parallel seed processing for multi-token queries (default: 1)\n"
                   << "  --max-gap N      Cap for + and * quantifiers (default: " << REPEAT_UNBOUNDED << ")\n"
+                  << "  --strict-quoted-strings  Only /pattern/ is regex; quoted strings are always literal\n"
                   << "  --no-mv-explode  count/freq: keep pipe-joined multivalue keys (no per-component buckets)\n"
                   << "\nCollocation options (coll/dcoll commands):\n"
                   << "  --window N       Symmetric window size (default: 5)\n"

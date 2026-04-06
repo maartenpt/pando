@@ -1,10 +1,13 @@
 #include "query/parser.h"
+#include "query/quoted_string_pattern.h"
+#include <cctype>
 #include <stdexcept>
 #include <algorithm>
 
 namespace manatree {
 
-Parser::Parser(const std::string& input) : lexer_(input) {}
+Parser::Parser(const std::string& input, ParserOptions opts)
+    : lexer_(input), opts_(opts) {}
 
 Program Parser::parse() {
     Program prog;
@@ -522,32 +525,69 @@ QueryToken Parser::parse_token_expr() {
         const std::string& content = rs.text;
         size_t i = 0;
         // Region name
-        while (i < content.size() && !std::isspace(content[i])) ++i;
+        while (i < content.size() && !std::isspace(static_cast<unsigned char>(content[i]))) ++i;
         qt.anchor_region = content.substr(0, i);
 
-        // Optional attrs: key="value" pairs
-        while (i < content.size()) {
-            while (i < content.size() && std::isspace(content[i])) ++i;
+        auto try_parse_clause = [&](size_t& pos, AnchorRegionClause* out) -> bool {
+            while (pos < content.size() && std::isspace(static_cast<unsigned char>(content[pos]))) ++pos;
+            if (pos >= content.size()) return false;
+            static const struct {
+                const char* pref;
+                size_t len;
+                AnchorRegionClauseKind kind;
+            } kClauses[] = {
+                {"contains(", 9, AnchorRegionClauseKind::Contains},
+                {"rchild(", 7, AnchorRegionClauseKind::RchildOf},
+            };
+            for (const auto& c : kClauses) {
+                if (pos + c.len > content.size() || content.compare(pos, c.len, c.pref, c.len) != 0)
+                    continue;
+                pos += c.len;
+                size_t id0 = pos;
+                while (pos < content.size()
+                       && (std::isalnum(static_cast<unsigned char>(content[pos]))
+                           || content[pos] == '_'))
+                    ++pos;
+                if (pos == id0)
+                    throw std::runtime_error(std::string(c.pref) + " in region anchor requires a label");
+                out->peer_label = content.substr(id0, pos - id0);
+                out->kind = c.kind;
+                if (pos >= content.size() || content[pos] != ')')
+                    throw std::runtime_error(std::string(c.pref) + " in region anchor expected ')'");
+                ++pos;
+                return true;
+            }
+            return false;
+        };
+
+        // Interleaved: key=value attrs and rchild(...)/contains(...) (not "child" — UD reserved)
+        while (true) {
+            while (i < content.size() && std::isspace(static_cast<unsigned char>(content[i]))) ++i;
             if (i >= content.size()) break;
-            // key
+            AnchorRegionClause cl;
+            if (try_parse_clause(i, &cl)) {
+                qt.anchor_region_clauses.push_back(std::move(cl));
+                continue;
+            }
             size_t key_start = i;
-            while (i < content.size() && content[i] != '=' && !std::isspace(content[i])) ++i;
+            while (i < content.size() && content[i] != '=' && !std::isspace(static_cast<unsigned char>(content[i])))
+                ++i;
             std::string key = content.substr(key_start, i - key_start);
-            if (key.empty()) break;
-            // =
-            while (i < content.size() && std::isspace(content[i])) ++i;
-            if (i >= content.size() || content[i] != '=') break;
+            if (key.empty())
+                throw std::runtime_error("Malformed region anchor after '" + qt.anchor_region + "'");
+            while (i < content.size() && std::isspace(static_cast<unsigned char>(content[i]))) ++i;
+            if (i >= content.size() || content[i] != '=')
+                throw std::runtime_error("Expected '=' in region anchor attribute or rchild/contains(...)");
             ++i;
-            while (i < content.size() && std::isspace(content[i])) ++i;
-            // "value"
+            while (i < content.size() && std::isspace(static_cast<unsigned char>(content[i]))) ++i;
             std::string value;
             if (i < content.size() && content[i] == '"') {
                 ++i;
                 while (i < content.size() && content[i] != '"') value += content[i++];
-                if (i < content.size()) ++i; // consume closing "
+                if (i < content.size()) ++i;
             } else {
                 size_t val_start = i;
-                while (i < content.size() && !std::isspace(content[i])) ++i;
+                while (i < content.size() && !std::isspace(static_cast<unsigned char>(content[i]))) ++i;
                 value = content.substr(val_start, i - val_start);
             }
             qt.anchor_attrs.emplace_back(std::move(key), std::move(value));
@@ -575,15 +615,14 @@ QueryToken Parser::parse_token_expr() {
         // "aux" → [form="aux" | contr_form="aux"]+
         // + matches maximal contiguous runs (one hit per run); see executor single-token path.
         lexer_.consume();
+        std::string raw = t.text;
         AttrCondition ac;
         ac.attr = "form";
-        ac.op = CompOp::EQ;
-        ac.value = t.text;
+        interpret_quoted_eq_string(ac, raw, opts_.strict_quoted_strings);
         auto form_node = ConditionNode::make_leaf(std::move(ac));
         AttrCondition ac_contr;
         ac_contr.attr = "contr_form";
-        ac_contr.op = CompOp::EQ;
-        ac_contr.value = t.text;
+        interpret_quoted_eq_string(ac_contr, std::move(raw), opts_.strict_quoted_strings);
         auto contr_node = ConditionNode::make_leaf(std::move(ac_contr));
         qt.conditions = ConditionNode::make_branch(BoolOp::OR, std::move(form_node), std::move(contr_node));
         qt.min_repeat = 1;
@@ -871,13 +910,27 @@ ConditionPtr Parser::parse_primary_condition() {
                 ac.op = CompOp::REGEX;
                 ac.value = val.text;
             } else {
-                ac.op = CompOp::EQ;
                 Token v = lexer_.next();
-                ac.value = v.text;
+                if (v.type == TokType::STRING) {
+                    interpret_quoted_eq_string(ac, std::string(v.text), opts_.strict_quoted_strings);
+                } else if (v.type == TokType::NUMBER) {
+                    ac.op = CompOp::EQ;
+                    ac.value = v.text;
+                } else {
+                    throw std::runtime_error("Expected string or number after '=' at position " +
+                                             std::to_string(v.pos));
+                }
             }
             break;
         }
-        case TokType::NEQ:  ac.op = CompOp::NEQ;  ac.value = lexer_.next().text; break;
+        case TokType::NEQ: {
+            Token v = lexer_.next();
+            ac.op = CompOp::NEQ;
+            ac.value = v.text;
+            if (v.type == TokType::STRING)
+                validate_neq_quoted_string(ac.value, opts_.strict_quoted_strings);
+            break;
+        }
         case TokType::LT:   ac.op = CompOp::LT;   ac.value = lexer_.next().text; break;
         case TokType::GT:   ac.op = CompOp::GT;    ac.value = lexer_.next().text; break;
         case TokType::LTE:  ac.op = CompOp::LTE;   ac.value = lexer_.next().text; break;
@@ -1036,6 +1089,7 @@ void Parser::parse_global_filters(TokenQuery& tq) {
                 else if (name == "ndescendants") fc.func = GlobalFunctionType::NDESCENDANTS;
                 else if (name == "nvals")         fc.func = GlobalFunctionType::NVALS;
                 else if (name == "contains")      fc.func = GlobalFunctionType::CONTAINS;
+                else if (name == "rchild")        fc.func = GlobalFunctionType::RCHILD;
                 else throw std::runtime_error("Unknown function in global filter: " + name);
                 lexer_.consume(); // consume LPAREN
                 while (lexer_.peek().type != TokType::RPAREN) {

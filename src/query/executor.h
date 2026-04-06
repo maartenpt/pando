@@ -394,6 +394,8 @@ private:
         std::vector<std::pair<std::string, std::string>> attrs;  // optional attr constraints
         /// Non-empty → bind this region row to `named_regions[name]` (e.g. `np:<node …>`).
         std::string binding_name;
+        /// Peer clauses from anchor text: `rchild` / `contains` (see `AnchorRegionClause`).
+        std::vector<AnchorRegionClause> anchor_region_clauses;
         /// True: region-start anchor with no following token — enumerate all rows of `region`.
         bool region_enumeration = false;
     };
@@ -446,11 +448,13 @@ private:
     // For single-token queries with aggregation and no complex post-filters,
     // bypass Match construction entirely. Iterates seed positions and
     // computes bucket keys using integer array lookups only.
+    // Named anchors in aggregate fields must resolve to token index 0 (same as fill_aggregate_key).
     bool try_fast_aggregate(const TokenQuery& q,
                             AggregateBucketData& agg,
                             const std::vector<ResolvedRegionFilter>& resolved_filters,
                             size_t max_total_cap,
-                            MatchSet& result) const;
+                            MatchSet& result,
+                            const NameIndexMap& name_map) const;
 
     // Pre-resolve :: region filters to avoid per-match string parsing.
     std::vector<ResolvedRegionFilter> resolve_region_filters(

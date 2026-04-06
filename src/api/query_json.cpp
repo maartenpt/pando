@@ -71,7 +71,7 @@ std::vector<std::pair<std::string, size_t>> region_attr_show_values_mv(const Str
 std::pair<MatchSet, double> run_single_query(const Corpus& corpus,
                                             const std::string& query_text,
                                             const QueryOptions& opts) {
-    Parser parser(query_text);
+    Parser parser(query_text, ParserOptions{opts.strict_quoted_strings});
     Program prog = parser.parse();
     if (prog.empty() || !prog[0].has_query)
         return {MatchSet{}, 0.0};

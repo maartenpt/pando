@@ -71,6 +71,36 @@ public:
         }
     }
 
+    // Anchor resolution: every region whose span starts (or ends) exactly at pos.
+    // Regions are sorted by start; equal starts are contiguous. f returns true to continue.
+    template<typename F>
+    void for_each_region_starting_at(CorpusPos pos, F&& f) const {
+        size_t n = region_count();
+        if (n == 0) return;
+        const Region* r = region_data();
+        size_t lo = 0, hi = n;
+        while (lo < hi) {
+            size_t mid = lo + (hi - lo) / 2;
+            if (r[mid].start < pos) lo = mid + 1;
+            else hi = mid;
+        }
+        for (size_t i = lo; i < n && r[i].start == pos; ++i) {
+            if (!f(i)) return;
+        }
+    }
+
+    // Ends-at scan: not keyed by start sort; linear over all regions (typical n modest per type).
+    template<typename F>
+    void for_each_region_ending_at(CorpusPos pos, F&& f) const {
+        size_t n = region_count();
+        const Region* r = region_data();
+        for (size_t i = 0; i < n; ++i) {
+            if (r[i].end == pos) {
+                if (!f(i)) return;
+            }
+        }
+    }
+
     // #28: Cursor-based find_region — start search from hint index.
     // When iterating sorted positions, pass the last returned region index
     // as hint; advances linearly from there, falling back to binary search

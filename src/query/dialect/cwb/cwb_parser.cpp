@@ -1,6 +1,7 @@
 #include "query/dialect/cwb/cwb_parser.h"
 
 #include "query/dialect/cwb/cwb_lexer.h"
+#include "query/quoted_string_pattern.h"
 
 #include <cctype>
 #include <sstream>
@@ -29,45 +30,12 @@ struct TokStream {
     }
 };
 
-bool is_regex_metachar(char c) {
-    switch (c) {
-    case '.':
-    case '*':
-    case '+':
-    case '?':
-    case '[':
-    case ']':
-    case '(':
-    case ')':
-    case '{':
-    case '}':
-    case '|':
-    case '^':
-    case '$':
-    case '\\':
-        return true;
-    default:
-        return false;
-    }
-}
-
 void set_attr_pattern(AttrCondition& ac, const std::string& raw, std::ostringstream* trace) {
-    bool literal = true;
-    for (char ch : raw) {
-        if (is_regex_metachar(ch)) {
-            literal = false;
-            break;
-        }
-    }
-    if (literal) {
-        ac.op = CompOp::EQ;
-        ac.value = raw;
-        if (trace)
+    interpret_quoted_eq_string(ac, raw, /*strict_quoted_strings=*/false);
+    if (trace) {
+        if (ac.op == CompOp::EQ)
             *trace << "        (literal → EQ)\n";
-    } else {
-        ac.op = CompOp::REGEX;
-        ac.value = "^" + raw + "$";
-        if (trace)
+        else
             *trace << "        (regex → REGEX /^...$/ whole-token)\n";
     }
 }
@@ -292,16 +260,7 @@ ConditionPtr parse_rel_expr(TokStream& ts, std::ostringstream* trace) {
         } else if (op == CompOp::EQ) {
             set_attr_pattern(ac, ac.value, trace);
         } else if (op == CompOp::NEQ) {
-            bool lit = true;
-            for (char ch : ac.value) {
-                if (is_regex_metachar(ch)) {
-                    lit = false;
-                    break;
-                }
-            }
-            if (!lit)
-                throw std::runtime_error(
-                    "Unsupported: != with regex metacharacters (use literal inequality or native CQL)");
+            validate_neq_quoted_string(ac.value, /*strict_quoted_strings=*/false);
             ac.op = CompOp::NEQ;
         } else {
             ac.op = op;

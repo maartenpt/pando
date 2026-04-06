@@ -62,11 +62,12 @@ public:
         return true;
     }
 
-    // Regex match: returns owned vector (union of all matching lex entries)
+    // Regex match: returns owned vector (union of all matching lex entries).
+    // full_match: whole lexicon string must match (RE2 FullMatch / std::regex_match); else substring.
 #ifdef PANDO_USE_RE2
-    std::vector<CorpusPos> positions_matching(const re2::RE2& re) const;
+    std::vector<CorpusPos> positions_matching(const re2::RE2& re, bool full_match = false) const;
 #else
-    std::vector<CorpusPos> positions_matching(const std::regex& re) const;
+    std::vector<CorpusPos> positions_matching(const std::regex& re, bool full_match = false) const;
 #endif
 
     // Negation: all positions where value != given value

@@ -6,6 +6,14 @@
 
 namespace manatree {
 
+struct ParserOptions {
+    /// When true: only `/pattern/` is regex inside `[...]`; quoted strings are always literal
+    /// (legacy pando behavior). When false (default): `attr = "x"` uses the same heuristic as
+    /// the CWB dialect — if `x` contains no regex metacharacters, literal equality; otherwise
+    /// anchored whole-token regex `^x$`.
+    bool strict_quoted_strings = false;
+};
+
 // Recursive-descent parser for ClickCQL.
 //
 // Parses semicolon-separated statements.  Each statement is either:
@@ -17,7 +25,7 @@ namespace manatree {
 // they are dependency relations.
 class Parser {
 public:
-    explicit Parser(const std::string& input);
+    explicit Parser(const std::string& input, ParserOptions opts = {});
 
     Program parse();
 
@@ -52,6 +60,7 @@ private:
     void parse_global_filters(TokenQuery& tq);
 
     Lexer lexer_;
+    ParserOptions opts_;
 };
 
 } // namespace manatree

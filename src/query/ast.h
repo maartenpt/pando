@@ -58,6 +58,11 @@ struct AttrCondition {
     // When true, `op` compares the computed count to `nvals_compare` (integer RHS).
     bool is_nvals = false;
     int64_t nvals_compare = 0;
+
+    // When op==REGEX: if true, match the whole token string (RE2::FullMatch / std::regex_match);
+    // if false, substring match (RE2::PartialMatch / std::regex_search). Quoted-string CWB-style
+    // heuristics set this instead of wrapping the pattern in ^$.
+    bool regex_full_match = false;
 };
 
 // ── Boolean combination of conditions ───────────────────────────────────
@@ -146,6 +151,18 @@ enum class RegionAnchorType {
     REGION_END,    // </s> — zero-width, binds to previous token's position
 };
 
+/// Suffix clauses on `<region ...>` (any order, whitespace-separated): rchild(vp), contains(vp).
+/// (`child` is reserved for dependency relations in `[]`, not region-tree parent.)
+enum class AnchorRegionClauseKind {
+    RchildOf,   // rchild(vp) — immediate parent row == region bound as vp (.par)
+    Contains,   // contains(vp) — this row's span geometrically contains vp's span
+};
+
+struct AnchorRegionClause {
+    AnchorRegionClauseKind kind = AnchorRegionClauseKind::RchildOf;
+    std::string            peer_label;
+};
+
 struct QueryToken {
     std::string    name;              // optional label (e.g. "verb:")
     ConditionPtr   conditions;        // may be null (empty token [])
@@ -156,6 +173,8 @@ struct QueryToken {
     RegionAnchorType anchor = RegionAnchorType::NONE;
     std::string      anchor_region;   // region name, e.g. "s", "text", "np"
     std::vector<std::pair<std::string, std::string>> anchor_attrs;  // <text genre="book"> → {{"genre","book"}}
+    /// Optional peer clauses: <node contains(vp) type="NP" rchild(pp)> — AND of all.
+    std::vector<AnchorRegionClause> anchor_region_clauses;
 
     bool has_repetition() const { return min_repeat != 1 || max_repeat != 1; }
     bool is_anchor() const { return anchor != RegionAnchorType::NONE; }
@@ -192,7 +211,9 @@ enum class GlobalFunctionType {
     NDESCENDANTS,
     NVALS,
     /// Layer A: B's token span ⊆ A's span (both args = named region bindings).
-    CONTAINS
+    CONTAINS,
+    /// Layer B (nested + `.par`): child row's parent id == parent's region index.
+    RCHILD
 };
 
 // A single function call: func(args...)

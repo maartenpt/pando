@@ -10,6 +10,7 @@
 #include <unordered_set>
 #include <functional>
 #include <optional>
+#include <string>
 
 #ifndef PANDO_USE_RE2
 #include <mutex>
@@ -18,6 +19,21 @@
 namespace manatree {
 
 namespace {
+
+#ifdef PANDO_USE_RE2
+static bool regex_eval_sv(std::string_view val, const re2::RE2& re, bool full_match) {
+    if (full_match)
+        return re2::RE2::FullMatch(val, re);
+    return re2::RE2::PartialMatch(val, re);
+}
+#else
+static bool regex_eval_sv(std::string_view val, const std::regex& re, bool full_match) {
+    std::string s(val);
+    if (full_match)
+        return std::regex_match(s, re);
+    return std::regex_search(s, re);
+}
+#endif
 
 // `within S` when S is declared nested= or overlapping= (see expand_seed caller):
 // the full match span [min,max] must be contained in *some* region row of S.
@@ -88,8 +104,13 @@ static void collect_token_and_region_labels(const TokenQuery& q,
                                             std::unordered_set<std::string>* region_labels) {
     for (const auto& t : q.tokens) {
         if (t.name.empty()) continue;
-        if (t.is_anchor()) region_labels->insert(t.name);
-        else token_labels->insert(t.name);
+        if (t.is_anchor()) {
+            region_labels->insert(t.name);
+            for (const auto& cl : t.anchor_region_clauses)
+                if (!cl.peer_label.empty()) region_labels->insert(cl.peer_label);
+        } else {
+            token_labels->insert(t.name);
+        }
     }
 }
 
@@ -163,6 +184,7 @@ static void append_func_call_token_args(const GlobalFuncCall& fc, std::vector<st
             if (!fc.args.empty()) out->push_back(fc.args[0]);
             break;
         case GlobalFunctionType::CONTAINS:
+        case GlobalFunctionType::RCHILD:
             break;
     }
 }
@@ -184,11 +206,13 @@ static void validate_global_func_filter_token_labels(const GlobalFunctionFilter&
                                                      const std::unordered_set<std::string>& token_labels,
                                                      const std::unordered_set<std::string>& region_labels) {
     auto check_call = [&](const GlobalFuncCall& fc) {
-        if (fc.func == GlobalFunctionType::CONTAINS) {
+        if (fc.func == GlobalFunctionType::CONTAINS || fc.func == GlobalFunctionType::RCHILD) {
             if (fc.args.size() < 2)
-                throw std::runtime_error("contains(outer, inner) requires two named region labels");
-            expect_region_label(fc.args[0], "contains(…)", token_labels, region_labels);
-            expect_region_label(fc.args[1], "contains(…)", token_labels, region_labels);
+                throw std::runtime_error(
+                        "contains(outer, inner) and rchild(parent, child) require two named region labels");
+            const char* ctx = fc.func == GlobalFunctionType::CONTAINS ? "contains(…)" : "rchild(…)";
+            expect_region_label(fc.args[0], ctx, token_labels, region_labels);
+            expect_region_label(fc.args[1], ctx, token_labels, region_labels);
             return;
         }
         std::vector<std::string> names;
@@ -416,6 +440,36 @@ void QueryExecutor::validate_query_name_bindings(const TokenQuery& query) const 
     }
     for (const auto& ff : query.global_function_filters)
         validate_global_func_filter_token_labels(ff, token_labels, region_labels);
+
+    size_t real_token_slots = 0;
+    for (const auto& tok : query.tokens) {
+        if (!tok.is_anchor()) ++real_token_slots;
+    }
+    for (size_t i = 0; i < query.tokens.size(); ++i) {
+        const auto& tok = query.tokens[i];
+        if (!tok.is_anchor() || tok.anchor_region_clauses.empty()) continue;
+        for (const auto& cl : tok.anchor_region_clauses) {
+            const std::string& plab = cl.peer_label;
+            bool peer_before = false;
+            for (size_t j = 0; j < i; ++j) {
+                if (query.tokens[j].is_anchor() && query.tokens[j].name == plab) {
+                    peer_before = true;
+                    break;
+                }
+            }
+            if (!peer_before) {
+                throw std::runtime_error(
+                        "Region anchor clause referencing '" + plab
+                        + "': an earlier anchor must be labeled '" + plab + "' (e.g. " + plab
+                        + ":<node …>)");
+            }
+        }
+        if (real_token_slots == 0) {
+            throw std::runtime_error(
+                    "Region anchor peer clauses (rchild/contains) require at least one "
+                    "non-anchor token (region-only enumeration cannot resolve peers together)");
+        }
+    }
 }
 
 // ── Cardinality estimation ──────────────────────────────────────────────
@@ -686,14 +740,19 @@ bool QueryExecutor::check_leaf(CorpusPos pos, const AttrCondition& ac) const {
                                             it = regex_cache_.emplace(ac.value, std::make_unique<re2::RE2>(ac.value)).first;
                                         compiled = it->second.get();
                                     }
-                                    if (re2::RE2::PartialMatch(val, *compiled)) { any_match = true; return false; }
+                                    if (regex_eval_sv(val, *compiled, ac.regex_full_match)) {
+                                        any_match = true;
+                                        return false;
+                                    }
 #else
                                     std::lock_guard<std::mutex> lock(regex_cache_mutex_);
                                     auto it = regex_cache_.find(ac.value);
                                     if (it == regex_cache_.end())
                                         it = regex_cache_.emplace(ac.value, std::regex(ac.value)).first;
-                                    std::string s(val);
-                                    if (std::regex_search(s, it->second)) { any_match = true; return false; }
+                                    if (regex_eval_sv(val, it->second, ac.regex_full_match)) {
+                                        any_match = true;
+                                        return false;
+                                    }
 #endif
                                     break;
                                 }
@@ -732,14 +791,13 @@ bool QueryExecutor::check_leaf(CorpusPos pos, const AttrCondition& ac) const {
                                         it = regex_cache_.emplace(ac.value, std::make_unique<re2::RE2>(ac.value)).first;
                                     compiled = it->second.get();
                                 }
-                                return re2::RE2::PartialMatch(val, *compiled);
+                                return regex_eval_sv(val, *compiled, ac.regex_full_match);
 #else
                                 std::lock_guard<std::mutex> lock(regex_cache_mutex_);
                                 auto it = regex_cache_.find(ac.value);
                                 if (it == regex_cache_.end())
                                     it = regex_cache_.emplace(ac.value, std::regex(ac.value)).first;
-                                std::string s(val);
-                                return std::regex_search(s, it->second);
+                                return regex_eval_sv(val, it->second, ac.regex_full_match);
 #endif
                             }
                             case CompOp::LT:    return val < ac.value;
@@ -800,14 +858,13 @@ bool QueryExecutor::check_leaf(CorpusPos pos, const AttrCondition& ac) const {
                     it = regex_cache_.emplace(ac.value, std::make_unique<re2::RE2>(ac.value)).first;
                 compiled = it->second.get();
             }
-            return re2::RE2::PartialMatch(val, *compiled);
+            return regex_eval_sv(val, *compiled, ac.regex_full_match);
 #else
             std::lock_guard<std::mutex> lock(regex_cache_mutex_);
             auto it = regex_cache_.find(ac.value);
             if (it == regex_cache_.end())
                 it = regex_cache_.emplace(ac.value, std::regex(ac.value)).first;
-            std::string s(val);
-            return std::regex_search(s, it->second);
+            return regex_eval_sv(val, it->second, ac.regex_full_match);
 #endif
         }
         case CompOp::LT:    return val < ac.value;
@@ -1180,13 +1237,13 @@ std::vector<CorpusPos> QueryExecutor::resolve_leaf(
                     it = regex_cache_.emplace(ac.value, std::make_unique<re2::RE2>(ac.value)).first;
                 compiled = it->second.get();
             }
-            return pa.positions_matching(*compiled);
+            return pa.positions_matching(*compiled, ac.regex_full_match);
 #else
             std::lock_guard<std::mutex> lock(regex_cache_mutex_);
             auto it = regex_cache_.find(ac.value);
             if (it == regex_cache_.end())
                 it = regex_cache_.emplace(ac.value, std::regex(ac.value)).first;
-            return pa.positions_matching(it->second);
+            return pa.positions_matching(it->second, ac.regex_full_match);
 #endif
         }
         default:
@@ -1284,14 +1341,19 @@ bool QueryExecutor::try_fast_aggregate(
         AggregateBucketData& agg,
         const std::vector<ResolvedRegionFilter>& resolved_filters,
         size_t max_total_cap,
-        MatchSet& result) const {
+        MatchSet& result,
+        const NameIndexMap& name_map) const {
 
-    // Guard: single-token, non-repeating, no named-anchor columns or filters
+    // Guard: single-token, non-repeating, no global function filters
     if (q.tokens.size() != 1) return false;
     if (q.tokens[0].min_repeat != 1 || q.tokens[0].max_repeat != 1) return false;
     if (!q.global_function_filters.empty()) return false;
+    // Named anchors in aggregate columns must refer to this single query token (index 0),
+    // matching fill_aggregate_key / resolve_name (RG-REG-7 fast path).
     for (const auto& col : agg.columns) {
-        if (!col.named_anchor.empty()) return false;
+        if (col.named_anchor.empty()) continue;
+        auto it = name_map.find(col.named_anchor);
+        if (it == name_map.end() || it->second != 0) return false;
     }
     for (const auto& rf : resolved_filters) {
         if (!rf.anchor_name.empty()) return false;
@@ -2019,7 +2081,7 @@ MatchSet QueryExecutor::execute(const TokenQuery& query,
         if (agg_ptr && !agg_per_match_post) {
             auto resolved_filters = resolve_region_filters(q);
             if (try_fast_aggregate(q, *agg_ptr, resolved_filters,
-                                   max_total_cap, result)) {
+                                   max_total_cap, result, name_map)) {
                 result.aggregate_buckets = std::move(agg_storage);
                 return result;
             }
@@ -2792,6 +2854,25 @@ void QueryExecutor::apply_global_filters(const TokenQuery& query, const NameInde
                     if (!outer || !inner) return {false, 0};
                     return {true, region_span_contains(*outer, *inner) ? 1 : 0};
                 }
+                case GlobalFunctionType::RCHILD: {
+                    if (fc.args.size() < 2) return {false, 0};
+                    auto pit = m.named_regions.find(fc.args[0]);
+                    auto cit = m.named_regions.find(fc.args[1]);
+                    if (pit == m.named_regions.end() || cit == m.named_regions.end())
+                        return {false, 0};
+                    const RegionRef& pr = pit->second;
+                    const RegionRef& cr = cit->second;
+                    if (pr.struct_name != cr.struct_name)
+                        return {true, 0};
+                    if (!corpus_.has_structure(pr.struct_name)) return {false, 0};
+                    const auto& sa = corpus_.structure(pr.struct_name);
+                    if (!sa.has_parent_region_id()) return {false, 0};
+                    if (pr.region_idx >= sa.region_count() || cr.region_idx >= sa.region_count())
+                        return {false, 0};
+                    int32_t par = sa.parent_region_id(cr.region_idx);
+                    bool ok = par >= 0 && static_cast<size_t>(par) == pr.region_idx;
+                    return {true, ok ? 1 : 0};
+                }
                 }
                 return {false, 0};
             };
@@ -2853,6 +2934,7 @@ TokenQuery QueryExecutor::strip_anchors(const TokenQuery& query,
             ac.is_start = (query.tokens[i].anchor == RegionAnchorType::REGION_START);
             ac.attrs = query.tokens[i].anchor_attrs;
             ac.binding_name = query.tokens[i].name;
+            ac.anchor_region_clauses = query.tokens[i].anchor_region_clauses;
 
             bool bound = false;
             if (ac.is_start) {
@@ -3079,24 +3161,71 @@ bool QueryExecutor::resolve_anchor_constraints(Match& m,
                                        : m.positions[ac.token_idx]);
         if (!corpus_.has_structure(ac.region)) return false;
         const auto& sa = corpus_.structure(ac.region);
-        int64_t rgn = sa.find_region(pos);
-        if (rgn < 0) return false;
 
-        Region reg = sa.get(static_cast<size_t>(rgn));
-        if (ac.is_start) {
-            if (pos != reg.start) return false;
-        } else {
-            if (pos != reg.end) return false;
+        const bool multi = corpus_.is_nested(ac.region) || corpus_.is_overlapping(ac.region)
+                           || corpus_.is_zerowidth(ac.region);
+
+        auto attrs_match = [&](size_t ri) -> bool {
+            for (const auto& [key, val] : ac.attrs) {
+                if (!sa.has_region_attr(key)) return false;
+                std::string_view rv = sa.region_value(key, ri);
+                if (rv != val) return false;
+            }
+            return true;
+        };
+
+        auto anchor_clauses_ok = [&](size_t ri) -> bool {
+            Region cur = sa.get(ri);
+            for (const auto& cl : ac.anchor_region_clauses) {
+                if (cl.kind == AnchorRegionClauseKind::RchildOf) {
+                    auto pit = m.named_regions.find(cl.peer_label);
+                    if (pit == m.named_regions.end()) return false;
+                    const RegionRef& pr = pit->second;
+                    if (pr.struct_name != ac.region) return false;
+                    if (!sa.has_parent_region_id()) return false;
+                    int32_t par = sa.parent_region_id(ri);
+                    if (par < 0 || static_cast<size_t>(par) != pr.region_idx) return false;
+                } else if (cl.kind == AnchorRegionClauseKind::Contains) {
+                    auto inner = named_region_span(corpus_, m, cl.peer_label);
+                    if (!inner) return false;
+                    if (!region_span_contains(cur, *inner)) return false;
+                }
+            }
+            return true;
+        };
+
+        if (!multi) {
+            int64_t rgn = sa.find_region(pos);
+            if (rgn < 0) return false;
+            Region reg = sa.get(static_cast<size_t>(rgn));
+            if (ac.is_start) {
+                if (pos != reg.start) return false;
+            } else {
+                if (pos != reg.end) return false;
+            }
+            if (!attrs_match(static_cast<size_t>(rgn))) return false;
+            if (!anchor_clauses_ok(static_cast<size_t>(rgn))) return false;
+            if (!ac.binding_name.empty())
+                m.named_regions[ac.binding_name] = RegionRef{ac.region, static_cast<size_t>(rgn)};
+            continue;
         }
 
-        for (const auto& [key, val] : ac.attrs) {
-            if (!sa.has_region_attr(key)) return false;
-            std::string_view rv = sa.region_value(key, static_cast<size_t>(rgn));
-            if (rv != val) return false;
-        }
-
-        if (!ac.binding_name.empty())
-            m.named_regions[ac.binding_name] = RegionRef{ac.region, static_cast<size_t>(rgn)};
+        // Nested / overlapping / zerowidth: multiple rows can share the same start or end;
+        // find_region picks only one. Scan every region that starts (or ends) at pos.
+        bool found = false;
+        auto try_row = [&](size_t ri) -> bool {
+            if (!attrs_match(ri)) return true;
+            if (!anchor_clauses_ok(ri)) return true;
+            found = true;
+            if (!ac.binding_name.empty())
+                m.named_regions[ac.binding_name] = RegionRef{ac.region, ri};
+            return false;
+        };
+        if (ac.is_start)
+            sa.for_each_region_starting_at(pos, try_row);
+        else
+            sa.for_each_region_ending_at(pos, try_row);
+        if (!found) return false;
     }
     return true;
 }

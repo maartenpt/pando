@@ -112,6 +112,13 @@ int main(int argc, char* argv[]) {
             pos += search.size();
             return static_cast<size_t>(std::strtoull(body.c_str() + pos, nullptr, 10));
         };
+        auto extract_bool = [&body](const char* key, bool default_val) -> bool {
+            std::string search = std::string("\"") + key + "\":";
+            auto pos = body.find(search);
+            if (pos == std::string::npos) return default_val;
+            pos += search.size();
+            return body.substr(pos, 4) == "true";
+        };
 
         std::string cql = extract_str("cql");
         if (cql.empty()) cql = extract_str("query");
@@ -128,6 +135,7 @@ int main(int argc, char* argv[]) {
         opts.context    = static_cast<int>(extract_num("context", 5));
         opts.total      = (body.find("\"total\":true") != std::string::npos);
         opts.group_limit = extract_num("group_limit", 1000);
+        opts.strict_quoted_strings = extract_bool("strict_quoted_strings", false);
 
         std::string json = run_program_json(corpus, program_session, cql, opts);
         res.set_content(json, "application/json");
@@ -176,6 +184,7 @@ int main(int argc, char* argv[]) {
         opts.total     = extract_bool("total", false);
         opts.context   = static_cast<int>(extract_num("context", 5));
         opts.debug     = extract_bool("debug", false);
+        opts.strict_quoted_strings = extract_bool("strict_quoted_strings", false);
         std::string attrs_str = extract_str("attrs");
         opts.attrs.clear();
         if (!attrs_str.empty()) {

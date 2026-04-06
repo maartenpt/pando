@@ -84,6 +84,9 @@ manatree::QueryOptions parse_query_opts(const char* opts_json) {
     v = json_get(j, "context");      if (!v.empty()) try { opts.context  = std::stoi(v); }  catch (...) {}
     v = json_get(j, "total");        if (v == "true" || v == "1") opts.total = true;
     v = json_get(j, "debug");        if (v == "true" || v == "1") opts.debug = true;
+    v = json_get(j, "strict_quoted_strings");
+    if (v == "true" || v == "1")
+        opts.strict_quoted_strings = true;
     opts.attrs = json_get_string_array(j, "attrs");
     return opts;
 }
@@ -98,6 +101,9 @@ manatree::ProgramOptions parse_program_opts(const char* opts_json) {
     v = json_get(j, "max_total");       if (!v.empty()) try { opts.max_total = std::stoull(v); } catch (...) {}
     v = json_get(j, "context");         if (!v.empty()) try { opts.context  = std::stoi(v); }  catch (...) {}
     v = json_get(j, "total");           if (v == "true" || v == "1") opts.total = true;
+    v = json_get(j, "strict_quoted_strings");
+    if (v == "true" || v == "1")
+        opts.strict_quoted_strings = true;
     v = json_get(j, "group_limit");     if (!v.empty()) try { opts.group_limit = std::stoull(v); } catch (...) {}
     v = json_get(j, "coll_left");       if (!v.empty()) try { opts.coll_left = std::stoi(v); } catch (...) {}
     v = json_get(j, "coll_right");      if (!v.empty()) try { opts.coll_right = std::stoi(v); } catch (...) {}

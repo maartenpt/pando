@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(pando VERSION 0.1.0 LANGUAGES CXX)
+project(pando VERSION 0.1.1 LANGUAGES CXX)
 
 include(CTest)
 
@@ -94,6 +94,7 @@ add_library(pando_core STATIC
     src/corpus/streaming_builder.cpp
     src/query/lexer.cpp
     src/query/parser.cpp
+    src/query/dialect/tiger/tiger_translate.cpp
     src/query/executor.cpp
     src/api/index_api.cpp
 )
@@ -131,8 +132,14 @@ target_link_libraries(pando_api PUBLIC pando_core)
 # Enable with: cmake -DPANDO_BUILD_SHARED=ON ..
 option(PANDO_BUILD_SHARED "Build libpando shared library" OFF)
 
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/pando_version.h.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/pando_version.h"
+    @ONLY)
+
 # CLI executable
 add_executable(pando src/cli/query_main.cpp)
+target_include_directories(pando PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
 target_link_libraries(pando PRIVATE pando_api)
 if(PANDO_CWB_DIALECT)
     target_compile_definitions(pando PRIVATE PANDO_WITH_CWB_DIALECT=1)
@@ -148,6 +155,15 @@ if(BUILD_TESTING AND PANDO_PMLTQ_DIALECT)
     add_executable(pmltq_dialect_test src/query/dialect/pmltq/pmltq_dialect_test.cpp)
     target_link_libraries(pmltq_dialect_test PRIVATE pando_pmltq_dialect)
     add_test(NAME pmltq_dialect COMMAND pmltq_dialect_test)
+endif()
+
+if(BUILD_TESTING)
+    add_executable(tiger_dialect_test src/query/dialect/tiger/tiger_dialect_test.cpp)
+    target_link_libraries(tiger_dialect_test PRIVATE pando_core)
+    add_test(NAME tiger_dialect COMMAND tiger_dialect_test)
+    add_executable(parser_quoted_test src/query/parser_quoted_test.cpp)
+    target_link_libraries(parser_quoted_test PRIVATE pando_core)
+    add_test(NAME parser_quoted COMMAND parser_quoted_test)
 endif()
 
 install(TARGETS pando_cwb_dialect

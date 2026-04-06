@@ -80,7 +80,11 @@ You can **label** a region-start anchor like a token name: **`np:<s>`** binds th
 
 **Layer A global `::` geometry:** **`contains(outer, inner)`** — both arguments must be **named region bindings** (e.g. `s:<s> np:<node type="NP">`). True iff the inner region’s inclusive token span lies inside the outer’s (`inner.start ≥ outer.start` and `inner.end ≤ outer.end`). Example: **`:: contains(s, np) = 1`** (or **`> 0`**). Tabulate / aggregate fields support **`tcnt(label)`** for token counts inside a named region (separate from **`contains`**).
 
-**Still open (see [dev/REGIONS-FIRST-CQL-PLAN.md](../dev/REGIONS-FIRST-CQL-PLAN.md) §9):** Layer A **`overlap`**, tree **`rchild` / `rcontains`**, and **`count`/`group` by `np.*`** in the fast aggregate path may not match **`tabulate`** in every case until extended.
+**Layer B (nested structural types with a `.par` parent index):** **`rchild(parent, child)`** — both arguments are **named region bindings** for the **same** structural type (e.g. two `node` labels). True iff **`child`’s** stored **`parent_region_id`** equals **`parent`’s** region row index (immediate dominance in the tree). Example: **`vp:<node type="VP"> np:<node type="NP"> [] :: rchild(vp, np) = 1`**. Requires the corpus to declare that type as **`nested`** and to ship **`.par`** (see indexing docs).
+
+**Peer clauses on region anchors (whitespace-separated, any order):** **`rchild(vp)`** — same test as **`:: rchild(vp, …)`** on this binding (immediate parent row must be **`vp`**’s row; **`.par`** required). Use **`rchild`**, not **`child`**, so **`child`** stays reserved for **dependency** relations in **`[]`**. **`contains(vp)`** — this row’s span must geometrically **contain** **`vp`**’s span (Layer A). Example: **`np:<node contains(vp) type="NP" rchild(pp)>`**. Each peer label must be bound by an **earlier** anchor. At least one **non-anchor** token is required so anchors can bind to token positions.
+
+**Still open (see [dev/REGIONS-FIRST-CQL-PLAN.md](../dev/REGIONS-FIRST-CQL-PLAN.md) §9):** Layer A **`overlap`**, tree **`rcontains`**, and **`count`/`group` by `np.*`** in the fast aggregate path may not match **`tabulate`** in every case until extended.
 
 ## Named tokens and aligned corpora
 
@@ -98,7 +102,11 @@ For a more efficient but more limited way of searching through sentence-aligned 
 
 ## Regular expressions
 
-To look for patterns inside words, CQL allows regular expressions in token restrictions. In regular expressions, you can look for optional letters, repeated letters, etc. In pando-CQL, regular expressions use the format that is made popular by Python: `[form = /pan.*tion/]`. Contrary to CWB-CQL, regular expressions are used directly, and not as "word-bound matches". So where in CWB, `[form = ".*tion"]` will match all and only words ending in *-tion*, in pando-CQL, `[form = /.*tion/]` will give an words that contain any number of characters followed by *tion*, so including *conditional*. It will have the exact same matches as `[form = /tion/]`, since the optional characters at the beginning do not have any effect in this particular query. To mimic the query behaviour of CWB, the query has to be explictly bound to the word boundaries: `[form = /^.*tion$/]`, which is more naturally expressed as `[form = /tion$/]`.
+To look for patterns inside words, CQL allows regular expressions in token restrictions. In regular expressions, you can look for optional letters, repeated letters, etc. In pando-CQL, the explicit regex form uses slash delimiters: `[form = /pan.*tion/]`.
+
+**Quoted strings and CWB compatibility:** If a double-quoted value contains **no** regex metacharacters (`. * + ? [ ] ( ) { } | ^ $ \\`), `attr = "value"` is a **literal** string test. If it **does** contain any of those characters, it is treated like **CWB / Manatee**: the pattern is matched against the **whole token** using `RE2::FullMatch` (or `std::regex_match` when RE2 is disabled)—the same rule as the `--cql cwb` translator, without embedding `^`/`$` in the pattern string. So `[form = ".*tion"]` matches words that end in *-tion*, like CWB. To keep the **older pando behavior** where only `/pattern/` is a regex and quotes are always literal, pass **`--strict-quoted-strings`** to the CLI, or set `strict_quoted_strings` in API / JSON options. **Inequality** with metacharacters in quotes (`!=`) is not supported in this heuristic mode (use `=` with `/.../` or enable strict quotes).
+
+Slash-regex values are passed to the engine **as written** (not auto-anchored). For example `[form = /.*tion/]` matches any substring *tion* inside the token (e.g. *conditional*), not only *-tion* suffixes; anchoring is up to your pattern (e.g. `[form = /tion$/]`).
 
 
 ## Matching strategy flags

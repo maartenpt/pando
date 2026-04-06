@@ -718,7 +718,7 @@ std::string run_program_json(Corpus& corpus, ProgramSession& ps,
                              const std::string& cql, ProgramOptions opts) {
     auto& S = *ps.impl_;
 
-    Parser parser(cql);
+    Parser parser(cql, ParserOptions{opts.strict_quoted_strings});
     Program prog = parser.parse();
 
     QueryExecutor executor(corpus);

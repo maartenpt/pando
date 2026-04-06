@@ -28,7 +28,7 @@ Hits = [upos="VERB" & lemma="book"]; coll Hits by lemma;
 
 ## Dependency collocations (`dcoll`)
 
-If the corpus has a **dependency index** (sentence structure `s` plus `dep.*` data), **`dcoll`** collects neighbours along **dependency edges** instead of linear distance.
+If the corpus has a **dependency index** (sentence structure `s` plus `dep.*` data), **`dcoll`** collects neighbours along **dependency edges** instead of linear distance. That is to say, the most typical nominal subject or adjectival modifier.
 
 ```text
 [upos="NOUN" & lemma="book"]; dcoll amod by lemma
