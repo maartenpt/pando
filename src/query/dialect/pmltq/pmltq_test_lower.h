@@ -5,7 +5,7 @@
 #include <string>
 #include <string_view>
 
-namespace manatree::pmltq {
+namespace pando::pmltq {
 
 // Shared by gold JSON and native parser: map PML-TQ field / operator / raw value to
 // a leaf AttrCondition (CWB-aligned = vs regex metacharacters).
@@ -14,4 +14,4 @@ ConditionPtr lower_pmltq_test_strings(const std::string& field, const std::strin
 
 std::string pmltq_map_field(std::string field);
 
-} // namespace manatree::pmltq
+} // namespace pando::pmltq

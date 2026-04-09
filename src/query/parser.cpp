@@ -4,7 +4,7 @@
 #include <stdexcept>
 #include <algorithm>
 
-namespace manatree {
+namespace pando {
 
 Parser::Parser(const std::string& input, ParserOptions opts)
     : lexer_(input), opts_(opts) {}
@@ -267,11 +267,19 @@ GroupCommand Parser::parse_command() {
                 std::string first = lexer_.next().text;
                 std::string low = first;
                 std::transform(low.begin(), low.end(), low.begin(), ::tolower);
-                if (low == "tcnt" && lexer_.peek().type == TokType::LPAREN) {
+                if ((low == "tcnt" || low == "forms" || low == "spellout")
+                    && lexer_.peek().type == TokType::LPAREN) {
                     lexer_.consume();
                     std::string inner = lexer_.expect(TokType::IDENT).text;
-                    lexer_.expect(TokType::RPAREN);
-                    cmd.fields.push_back("tcnt(" + inner + ")");
+                    if (low == "spellout") {
+                        lexer_.expect(TokType::COMMA);
+                        std::string attr = lexer_.expect(TokType::IDENT).text;
+                        lexer_.expect(TokType::RPAREN);
+                        cmd.fields.push_back("spellout(" + inner + "," + attr + ")");
+                    } else {
+                        lexer_.expect(TokType::RPAREN);
+                        cmd.fields.push_back(low + "(" + inner + ")");
+                    }
                     continue;
                 }
                 std::string field = std::move(first);
@@ -296,11 +304,19 @@ GroupCommand Parser::parse_command() {
             {
                 std::string low = first;
                 std::transform(low.begin(), low.end(), low.begin(), ::tolower);
-                if (low == "tcnt" && lexer_.peek().type == TokType::LPAREN) {
+                if ((low == "tcnt" || low == "forms" || low == "spellout")
+                    && lexer_.peek().type == TokType::LPAREN) {
                     lexer_.consume();
                     std::string inner = lexer_.expect(TokType::IDENT).text;
-                    lexer_.expect(TokType::RPAREN);
-                    cmd.fields.push_back("tcnt(" + inner + ")");
+                    if (low == "spellout") {
+                        lexer_.expect(TokType::COMMA);
+                        std::string attr = lexer_.expect(TokType::IDENT).text;
+                        lexer_.expect(TokType::RPAREN);
+                        cmd.fields.push_back("spellout(" + inner + "," + attr + ")");
+                    } else {
+                        lexer_.expect(TokType::RPAREN);
+                        cmd.fields.push_back(low + "(" + inner + ")");
+                    }
                     parse_field_tail();
                     return cmd;
                 }
@@ -330,12 +346,20 @@ GroupCommand Parser::parse_command() {
                 {
                     std::string low2 = second;
                     std::transform(low2.begin(), low2.end(), low2.begin(), ::tolower);
-                    if (low2 == "tcnt" && lexer_.peek().type == TokType::LPAREN) {
+                    if ((low2 == "tcnt" || low2 == "forms" || low2 == "spellout")
+                        && lexer_.peek().type == TokType::LPAREN) {
                         cmd.query_name = first;
                         lexer_.consume();
                         std::string inner = lexer_.expect(TokType::IDENT).text;
-                        lexer_.expect(TokType::RPAREN);
-                        cmd.fields.push_back("tcnt(" + inner + ")");
+                        if (low2 == "spellout") {
+                            lexer_.expect(TokType::COMMA);
+                            std::string attr = lexer_.expect(TokType::IDENT).text;
+                            lexer_.expect(TokType::RPAREN);
+                            cmd.fields.push_back("spellout(" + inner + "," + attr + ")");
+                        } else {
+                            lexer_.expect(TokType::RPAREN);
+                            cmd.fields.push_back(low2 + "(" + inner + ")");
+                        }
                         parse_field_tail();
                         return cmd;
                     }
@@ -426,7 +450,22 @@ GroupCommand Parser::parse_command() {
         std::string field;
         Token ft = lexer_.next();
         field = ft.text;
-        if (lexer_.peek().type == TokType::DOT) {
+        std::string low = field;
+        std::transform(low.begin(), low.end(), low.begin(), ::tolower);
+        if ((low == "tcnt" || low == "forms" || low == "spellout")
+            && lexer_.peek().type == TokType::LPAREN) {
+            lexer_.consume();
+            std::string inner = lexer_.expect(TokType::IDENT).text;
+            if (low == "spellout") {
+                lexer_.expect(TokType::COMMA);
+                std::string attr = lexer_.expect(TokType::IDENT).text;
+                lexer_.expect(TokType::RPAREN);
+                field = "spellout(" + inner + "," + attr + ")";
+            } else {
+                lexer_.expect(TokType::RPAREN);
+                field = low + "(" + inner + ")";
+            }
+        } else if (lexer_.peek().type == TokType::DOT) {
             lexer_.consume();
             field += "." + lexer_.expect(TokType::IDENT).text;
         }
@@ -436,7 +475,22 @@ GroupCommand Parser::parse_command() {
             lexer_.consume();
             ft = lexer_.next();
             field = ft.text;
-            if (lexer_.peek().type == TokType::DOT) {
+            std::string lowf = field;
+            std::transform(lowf.begin(), lowf.end(), lowf.begin(), ::tolower);
+            if ((lowf == "tcnt" || lowf == "forms" || lowf == "spellout")
+                && lexer_.peek().type == TokType::LPAREN) {
+                lexer_.consume();
+                std::string inner = lexer_.expect(TokType::IDENT).text;
+                if (lowf == "spellout") {
+                    lexer_.expect(TokType::COMMA);
+                    std::string attr = lexer_.expect(TokType::IDENT).text;
+                    lexer_.expect(TokType::RPAREN);
+                    field = "spellout(" + inner + "," + attr + ")";
+                } else {
+                    lexer_.expect(TokType::RPAREN);
+                    field = lowf + "(" + inner + ")";
+                }
+            } else if (lexer_.peek().type == TokType::DOT) {
                 lexer_.consume();
                 field += "." + lexer_.expect(TokType::IDENT).text;
             }
@@ -537,6 +591,7 @@ QueryToken Parser::parse_token_expr() {
                 AnchorRegionClauseKind kind;
             } kClauses[] = {
                 {"contains(", 9, AnchorRegionClauseKind::Contains},
+                {"rcontains(", 10, AnchorRegionClauseKind::RcontainsOf},
                 {"rchild(", 7, AnchorRegionClauseKind::RchildOf},
             };
             for (const auto& c : kClauses) {
@@ -560,7 +615,7 @@ QueryToken Parser::parse_token_expr() {
             return false;
         };
 
-        // Interleaved: key=value attrs and rchild(...)/contains(...) (not "child" — UD reserved)
+        // Interleaved: key=value attrs and rchild(...)/rcontains(...)/contains(...) (not "child")
         while (true) {
             while (i < content.size() && std::isspace(static_cast<unsigned char>(content[i]))) ++i;
             if (i >= content.size()) break;
@@ -1106,6 +1161,7 @@ void Parser::parse_global_filters(TokenQuery& tq) {
                 else if (name == "nvals")         fc.func = GlobalFunctionType::NVALS;
                 else if (name == "contains")      fc.func = GlobalFunctionType::CONTAINS;
                 else if (name == "rchild")        fc.func = GlobalFunctionType::RCHILD;
+                else if (name == "rcontains")      fc.func = GlobalFunctionType::RCONTAINS;
                 else throw std::runtime_error("Unknown function in global filter: " + name);
                 lexer_.consume(); // consume LPAREN
                 while (lexer_.peek().type != TokType::RPAREN) {
@@ -1267,4 +1323,4 @@ void Parser::parse_global_filters(TokenQuery& tq) {
     }
 }
 
-} // namespace manatree
+} // namespace pando

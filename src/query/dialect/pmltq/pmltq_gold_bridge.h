@@ -2,7 +2,7 @@
 
 #include <string>
 
-namespace manatree::pmltq {
+namespace pando::pmltq {
 
 struct JsonValue;
 
@@ -14,4 +14,4 @@ bool pmltq_gold_run_node(const std::string& query, const std::string& js_dir,
                          const std::string& script_path, std::string* out_json, std::string* err_msg,
                          bool include_sql = false);
 
-} // namespace manatree::pmltq
+} // namespace pando::pmltq

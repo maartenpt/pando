@@ -5,7 +5,7 @@
 #include <string_view>
 #include <vector>
 
-namespace manatree::pmltq {
+namespace pando::pmltq {
 
 // Token kinds for PML-TQ surface syntax (aligned with perl-pmltq Grammar.pm; keywords
 // are not folded here — the parser treats IDENT vs reserved words).
@@ -61,4 +61,4 @@ private:
 // Exposed for tests and future parser layers.
 std::vector<PmltqToken> tokenize_pmltq_all(std::string_view input);
 
-} // namespace manatree::pmltq
+} // namespace pando::pmltq

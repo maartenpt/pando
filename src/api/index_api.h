@@ -11,7 +11,7 @@
 // This wraps StreamingBuilder in a stable, minimal surface so external
 // callers don't have to depend on internal details or parsing logic.
 
-namespace manatree {
+namespace pando {
 
 class PandoIndexBuilder {
 public:
@@ -62,5 +62,5 @@ private:
     StreamingBuilder builder_;
 };
 
-} // namespace manatree
+} // namespace pando
 

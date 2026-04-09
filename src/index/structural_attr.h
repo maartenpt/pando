@@ -7,9 +7,10 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include <optional>
 #include <unordered_map>
 
-namespace manatree {
+namespace pando {
 
 // Read-only structural attribute: stores (start, end) pairs for regions
 // (sentences, paragraphs, documents) and supports O(log N) position-to-region
@@ -34,6 +35,9 @@ public:
     // Parallel to .rgn row order; -1 = root or unknown. Absent if index has no .par file.
     bool has_parent_region_id() const;
     int32_t parent_region_id(size_t region_idx) const;
+
+    // RG-REG-6: transitive tree dominance (reflexive): ancestor on .par chain of descendant.
+    bool region_is_ancestor_of(size_t ancestor_idx, size_t descendant_idx) const;
 
     // Direct access to the Region array pointer (for cursor-based iteration).
     const Region* region_data() const { return file_.as<Region>(); }
@@ -169,4 +173,19 @@ private:
     std::vector<std::string> region_attr_names_;
 };
 
-} // namespace manatree
+/// TEITOK CQP uses composite names like \c s_id (region \c s, attribute \c id).
+/// The indexer normally registers the short key \c id (files \c s_id.val → corpus.info
+/// entry \c s_id).  Some pipelines register the literal key \c s_id on structure \c s
+/// instead.  Try the split attribute first, then \c struct_name + "_" + attr
+/// (e.g. \c s_id).
+inline std::optional<std::string> resolve_region_attr_key(
+    const StructuralAttr& sa,
+    const std::string& struct_name,
+    const std::string& attr_from_split) {
+    if (sa.has_region_attr(attr_from_split)) return attr_from_split;
+    const std::string composite = struct_name + "_" + attr_from_split;
+    if (sa.has_region_attr(composite)) return composite;
+    return std::nullopt;
+}
+
+} // namespace pando

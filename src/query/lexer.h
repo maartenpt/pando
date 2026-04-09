@@ -4,7 +4,7 @@
 #include <string_view>
 #include <vector>
 
-namespace manatree {
+namespace pando {
 
 enum class TokType {
     END,
@@ -112,4 +112,4 @@ private:
     bool        has_lookahead_ = false;
 };
 
-} // namespace manatree
+} // namespace pando

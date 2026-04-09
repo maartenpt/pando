@@ -6,7 +6,7 @@
 #include <vector>
 #include <memory>
 
-namespace manatree {
+namespace pando {
 
 struct QueryOptions {
     size_t limit   = 20;
@@ -90,4 +90,4 @@ struct ProgramOptions {
 std::string run_program_json(Corpus& corpus, ProgramSession& session,
                              const std::string& cql, ProgramOptions opts = {});
 
-} // namespace manatree
+} // namespace pando

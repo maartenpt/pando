@@ -4,7 +4,7 @@
 #include <string>
 #include <string_view>
 
-namespace manatree::cwb {
+namespace pando::cwb {
 
 /// Token kinds aligned with IMS CWB cqp/parser.l / parser.y (clean-room).
 enum class CwbTok {
@@ -167,4 +167,4 @@ private:
     static std::string strip_quotes(std::string_view raw);
 };
 
-} // namespace manatree::cwb
+} // namespace pando::cwb

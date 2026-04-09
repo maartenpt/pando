@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <string_view>
 
-namespace manatree {
+namespace pando {
 
 namespace {
 
@@ -109,4 +109,4 @@ void emit_count_result_hierarchy_json(std::ostream& out,
     out << "\n  ]";
 }
 
-} // namespace manatree
+} // namespace pando

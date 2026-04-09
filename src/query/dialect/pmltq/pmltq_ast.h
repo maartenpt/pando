@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-namespace manatree::pmltq {
+namespace pando::pmltq {
 
 struct PmltqSpan {
     size_t begin = 0;
@@ -62,4 +62,4 @@ struct PmltqQuery {
     PmltqOutputBlock output;
 };
 
-} // namespace manatree::pmltq
+} // namespace pando::pmltq

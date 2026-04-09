@@ -21,7 +21,7 @@
 #include <iomanip>
 #include <stdexcept>
 
-namespace manatree {
+namespace pando {
 
 // ── Session impl ────────────────────────────────────────────────────────
 
@@ -240,9 +240,10 @@ static void emit_freq_json(std::ostream& out, const Corpus& corpus, const MatchS
         if (split_region_attr_name(cmd.fields[0], parts) &&
             corpus.has_structure(parts.struct_name)) {
             const auto& sa = corpus.structure(parts.struct_name);
-            if (sa.has_region_attr(parts.attr_name)) {
+            auto rkey = resolve_region_attr_key(sa, parts.struct_name, parts.attr_name);
+            if (rkey) {
                 freq_sa = &sa;
-                freq_region_attr = parts.attr_name;
+                freq_region_attr = *rkey;
             }
         }
     }
@@ -964,4 +965,4 @@ std::string run_program_json(Corpus& corpus, ProgramSession& ps,
     return result;
 }
 
-} // namespace manatree
+} // namespace pando

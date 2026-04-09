@@ -2,7 +2,7 @@
 #include <stdexcept>
 #include <cctype>
 
-namespace manatree {
+namespace pando {
 
 Lexer::Lexer(const std::string& input) : input_(input) {}
 
@@ -179,4 +179,4 @@ Token Lexer::expect(TokType type) {
     return t;
 }
 
-} // namespace manatree
+} // namespace pando

@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-namespace manatree {
+namespace pando {
 
 namespace {
 
@@ -941,4 +941,4 @@ Program translate_cwb_program_parsed(const std::string& input, int debug_level,
     return prog;
 }
 
-} // namespace manatree
+} // namespace pando

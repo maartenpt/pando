@@ -3,7 +3,7 @@
 #include "query/ast.h"
 #include <string>
 
-namespace manatree {
+namespace pando {
 
 // Translate a CWB/CQP-style query subset into native pando Program.
 // When trace_out is non-null and debug_level > 0, append a human-readable
@@ -14,4 +14,4 @@ namespace manatree {
 Program translate_cwb_program(const std::string& input, int debug_level,
                               std::string* trace_out);
 
-} // namespace manatree
+} // namespace pando

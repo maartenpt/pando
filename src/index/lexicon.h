@@ -5,7 +5,7 @@
 #include <string>
 #include <string_view>
 
-namespace manatree {
+namespace pando {
 
 // Read-only lexicon backed by mmap'd .lex and .lex.idx files.
 // Supports O(log V) string→ID lookup via binary search on sorted strings.
@@ -22,4 +22,4 @@ private:
     MmapFile offsets_;       // .lex.idx  (int64 byte offsets, size = lex_size+1)
 };
 
-} // namespace manatree
+} // namespace pando

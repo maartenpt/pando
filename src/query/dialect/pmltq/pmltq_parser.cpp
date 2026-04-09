@@ -6,7 +6,7 @@
 #include <stdexcept>
 #include <utility>
 
-namespace manatree::pmltq {
+namespace pando::pmltq {
 
 namespace {
 
@@ -291,4 +291,4 @@ PmltqQuery parse_pmltq_query(const std::string& input) {
     return p.parse_query();
 }
 
-} // namespace manatree::pmltq
+} // namespace pando::pmltq

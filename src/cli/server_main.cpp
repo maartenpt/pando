@@ -10,7 +10,7 @@
 #include <cstdlib>
 #include <thread>
 
-using namespace manatree;
+using namespace pando;
 
 static unsigned default_thread_pool_size() {
     unsigned n = std::thread::hardware_concurrency();

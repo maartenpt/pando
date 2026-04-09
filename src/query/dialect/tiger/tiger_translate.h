@@ -4,7 +4,7 @@
 #include "query/parser.h"
 #include <string>
 
-namespace manatree {
+namespace pando {
 
 // Thin TIGERSearch-style surface → native ClickCQL (constituency / nested `node` regions).
 // Expands line-based macros, then parses with the normal Parser. See dev/TIGER-DIALECT.md.
@@ -13,4 +13,4 @@ Program translate_tiger_program(const std::string& input, int debug_level,
                                 std::string* trace_out,
                                 ParserOptions parse_opts = {});
 
-} // namespace manatree
+} // namespace pando

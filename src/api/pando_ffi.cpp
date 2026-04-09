@@ -74,8 +74,8 @@ char* to_c_string(const std::string& s) {
 }
 
 // Parse QueryOptions from an opts_json string (or defaults if null/empty).
-manatree::QueryOptions parse_query_opts(const char* opts_json) {
-    manatree::QueryOptions opts;
+pando::QueryOptions parse_query_opts(const char* opts_json) {
+    pando::QueryOptions opts;
     if (!opts_json || opts_json[0] == '\0') return opts;
     std::string j(opts_json);
     auto v = json_get(j, "limit");   if (!v.empty()) try { opts.limit    = std::stoull(v); } catch (...) {}
@@ -92,8 +92,8 @@ manatree::QueryOptions parse_query_opts(const char* opts_json) {
 }
 
 // Parse ProgramOptions from an opts_json string.
-manatree::ProgramOptions parse_program_opts(const char* opts_json) {
-    manatree::ProgramOptions opts;
+pando::ProgramOptions parse_program_opts(const char* opts_json) {
+    pando::ProgramOptions opts;
     if (!opts_json || opts_json[0] == '\0') return opts;
     std::string j(opts_json);
     auto v = json_get(j, "limit");      if (!v.empty()) try { opts.limit    = std::stoull(v); } catch (...) {}
@@ -115,8 +115,8 @@ manatree::ProgramOptions parse_program_opts(const char* opts_json) {
 }
 
 struct PandoHandle {
-    manatree::Corpus corpus;
-    manatree::ProgramSession session;
+    pando::Corpus corpus;
+    pando::ProgramSession session;
 };
 
 } // namespace
@@ -141,8 +141,8 @@ char* pando_query(pando_handle_t handle, const char* cql, const char* opts_json)
     try {
         auto* h = static_cast<PandoHandle*>(handle);
         auto opts = parse_query_opts(opts_json);
-        auto [ms, elapsed] = manatree::run_single_query(h->corpus, cql, opts);
-        std::string json = manatree::to_query_result_json(h->corpus, cql, ms, opts, elapsed);
+        auto [ms, elapsed] = pando::run_single_query(h->corpus, cql, opts);
+        std::string json = pando::to_query_result_json(h->corpus, cql, ms, opts, elapsed);
         return to_c_string(json);
     } catch (...) {
         return to_c_string("{\"ok\":false,\"error\":\"query execution failed\"}");
@@ -154,7 +154,7 @@ char* pando_run(pando_handle_t handle, const char* cql, const char* opts_json) {
     try {
         auto* h = static_cast<PandoHandle*>(handle);
         auto opts = parse_program_opts(opts_json);
-        std::string json = manatree::run_program_json(h->corpus, h->session, cql, opts);
+        std::string json = pando::run_program_json(h->corpus, h->session, cql, opts);
         return to_c_string(json);
     } catch (...) {
         return to_c_string("{\"ok\":false,\"error\":\"program execution failed\"}");
@@ -165,7 +165,7 @@ char* pando_info(pando_handle_t handle) {
     if (!handle) return nullptr;
     try {
         auto* h = static_cast<PandoHandle*>(handle);
-        std::string json = manatree::to_info_json(h->corpus);
+        std::string json = pando::to_info_json(h->corpus);
         return to_c_string(json);
     } catch (...) {
         return to_c_string("{\"ok\":false,\"error\":\"info failed\"}");

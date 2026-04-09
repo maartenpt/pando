@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-namespace manatree {
+namespace pando {
 
 // Sentence-local dependency index.
 //
@@ -76,4 +76,4 @@ private:
     Region ensure_children_cache(CorpusPos pos) const;
 };
 
-} // namespace manatree
+} // namespace pando

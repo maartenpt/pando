@@ -4,7 +4,7 @@
 #include "query/lexer.h"
 #include <string>
 
-namespace manatree {
+namespace pando {
 
 struct ParserOptions {
     /// When true: only `/pattern/` is regex inside `[...]`; quoted strings are always literal
@@ -63,4 +63,4 @@ private:
     ParserOptions opts_;
 };
 
-} // namespace manatree
+} // namespace pando

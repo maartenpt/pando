@@ -5,7 +5,7 @@
 #include <utility>
 #include <vector>
 
-namespace manatree::pmltq {
+namespace pando::pmltq {
 
 // Minimal JSON value for gold AST / bridge responses (no third-party dependency).
 struct JsonValue {
@@ -27,4 +27,4 @@ struct JsonValue {
 
 bool parse_json(std::string_view in, JsonValue& out, std::string& err);
 
-} // namespace manatree::pmltq
+} // namespace pando::pmltq

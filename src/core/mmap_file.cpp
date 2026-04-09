@@ -8,7 +8,7 @@
 #include <cstring>
 #include <fstream>
 
-namespace manatree {
+namespace pando {
 
 MmapFile::~MmapFile() { close(); }
 
@@ -98,4 +98,4 @@ void write_strings(const std::string& path,
     offsets_out.push_back(offset);
 }
 
-} // namespace manatree
+} // namespace pando

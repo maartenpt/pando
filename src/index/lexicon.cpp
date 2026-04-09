@@ -3,7 +3,7 @@
 #include <cstring>
 #include <stdexcept>
 
-namespace manatree {
+namespace pando {
 
 // ── Lexicon (read-only) ─────────────────────────────────────────────────
 
@@ -39,4 +39,4 @@ LexiconId Lexicon::lookup(std::string_view value) const {
     return UNKNOWN_LEX;
 }
 
-} // namespace manatree
+} // namespace pando

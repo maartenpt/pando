@@ -3,7 +3,7 @@
 #include "query/ast.h"
 #include <string>
 
-namespace manatree {
+namespace pando {
 
 // Translate PML-TQ into native pando Program. Semantic lowering will follow
 // clickpmltq for token+region corpora; see dev/PMLTQ-ROADMAP.md.
@@ -18,4 +18,4 @@ Program translate_pmltq_program(const std::string& input, int debug_level,
 bool translate_pmltq_export_click_sql(const std::string& input, std::string* out_sql,
                                       std::string* err_msg);
 
-} // namespace manatree
+} // namespace pando

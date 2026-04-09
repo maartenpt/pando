@@ -1,8 +1,8 @@
 #include "query/parser.h"
 
 int main() {
-    using manatree::Parser;
-    using manatree::ParserOptions;
+    using pando::Parser;
+    using pando::ParserOptions;
     Parser(R"([form = "th.*"])", {}).parse();
     Parser(R"([form = "the"])", {}).parse();
     ParserOptions strict;

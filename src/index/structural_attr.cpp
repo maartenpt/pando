@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <fstream>
 
-namespace manatree {
+namespace pando {
 
 void StructuralAttr::open(const std::string& rgn_path, bool preload) {
     file_ = MmapFile::open(rgn_path, preload);
@@ -93,6 +93,18 @@ bool StructuralAttr::has_parent_region_id() const {
 int32_t StructuralAttr::parent_region_id(size_t region_idx) const {
     if (!has_parent_region_id() || region_idx >= region_count()) return -1;
     return par_.as<int32_t>()[region_idx];
+}
+
+bool StructuralAttr::region_is_ancestor_of(size_t ancestor_idx, size_t descendant_idx) const {
+    if (!has_parent_region_id()) return false;
+    if (ancestor_idx >= region_count() || descendant_idx >= region_count()) return false;
+    size_t cur = descendant_idx;
+    while (true) {
+        if (cur == ancestor_idx) return true;
+        int32_t par = parent_region_id(cur);
+        if (par < 0) return false;
+        cur = static_cast<size_t>(par);
+    }
 }
 
 int64_t StructuralAttr::find_region(CorpusPos pos) const {
@@ -296,4 +308,4 @@ bool StructuralAttr::regions_for_value(const std::string& attr_name,
     return true;
 }
 
-} // namespace manatree
+} // namespace pando

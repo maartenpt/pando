@@ -6,7 +6,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace manatree {
+namespace pando {
 
 // FoldMap: maps normalized (lowercased / accent-stripped) strings to sets of
 // original LexiconId entries.  Built lazily from a Lexicon; proportional to
@@ -47,4 +47,4 @@ private:
     static const std::vector<LexiconId> empty_;
 };
 
-} // namespace manatree
+} // namespace pando

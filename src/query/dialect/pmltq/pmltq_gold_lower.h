@@ -4,7 +4,7 @@
 
 #include <string>
 
-namespace manatree::pmltq {
+namespace pando::pmltq {
 
 struct JsonValue;
 
@@ -12,4 +12,4 @@ struct JsonValue;
 // single selector, type selector/a-node, flat and/tests, no >> return yet.
 Program lower_gold_ast_to_program(const JsonValue& gold_response, std::string& err);
 
-} // namespace manatree::pmltq
+} // namespace pando::pmltq

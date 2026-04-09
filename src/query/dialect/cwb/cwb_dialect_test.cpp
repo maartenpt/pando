@@ -6,13 +6,13 @@
 #include <string>
 
 static void expect_ok(const char* q, std::size_t n_stmt = 1) {
-    auto p = manatree::translate_cwb_program(q, 0, nullptr);
+    auto p = pando::translate_cwb_program(q, 0, nullptr);
     assert(p.size() == n_stmt);
 }
 
 static void expect_throw(const char* q) {
     try {
-        manatree::translate_cwb_program(q, 0, nullptr);
+        pando::translate_cwb_program(q, 0, nullptr);
         assert(false);
     } catch (const std::runtime_error&) {
     }
@@ -23,10 +23,10 @@ int main() {
     expect_ok("[lemma=\"a\" & lemma=\"b\"]");
     expect_ok("[lemma=\"a\" | lemma=\"b\"]");
     expect_ok("q = [lemma=\"x\"]", 1);
-    assert(manatree::translate_cwb_program("q = [lemma=\"x\"]", 0, nullptr)[0].name == "q");
+    assert(pando::translate_cwb_program("q = [lemma=\"x\"]", 0, nullptr)[0].name == "q");
 
     expect_ok("[lemma=\"a\"][lemma=\"b\"]", 1);
-    assert(manatree::translate_cwb_program("[lemma=\"a\"][lemma=\"b\"]", 0, nullptr)[0]
+    assert(pando::translate_cwb_program("[lemma=\"a\"][lemma=\"b\"]", 0, nullptr)[0]
                .query.tokens.size() == 2);
 
     expect_throw("count [lemma=\"x\"]");
@@ -35,70 +35,70 @@ int main() {
     expect_throw("[lemma=\"x\"] ::");
 
     try {
-        manatree::translate_cwb_program("count", 0, nullptr);
+        pando::translate_cwb_program("count", 0, nullptr);
         assert(false);
     } catch (const std::runtime_error& e) {
         assert(std::strstr(e.what(), "by") != nullptr);
     }
 
     {
-        auto p = manatree::translate_cwb_program("[lemma=\"the\"]; count by form", 0, nullptr);
+        auto p = pando::translate_cwb_program("[lemma=\"the\"]; count by form", 0, nullptr);
         assert(p.size() == 2);
         assert(p[1].has_command);
-        assert(p[1].command.type == manatree::CommandType::COUNT);
+        assert(p[1].command.type == pando::CommandType::COUNT);
         assert(p[1].command.fields.size() == 1);
         assert(p[1].command.fields[0] == "form");
     }
 
     {
-        auto p = manatree::translate_cwb_program("[upos=\"NOUN\"]; group by lemma", 0, nullptr);
+        auto p = pando::translate_cwb_program("[upos=\"NOUN\"]; group by lemma", 0, nullptr);
         assert(p.size() == 2);
         assert(p[1].has_command);
-        assert(p[1].command.type == manatree::CommandType::GROUP);
+        assert(p[1].command.type == pando::CommandType::GROUP);
         assert(p[1].command.fields.size() == 1);
         assert(p[1].command.fields[0] == "lemma");
     }
 
     {
-        auto p = manatree::translate_cwb_program("group by match lemma", 0, nullptr);
+        auto p = pando::translate_cwb_program("group by match lemma", 0, nullptr);
         assert(p.size() == 1);
-        assert(p[0].command.type == manatree::CommandType::GROUP);
+        assert(p[0].command.type == pando::CommandType::GROUP);
         assert(p[0].command.fields.size() == 1);
         assert(p[0].command.fields[0] == "match.lemma");
     }
 
     {
-        auto p = manatree::translate_cwb_program("group by match.lemma", 0, nullptr);
+        auto p = pando::translate_cwb_program("group by match.lemma", 0, nullptr);
         assert(p.size() == 1);
         assert(p[0].command.fields[0] == "match.lemma");
     }
 
     {
-        auto p = manatree::translate_cwb_program("group by lemma, form", 0, nullptr);
+        auto p = pando::translate_cwb_program("group by lemma, form", 0, nullptr);
         assert(p[0].command.fields.size() == 2);
         assert(p[0].command.fields[0] == "lemma");
         assert(p[0].command.fields[1] == "form");
     }
 
     {
-        auto p = manatree::translate_cwb_program("[lemma=\"the\"]; size", 0, nullptr);
+        auto p = pando::translate_cwb_program("[lemma=\"the\"]; size", 0, nullptr);
         assert(p.size() == 2);
         assert(p[1].has_command);
-        assert(p[1].command.type == manatree::CommandType::SIZE);
+        assert(p[1].command.type == pando::CommandType::SIZE);
     }
 
     {
-        auto p = manatree::translate_cwb_program("[lemma=\"the\"]; sort by lemma", 0, nullptr);
+        auto p = pando::translate_cwb_program("[lemma=\"the\"]; sort by lemma", 0, nullptr);
         assert(p.size() == 2);
-        assert(p[1].command.type == manatree::CommandType::SORT);
+        assert(p[1].command.type == pando::CommandType::SORT);
         assert(p[1].command.fields.size() == 1);
         assert(p[1].command.fields[0] == "lemma");
     }
 
     {
-        auto p = manatree::translate_cwb_program("[lemma=\"the\"]; tabulate 0 5 lemma", 0, nullptr);
+        auto p = pando::translate_cwb_program("[lemma=\"the\"]; tabulate 0 5 lemma", 0, nullptr);
         assert(p.size() == 2);
-        assert(p[1].command.type == manatree::CommandType::TABULATE);
+        assert(p[1].command.type == pando::CommandType::TABULATE);
         assert(p[1].command.tabulate_offset == 0);
         assert(p[1].command.tabulate_limit == 5);
         assert(p[1].command.fields.size() == 1);
@@ -106,7 +106,7 @@ int main() {
     }
 
     {
-        auto p = manatree::translate_cwb_program("tabulate lemma", 0, nullptr);
+        auto p = pando::translate_cwb_program("tabulate lemma", 0, nullptr);
         assert(p.size() == 1);
         assert(p[0].command.tabulate_offset == 0);
         assert(p[0].command.tabulate_limit == 1000);

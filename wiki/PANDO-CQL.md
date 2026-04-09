@@ -15,9 +15,9 @@ CQL is a sequence-based query language, meaning we can look for sequences of tok
 
 To look for patterns inside words, CQL allows regular expressions in token restrictions. In regular expressions, you can look for optional letters, repeated letters, etc. In pando-CQL, the explicit regex form uses slash delimiters: `[form = /pan.*tion/]`.
 
-**Quoted strings and CWB compatibility:** If a double-quoted value contains **no** regex metacharacters (`. * + ? [ ] ( ) { } | ^ $ \\`), `attr = "value"` is a **literal** string test. If it **does** contain any of those characters, it is treated like **CWB / Manatee**: the pattern is matched against the **whole token** using `RE2::FullMatch` (or `std::regex_match` when RE2 is disabled)—the same rule as the `--cql cwb` translator, without embedding `^`/`$` in the pattern string. So `[form = ".*tion"]` matches words that end in *-tion*, like CWB. To keep the **older pando behavior** where only `/pattern/` is a regex and quotes are always literal, pass **`--strict-quoted-strings`** to the CLI, or set `strict_quoted_strings` in API / JSON options. **Inequality** with metacharacters in quotes (`!=`) is not supported in this heuristic mode (use `=` with `/.../` or enable strict quotes).
+For compatible behaviour with CWB and Mantee, normal string matches are interpreted as bound regular expressions when they contain regular expression characters. So `[form = ".*tion"]` matches words that end in *-tion*, like CWB. This behaviour can be turned off by setting `strict_quoted_strings`, which will make the previous query look for the literal string *.\*tion*.
 
-Slash-regex values are passed to the engine **as written** (not auto-anchored). For example `[form = /.*tion/]` matches any substring *tion* inside the token (e.g. *conditional*), not only *-tion* suffixes; anchoring is up to your pattern (e.g. `[form = /tion$/]`).
+Slash-regex values are plain regular expressions. For example `[form = /.*tion/]` matches any substring *tion* inside the token (e.g. *conditional*), not only *-tion* suffixes; anchoring is up to your pattern (e.g. `[form = /tion$/]`).
 
 
 ## Token repetitions
@@ -73,6 +73,9 @@ And of course, those can be combined in queries, so if we want to look for the l
 
 Pando explicitly allows for zero-width regions: regions that have no tokens inside. Those are helpful in for instance spoken corpora, where pauses are often very relevant, but are between tokens, not tokens themselves. By treating pauses as zero-width regions, we can use them in corpus queries, so `[form="the" ] <pause>` will look for the word *the* followed by the beginning (as well as the end) of a pause "region".
 
+In pando, regions are first-class citizens: we can look for regions directly, without relying on the tokens they contain or border. So we can directly look for regions all texts of the book genre: `<text genre="Book">`, so that we concentrate on the regions themselves, not on their tokens. 
+
+
 ## Within and containing
 
 Like in Manatee, we can add a (single) token restriction on the the `within` clause - if we want to look for an interjection in a sentence that needs to contain the word *cat* we can do that by saying `[upos="INTJ"] within s having [form="cat"] :: match.text_genre = "Book" & match.text_lang = "English"` (Universal Dependencies tag `INTJ`; in the sample corpus that sentence is in the English book subcorpus).
@@ -89,21 +92,25 @@ You can **label** a region-start anchor like a token name: **`np:<s>`** binds th
 - **Region-only query** (no token in the query — only the anchor + `::`): **`np:<s> :: np.s_sent_id = "s01"`** enumerates sentence regions and keeps those that pass the filter. When you add tokens (e.g. **`np:<s> []`**) the anchor binds to the first real token as before.
 - **`tabulate`** (and similar commands on the last result) can project **short** region-attribute names on the bound structure: **`tabulate np.id`** or **`tabulate np.sent_id`** — the part after **`np.`** must match a **region attribute** on that structure (as in the index), not the combined `s_sent_id` token form used inside token restrictions.
 - **Anchors + named tokens:** Queries like **`<s> sent:[]`** strip the anchor before execution; **named token indices** in the session align with **`Match.positions`** (so **`tabulate sent.form`** resolves **`sent`** correctly).
-- **Multi-row binding (nested / overlapping / zero-width types):** when a single anchor position is contained in several candidate rows (e.g. two nested `NP`s sharing a start), Pando **fans out** by default — one match per candidate row that passes the anchor's attributes and peer clauses (**`rchild`** / **`contains`**). With multiple anchor constraints the **Cartesian product** is emitted, and each fanned-out match counts independently toward `--limit` / `--max-total`. Pass **`--anchor-binding=innermost`** on the command line (or **`set anchor-binding = innermost`** at runtime) to instead pick the single **tightest-enclosing** row (smallest span at the anchor position; ties broken on region index). Flat structural types have at most one containing row, so both modes coincide there.
 
 **Layer A global `::` geometry:** **`contains(outer, inner)`** — both arguments must be **named region bindings** (e.g. `s:<s> np:<node type="NP">`). True iff the inner region’s inclusive token span lies inside the outer’s (`inner.start ≥ outer.start` and `inner.end ≤ outer.end`). Example: **`:: contains(s, np) = 1`** (or **`> 0`**). Tabulate / aggregate fields support **`tcnt(label)`** for token counts inside a named region (separate from **`contains`**).
 
 **Layer B (nested structural types with a `.par` parent index):** **`rchild(parent, child)`** — both arguments are **named region bindings** for the **same** structural type (e.g. two `node` labels). True iff **`child`’s** stored **`parent_region_id`** equals **`parent`’s** region row index (immediate dominance in the tree). Example: **`vp:<node type="VP"> np:<node type="NP"> [] :: rchild(vp, np) = 1`**. Requires the corpus to declare that type as **`nested`** and to ship **`.par`** (see indexing docs).
 
-**Peer clauses on region anchors (whitespace-separated, any order):** **`rchild(vp)`** — same test as **`:: rchild(vp, …)`** on this binding (immediate parent row must be **`vp`**’s row; **`.par`** required). Use **`rchild`**, not **`child`**, so **`child`** stays reserved for **dependency** relations in **`[]`**. **`contains(vp)`** — this row’s span must geometrically **contain** **`vp`**’s span (Layer A). Example: **`np:<node contains(vp) type="NP" rchild(pp)>`**. Each peer label must be bound by an **earlier** anchor. At least one **non-anchor** token is required so anchors can bind to token positions.
+**`rcontains(ancestor, descendant)`** — same **named-region** rules, **`.par`** required. True iff **`ancestor`** is on the **parent chain** from **`descendant`** up to the root (reflexive: a row is its own ancestor). Example: **`:: rcontains(s, np) = 1`** when the sentence region **`s`** tree-dominates **`np`**. Differs from **`contains`** when spans alone are ambiguous: **`rcontains`** uses the tree index only.
+
+**Peer clauses on region anchors (whitespace-separated, any order):** **`rchild(vp)`** — same test as **`:: rchild(vp, …)`** on this binding (immediate parent row must be **`vp`**’s row; **`.par`** required). Use **`rchild`**, not **`child`**, so **`child`** stays reserved for **dependency** relations in **`[]`**. **`rcontains(vp)`** — this row must **tree-dominate** **`vp`** (same as **`:: rcontains(this, vp)`**). **`contains(vp)`** — this row’s span must geometrically **contain** **`vp`**’s span (Layer A). Example: **`np:<node contains(vp) type="NP" rchild(pp)>`**. Each peer label must be bound by an **earlier** anchor. At least one **non-anchor** token is required so anchors can bind to token positions.
 
 With named regions, there are some functions to compare and count regions. For two named regions *a* and *b*, there are the following functions
 
 | query | interpretation |
 | ------ | ------ | 
-| contains(a,b)  | the region *a* contains the region *b* |
-| rchild(a,b)  | only for nested regions: *b* is a direct child of *a*, so no other regions of this type with intermediate space |
+| contains(a,b)  | the region *a* contains the region *b* (token span ⊆ span) |
+| rchild(a,b)  | only for nested regions: *b* is a direct child of *a* on `.par` |
+| rcontains(a,b)  | nested + `.par`: *a* is an ancestor of *b* on the parent chain (reflexive) |
 | tcnt(a)  | renders the amount of tokens inside the region a |
+| forms(a)  | renders the forms of the tokens inside the region a |
+| spellout(a, attr)  | renders the join of attr for the tokens inside the region a |
 
 
 ## Named tokens and aligned corpora
@@ -175,6 +182,24 @@ Since aggregation functions count each item separately, the total counts for tok
 Notice that there is no straightforward way to look for tokens that have value in their genres that is not *Book*, but it can be done by looking for a regular expression that matches anything except Book, such as *genre = /^(?!Book$).+/*.
 
 The **`nvals(attr)`** function counts **non-empty** pipe-separated components of a value (or, for nested/overlapping region attributes, the number of **distinct** components across all covering regions at the token). Use a comparison and a numeric right-hand side: **`nvals(genre) > 2`**, **`nvals(wsd)=2`**. It applies to positional attributes, **`feats.X`** (0 or 1), and composite region attributes such as **`text_genre`**. For attributes not declared multivalue and with no `|` in the stored string, the count is 0 (empty or `_`) or 1 otherwise.
+
+
+## Stand-off regions
+
+Apart from overlapping, nesting and zero-width regions there is one more type of region in pando: discontinous regions. These are relevant if we for instance want to model phrasal verbs in preposition stranding cases, like *Which boss did he PICK the package UP FOR*. If we want to mark out only the phrasal verb, we have a gap inside the region. That is what discontinuous regions are for, also called stand-off annotations. 
+
+Stand-off annotations are not treated as full regions, since there are various region-related functions that are ill-defined when used with discontinuous regions. So instead, such regions are treated as grouped token-level attributes, that partially behave like regions. 
+
+Stand-off annotations can also be added as external additions to a corpus. Say we have a large online corpus, to which a user wants to add some custom annotations. In that case, we can have a separate folder with a "dependent" corpus that specifies additional annotations. Such corpora are called *overlay* corpora. When querying a corpus, we can specify one or more overlay corpora, that we can then search as if it was part of the main corpus. If I have an overlay corpus called *mine*, in which I annotate multi-word-expressions (mwe), with an attribute *type*, I can find all split phrasal verbs I annotated by using `<overlay-mine-mwe type="split-phrasal">`. 
+
+
+## Tokens to Regions
+
+There are two types of result groups in pando: token results and region results, and it depends on what we want to count or see which of the two we should use. We can directly name a region query item, and aggregate over it, so we can count all error annotations by type simply as follows: `n:<err>; count by n.type`. 
+
+But if we want to find regions that contain specific things, a direct syntax becomes very tricky. Instead, to find regions with token-based restrictions, you use two different queries: you first look for the tokens(say all lemmas *over*) in a named query. And then we restrict our region search on regions that contain at least one token from that named query. So we can find all *split* errors that involve the lemma *over* as follows: `Over = [lemma="over"]; <err type="SPLIT"> where Over`. 
+
+Notice that that gives entire regions, not (just) the tokens inside them - which you could of course find more directly using `[ lemma="over" & err_type="SPLIT" ]`.
 
 
 ## Collocations

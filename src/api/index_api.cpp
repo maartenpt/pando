@@ -1,6 +1,6 @@
 #include "api/index_api.h"
 
-namespace manatree {
+namespace pando {
 
 PandoIndexBuilder::PandoIndexBuilder(const std::string& output_dir)
     : builder_(output_dir) {}
@@ -34,5 +34,5 @@ CorpusPos PandoIndexBuilder::corpus_size() const {
     return builder_.corpus_size();
 }
 
-} // namespace manatree
+} // namespace pando
 

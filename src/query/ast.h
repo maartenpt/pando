@@ -6,7 +6,7 @@
 #include <memory>
 #include <variant>
 
-namespace manatree {
+namespace pando {
 
 // ── Relation types between query tokens ─────────────────────────────────
 
@@ -157,11 +157,12 @@ enum class RegionAnchorType {
     REGION_END,    // </s> — zero-width, binds to previous token's position
 };
 
-/// Suffix clauses on `<region ...>` (any order, whitespace-separated): rchild(vp), contains(vp).
+/// Suffix clauses on `<region ...>` (any order, whitespace-separated): rchild(vp), rcontains(vp), contains(vp).
 /// (`child` is reserved for dependency relations in `[]`, not region-tree parent.)
 enum class AnchorRegionClauseKind {
-    RchildOf,   // rchild(vp) — immediate parent row == region bound as vp (.par)
-    Contains,   // contains(vp) — this row's span geometrically contains vp's span
+    RchildOf,    // rchild(vp) — immediate parent row == region bound as vp (.par)
+    RcontainsOf, // rcontains(vp) — vp is in this row's subtree (.par ancestry)
+    Contains,    // contains(vp) — this row's span geometrically contains vp's span
 };
 
 struct AnchorRegionClause {
@@ -225,7 +226,9 @@ enum class GlobalFunctionType {
     /// Layer A: B's token span ⊆ A's span (both args = named region bindings).
     CONTAINS,
     /// Layer B (nested + `.par`): child row's parent id == parent's region index.
-    RCHILD
+    RCHILD,
+    /// Layer B: parent dominates child on `.par` tree (transitive; reflexive).
+    RCONTAINS
 };
 
 // A single function call: func(args...)
@@ -341,4 +344,4 @@ struct Statement {
 
 using Program = std::vector<Statement>;
 
-} // namespace manatree
+} // namespace pando

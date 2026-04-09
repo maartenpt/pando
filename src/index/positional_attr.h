@@ -11,7 +11,7 @@
 #include <regex>
 #endif
 
-namespace manatree {
+namespace pando {
 
 // Read-only positional attribute: provides O(log V) lookup from value
 // to a sorted position list, and O(1) lookup from position to value.
@@ -184,4 +184,4 @@ public:
     std::vector<LexiconId> mv_fwd_at(CorpusPos pos) const;
 };
 
-} // namespace manatree
+} // namespace pando

@@ -17,7 +17,7 @@
 #include <mutex>
 #endif
 
-namespace manatree {
+namespace pando {
 
 namespace {
 
@@ -186,6 +186,7 @@ static void append_func_call_token_args(const GlobalFuncCall& fc, std::vector<st
             break;
         case GlobalFunctionType::CONTAINS:
         case GlobalFunctionType::RCHILD:
+        case GlobalFunctionType::RCONTAINS:
             break;
     }
 }
@@ -198,7 +199,7 @@ static void expect_region_label(const std::string& name, const std::string& ctx,
     if (token_labels.count(name)) {
         throw std::runtime_error(
             ctx + ": '" + name +
-            "' is a token label; contains(outer, inner) expects named region bindings (e.g. s:<s> …)");
+            "' is a token label; these filters expect named region bindings (e.g. s:<s> …)");
     }
     throw std::runtime_error(ctx + ": unknown name '" + name + "'");
 }
@@ -207,11 +208,15 @@ static void validate_global_func_filter_token_labels(const GlobalFunctionFilter&
                                                      const std::unordered_set<std::string>& token_labels,
                                                      const std::unordered_set<std::string>& region_labels) {
     auto check_call = [&](const GlobalFuncCall& fc) {
-        if (fc.func == GlobalFunctionType::CONTAINS || fc.func == GlobalFunctionType::RCHILD) {
+        if (fc.func == GlobalFunctionType::CONTAINS || fc.func == GlobalFunctionType::RCHILD
+            || fc.func == GlobalFunctionType::RCONTAINS) {
             if (fc.args.size() < 2)
                 throw std::runtime_error(
-                        "contains(outer, inner) and rchild(parent, child) require two named region labels");
-            const char* ctx = fc.func == GlobalFunctionType::CONTAINS ? "contains(…)" : "rchild(…)";
+                        "contains(outer, inner), rchild(parent, child), and rcontains(ancestor, descendant) "
+                        "require two named region labels");
+            const char* ctx = fc.func == GlobalFunctionType::CONTAINS   ? "contains(…)"
+                             : fc.func == GlobalFunctionType::RCHILD    ? "rchild(…)"
+                                                                        : "rcontains(…)";
             expect_region_label(fc.args[0], ctx, token_labels, region_labels);
             expect_region_label(fc.args[1], ctx, token_labels, region_labels);
             return;
@@ -672,9 +677,10 @@ size_t QueryExecutor::estimate_leaf(const AttrCondition& ac) const {
             std::string region_attr = name.substr(us + 1);
             if (corpus_.has_structure(struct_name)) {
                 const auto& sa = corpus_.structure(struct_name);
-                if (sa.has_region_attr(region_attr)) {
-                    if (ac.op == CompOp::EQ && sa.has_region_value_reverse(region_attr)) {
-                        size_t spans = sa.token_span_sum_for_attr_eq(region_attr, ac.value);
+                auto rkey = resolve_region_attr_key(sa, struct_name, region_attr);
+                if (rkey) {
+                    if (ac.op == CompOp::EQ && sa.has_region_value_reverse(*rkey)) {
+                        size_t spans = sa.token_span_sum_for_attr_eq(*rkey, ac.value);
                         if (spans == SIZE_MAX)
                             return static_cast<size_t>(corpus_.size());
                         return std::min(spans, static_cast<size_t>(corpus_.size()));
@@ -820,8 +826,9 @@ std::optional<int64_t> QueryExecutor::nvals_cardinality_at(
     if (!corpus_.has_attr(name) && split_region_attr_name(name, rap)
         && corpus_.has_structure(rap.struct_name)) {
         const auto& sa = corpus_.structure(rap.struct_name);
-        const std::string& region_attr = rap.attr_name;
-        if (sa.has_region_attr(region_attr)) {
+        auto rkey = resolve_region_attr_key(sa, rap.struct_name, rap.attr_name);
+        if (rkey) {
+            const std::string& region_attr = *rkey;
             bool is_multi_region = corpus_.is_overlapping(rap.struct_name)
                                  || corpus_.is_nested(rap.struct_name);
             if (is_multi_region) {
@@ -879,7 +886,9 @@ bool QueryExecutor::check_leaf(CorpusPos pos, const AttrCondition& ac) const {
             std::string region_attr = name.substr(us + 1);
             if (corpus_.has_structure(struct_name)) {
                 const auto& sa = corpus_.structure(struct_name);
-                if (sa.has_region_attr(region_attr)) {
+                auto rkey = resolve_region_attr_key(sa, struct_name, region_attr);
+                if (rkey) {
+                    const std::string& resolved_attr = *rkey;
                     bool is_multi_region = corpus_.is_overlapping(struct_name)
                                          || corpus_.is_nested(struct_name);
 
@@ -888,7 +897,7 @@ bool QueryExecutor::check_leaf(CorpusPos pos, const AttrCondition& ac) const {
                     if (is_multi_region) {
                         bool any_match = false;
                         sa.for_each_region_at(pos, [&](size_t rgn_idx) -> bool {
-                            std::string_view val = sa.region_value(region_attr, rgn_idx);
+                            std::string_view val = sa.region_value(resolved_attr, rgn_idx);
                             switch (ac.op) {
                                 case CompOp::EQ:
                                     if (multivalue_eq(val, ac.value)) { any_match = true; return false; }
@@ -944,7 +953,7 @@ bool QueryExecutor::check_leaf(CorpusPos pos, const AttrCondition& ac) const {
                     // Flat structure: single region lookup (original path).
                     int64_t rgn = sa.find_region(pos);
                     if (rgn >= 0) {
-                        std::string_view val = sa.region_value(region_attr, static_cast<size_t>(rgn));
+                        std::string_view val = sa.region_value(resolved_attr, static_cast<size_t>(rgn));
                         switch (ac.op) {
                             case CompOp::EQ:    return multivalue_eq(val, ac.value);
                             case CompOp::NEQ:   return !multivalue_eq(val, ac.value);
@@ -1225,12 +1234,12 @@ void QueryExecutor::for_each_seed_position_impl(const ConditionPtr& cond,
             if (split_region_attr_name(name, parts) &&
                 corpus_.has_structure(parts.struct_name)) {
                 const auto& sa = corpus_.structure(parts.struct_name);
-                if (sa.has_region_attr(parts.attr_name) &&
-                    ac.op == CompOp::EQ) {
+                auto rkey = resolve_region_attr_key(sa, parts.struct_name, parts.attr_name);
+                if (rkey && ac.op == CompOp::EQ) {
                     // Fast path: iterate only positions inside matching regions
                     const int64_t* rgn_ids = nullptr;
                     size_t rgn_count = 0;
-                    if (sa.regions_for_value(parts.attr_name, ac.value,
+                    if (sa.regions_for_value(*rkey, ac.value,
                                              rgn_ids, rgn_count)) {
                         for (size_t k = 0; k < rgn_count; ++k) {
                             Region r = sa.get(static_cast<size_t>(rgn_ids[k]));
@@ -1246,7 +1255,7 @@ void QueryExecutor::for_each_seed_position_impl(const ConditionPtr& cond,
                     return;
                 }
                 // Non-EQ region attr or no region attr: materialize
-                if (sa.has_region_attr(parts.attr_name)) {
+                if (rkey) {
                     auto vec = resolve_leaf(ac);
                     for (CorpusPos p : vec)
                         if (!f(p)) return;
@@ -1339,14 +1348,15 @@ std::vector<CorpusPos> QueryExecutor::resolve_leaf(
             std::string region_attr = name.substr(us + 1);
             if (corpus_.has_structure(struct_name)) {
                 const auto& sa = corpus_.structure(struct_name);
-                if (sa.has_region_attr(region_attr)) {
+                auto rkey = resolve_region_attr_key(sa, struct_name, region_attr);
+                if (rkey) {
                     if (ac.op == CompOp::EQ) {
                         std::vector<CorpusPos> result;
                         // Fast path: use .rev index to get matching region indices,
                         // then emit only positions inside those regions.
                         const int64_t* rgn_ids = nullptr;
                         size_t rgn_count = 0;
-                        if (sa.regions_for_value(region_attr, ac.value,
+                        if (sa.regions_for_value(*rkey, ac.value,
                                                  rgn_ids, rgn_count)) {
                             result.reserve(rgn_count * 64);  // rough estimate
                             for (size_t k = 0; k < rgn_count; ++k) {
@@ -1363,7 +1373,7 @@ std::vector<CorpusPos> QueryExecutor::resolve_leaf(
                             int64_t rgn = sa.find_region(pos);
                             if (rgn >= 0) {
                                 std::string_view val = sa.region_value(
-                                    region_attr, static_cast<size_t>(rgn));
+                                    *rkey, static_cast<size_t>(rgn));
                                 if (val == ac.value)
                                     result.push_back(pos);
                             }
@@ -1498,10 +1508,11 @@ std::vector<ResolvedRegionFilter> QueryExecutor::resolve_region_filters(
         }
         if (corpus_.has_structure(parts.struct_name)) {
             const auto& sa = corpus_.structure(parts.struct_name);
-            if (sa.has_region_attr(parts.attr_name)) {
+            auto rkey = resolve_region_attr_key(sa, parts.struct_name, parts.attr_name);
+            if (rkey) {
                 rf.sa = &sa;
-                rf.attr_name = parts.attr_name;
-                rf.has_reverse = sa.has_region_value_reverse(parts.attr_name);
+                rf.attr_name = *rkey;
+                rf.has_reverse = sa.has_region_value_reverse(*rkey);
             }
         }
         out.push_back(std::move(rf));
@@ -1582,7 +1593,7 @@ bool QueryExecutor::try_fast_aggregate(
             auto it = binding_to_anchor_idx.find(col.named_anchor);
             if (it == binding_to_anchor_idx.end()) return false;
             const auto& ai = anchor_infos[it->second];
-            if (!ai.sa->has_region_attr(col.region_attr_name)) return false;
+            if (!resolve_region_attr_key(*ai.sa, ai.ac->region, col.region_attr_name)) return false;
             continue;
         }
         if (col.named_anchor.empty()) continue;
@@ -1759,8 +1770,9 @@ bool QueryExecutor::try_fast_aggregate(
                 if (pos != reg.end) return false;
             }
             for (const auto& [key, val] : info.ac->attrs) {
-                if (!info.sa->has_region_attr(key)) return false;
-                if (info.sa->region_value(key, static_cast<size_t>(rgn)) != val)
+                auto rk = resolve_region_attr_key(*info.sa, info.ac->region, key);
+                if (!rk) return false;
+                if (info.sa->region_value(*rk, static_cast<size_t>(rgn)) != val)
                     return false;
             }
             anchor_region_rows[ai] = static_cast<size_t>(rgn);
@@ -1906,10 +1918,11 @@ bool build_aggregate_plan(const Corpus& corpus, const std::vector<std::string>& 
                 // `node.type`, `s.id` — prefix is the structural type (named region binding label).
                 if (corpus.has_structure(prefix)) {
                     const auto& sa = corpus.structure(prefix);
-                    if (sa.has_region_attr(rattr)) {
+                    auto rkey = resolve_region_attr_key(sa, prefix, rattr);
+                    if (rkey) {
                         col.kind = AggregateBucketData::Column::Kind::Region;
                         col.sa = &sa;
-                        col.region_attr_name = std::move(rattr);
+                        col.region_attr_name = *rkey;
                         col.named_anchor = std::move(prefix);
                         out.columns.push_back(std::move(col));
                         continue;
@@ -1930,7 +1943,7 @@ bool build_aggregate_plan(const Corpus& corpus, const std::vector<std::string>& 
                 for (const std::string& st : corpus.structure_names()) {
                     if (!corpus.has_structure(st)) continue;
                     const auto& sa = corpus.structure(st);
-                    if (sa.has_region_attr(attr)) {
+                    if (resolve_region_attr_key(sa, st, attr)) {
                         any_region = true;
                         break;
                     }
@@ -1958,10 +1971,11 @@ bool build_aggregate_plan(const Corpus& corpus, const std::vector<std::string>& 
             std::string ran = ra_name.substr(us + 1);
             if (!corpus.has_structure(sn)) return false;
             const auto& sa = corpus.structure(sn);
-            if (!sa.has_region_attr(ran)) return false;
+            auto rkey = resolve_region_attr_key(sa, sn, ran);
+            if (!rkey) return false;
             col.kind = AggregateBucketData::Column::Kind::Region;
             col.sa = &sa;
-            col.region_attr_name = std::move(ran);
+            col.region_attr_name = *rkey;
             out.columns.push_back(std::move(col));
             found_reg = true;
             break;
@@ -1985,8 +1999,9 @@ bool fill_aggregate_key(AggregateBucketData& data, const Corpus& corpus, const M
             auto nr = m.named_regions.find(col.named_anchor);
             if (nr == m.named_regions.end()) return false;
             const auto& sa = corpus.structure(nr->second.struct_name);
-            if (!sa.has_region_attr(col.region_attr_name)) return false;
-            std::string val(sa.region_value(col.region_attr_name, nr->second.region_idx));
+            auto rk = resolve_region_attr_key(sa, nr->second.struct_name, col.region_attr_name);
+            if (!rk) return false;
+            std::string val(sa.region_value(*rk, nr->second.region_idx));
             auto& st = data.region_intern[i];
             auto it = st.str_to_id.find(val);
             if (it != st.str_to_id.end()) {
@@ -2067,15 +2082,16 @@ static bool global_region_eq_unsatisfiable(const Corpus& corpus,
         std::string attr_name = gf.region_attr.substr(us + 1);
         if (!corpus.has_structure(struct_name)) return true;
         const auto& sa = corpus.structure(struct_name);
-        if (!sa.has_region_attr(attr_name)) return true;
-        if (sa.has_region_value_reverse(attr_name)) {
-            if (sa.count_regions_with_attr_eq(attr_name, gf.value) == 0)
+        auto rkey = resolve_region_attr_key(sa, struct_name, attr_name);
+        if (!rkey) return true;
+        if (sa.has_region_value_reverse(*rkey)) {
+            if (sa.count_regions_with_attr_eq(*rkey, gf.value) == 0)
                 return true;
             continue;
         }
         bool any = false;
         for (size_t ri = 0; ri < sa.region_count(); ++ri) {
-            std::string rval(sa.region_value(attr_name, ri));
+            std::string rval(sa.region_value(*rkey, ri));
             if (rval == gf.value) {
                 any = true;
                 break;
@@ -2202,6 +2218,7 @@ MatchSet QueryExecutor::execute(const TokenQuery& query,
             }
             if (!ok) continue;
             Match m;
+            m.token_group_match = true;
             m.token_group_props = rec.props;
             for (const auto& s : rec.spans) {
                 m.positions.push_back(s.first);
@@ -3081,7 +3098,8 @@ void QueryExecutor::apply_region_filters(const TokenQuery& query, const NameInde
             std::string attr_name = gf.region_attr.substr(us + 1);
             if (!corpus_.has_structure(struct_name)) { pass = false; break; }
             const auto& sa = corpus_.structure(struct_name);
-            if (!sa.has_region_attr(attr_name)) { pass = false; break; }
+            auto rkey = resolve_region_attr_key(sa, struct_name, attr_name);
+            if (!rkey) { pass = false; break; }
 
             int64_t rgn = -1;
             if (!gf.anchor_name.empty()) {
@@ -3100,14 +3118,14 @@ void QueryExecutor::apply_region_filters(const TokenQuery& query, const NameInde
                 rgn = sa.find_region(pos);
                 if (rgn < 0) { pass = false; break; }
             }
-            if (gf.op == CompOp::EQ && sa.has_region_value_reverse(attr_name)) {
-                if (!sa.region_matches_attr_eq_rev(attr_name, static_cast<size_t>(rgn), gf.value)) {
+            if (gf.op == CompOp::EQ && sa.has_region_value_reverse(*rkey)) {
+                if (!sa.region_matches_attr_eq_rev(*rkey, static_cast<size_t>(rgn), gf.value)) {
                     pass = false;
                     break;
                 }
                 continue;
             }
-            std::string rval(sa.region_value(attr_name, static_cast<size_t>(rgn)));
+            std::string rval(sa.region_value(*rkey, static_cast<size_t>(rgn)));
             if (!compare_value(gf.op, rval, gf.value)) { pass = false; break; }
         }
 
@@ -3250,6 +3268,24 @@ void QueryExecutor::apply_global_filters(const TokenQuery& query, const NameInde
                         return {false, 0};
                     int32_t par = sa.parent_region_id(cr.region_idx);
                     bool ok = par >= 0 && static_cast<size_t>(par) == pr.region_idx;
+                    return {true, ok ? 1 : 0};
+                }
+                case GlobalFunctionType::RCONTAINS: {
+                    if (fc.args.size() < 2) return {false, 0};
+                    auto ait = m.named_regions.find(fc.args[0]);
+                    auto dit = m.named_regions.find(fc.args[1]);
+                    if (ait == m.named_regions.end() || dit == m.named_regions.end())
+                        return {false, 0};
+                    const RegionRef& ar = ait->second;
+                    const RegionRef& dr = dit->second;
+                    if (ar.struct_name != dr.struct_name)
+                        return {true, 0};
+                    if (!corpus_.has_structure(ar.struct_name)) return {false, 0};
+                    const auto& sa = corpus_.structure(ar.struct_name);
+                    if (!sa.has_parent_region_id()) return {false, 0};
+                    if (ar.region_idx >= sa.region_count() || dr.region_idx >= sa.region_count())
+                        return {false, 0};
+                    bool ok = sa.region_is_ancestor_of(ar.region_idx, dr.region_idx);
                     return {true, ok ? 1 : 0};
                 }
                 }
@@ -3409,7 +3445,8 @@ bool QueryExecutor::match_passes_inline_region_filters(const Match& m, const Tok
         std::string attr_name = gf.region_attr.substr(us + 1);
         if (!corpus_.has_structure(struct_name)) return false;
         const auto& sa = corpus_.structure(struct_name);
-        if (!sa.has_region_attr(attr_name)) return false;
+        auto rkey = resolve_region_attr_key(sa, struct_name, attr_name);
+        if (!rkey) return false;
 
         int64_t rgn = -1;
         if (!gf.anchor_name.empty()) {
@@ -3428,12 +3465,12 @@ bool QueryExecutor::match_passes_inline_region_filters(const Match& m, const Tok
             rgn = sa.find_region(pos);
             if (rgn < 0) return false;
         }
-        if (gf.op == CompOp::EQ && sa.has_region_value_reverse(attr_name)) {
-            if (!sa.region_matches_attr_eq_rev(attr_name, static_cast<size_t>(rgn), gf.value))
+        if (gf.op == CompOp::EQ && sa.has_region_value_reverse(*rkey)) {
+            if (!sa.region_matches_attr_eq_rev(*rkey, static_cast<size_t>(rgn), gf.value))
                 return false;
             continue;
         }
-        std::string rval(sa.region_value(attr_name, static_cast<size_t>(rgn)));
+        std::string rval(sa.region_value(*rkey, static_cast<size_t>(rgn)));
         if (!compare_value(gf.op, rval, gf.value)) return false;
     }
     return true;
@@ -3481,7 +3518,8 @@ MatchSet QueryExecutor::execute_region_enumeration(const std::vector<AnchorConst
 
         bool attr_ok = true;
         for (const auto& [key, val] : enum_ac->attrs) {
-            if (!sa.has_region_attr(key) || std::string(sa.region_value(key, ri)) != val) {
+            auto rk = resolve_region_attr_key(sa, enum_ac->region, key);
+            if (!rk || std::string(sa.region_value(*rk, ri)) != val) {
                 attr_ok = false;
                 break;
             }
@@ -3541,8 +3579,9 @@ struct AnchorRowCheck {
     const Match& m;
     bool attrs_match(size_t ri) const {
         for (const auto& [key, val] : attrs) {
-            if (!sa.has_region_attr(key)) return false;
-            if (sa.region_value(key, ri) != val) return false;
+            auto rk = resolve_region_attr_key(sa, region_name, key);
+            if (!rk) return false;
+            if (sa.region_value(*rk, ri) != val) return false;
         }
         return true;
     }
@@ -3955,4 +3994,4 @@ std::vector<CorpusPos> QueryExecutor::unite(
     return out;
 }
 
-} // namespace manatree
+} // namespace pando

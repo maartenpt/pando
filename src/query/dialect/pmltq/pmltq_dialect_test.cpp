@@ -12,7 +12,7 @@
 #include <stdexcept>
 #include <string>
 
-using namespace manatree::pmltq;
+using namespace pando::pmltq;
 
 namespace {
 

@@ -4,7 +4,7 @@
 #include <vector>
 #include <string>
 
-namespace manatree {
+namespace pando {
 
 using CorpusPos  = int64_t;   // int64: supports corpora beyond 2.1B tokens
 using LexiconId  = int32_t;   // int32: vocabularies never approach 2B entries
@@ -40,8 +40,8 @@ inline bool split_region_attr_name(const std::string& field, RegionAttrParts& ou
     return true;
 }
 
-} // namespace manatree
+} // namespace pando
 
-// Public namespace migration shim: prefer `pando::` in new code while we
-// incrementally rename internal declarations away from `manatree::`.
-namespace pando = manatree;
+// Historical name: `manatree` was the original C++ namespace; keep an alias for
+// external code and docs that still qualify `manatree::…`.
+namespace manatree = pando;

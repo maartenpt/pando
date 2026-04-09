@@ -31,7 +31,7 @@
 #include <unistd.h>
 
 namespace fs = std::filesystem;
-using namespace manatree;
+using namespace pando;
 
 namespace {
 

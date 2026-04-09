@@ -6,7 +6,7 @@
 #include <stdexcept>
 #include <unordered_set>
 
-namespace manatree {
+namespace pando {
 
 // Minimal JSON-like parser for corpus.info (avoids external dependency).
 // Format:  key=value lines, with list values comma-separated.
@@ -390,4 +390,4 @@ bool Corpus::is_multivalue(const std::string& name) const {
     return false;
 }
 
-} // namespace manatree
+} // namespace pando

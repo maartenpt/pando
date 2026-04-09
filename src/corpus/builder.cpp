@@ -10,7 +10,7 @@
 #include <unordered_set>
 #include <vector>
 
-namespace manatree {
+namespace pando {
 
 namespace {
 
@@ -494,6 +494,56 @@ void CorpusBuilder::read_conllu(const std::string& path) {
     }
 }
 
+// Korp / Kielipankki VRT: <!-- #vrt positional-attributes: word ref lemma pos ... -->
+// (IMS CWB itself usually takes -P from the command line; this in-file convention is common
+// in Korp pipelines and some downloadable VRT.)
+static bool try_parse_vrt_positional_header(const std::string& line,
+                                            std::vector<std::string>* names_out) {
+    constexpr const char* kMarker = "positional-attributes:";
+    size_t pos = line.find(kMarker);
+    if (pos == std::string::npos) return false;
+    pos += sizeof("positional-attributes:") - 1;
+    while (pos < line.size() && (line[pos] == ' ' || line[pos] == '\t')) ++pos;
+    size_t end = line.rfind("-->");
+    if (end == std::string::npos || end <= pos) return false;
+    std::string body = line.substr(pos, end - pos);
+    names_out->clear();
+    std::string cur;
+    for (char c : body) {
+        if (c == ' ' || c == '\t' || c == '\r' || c == '\n') {
+            if (!cur.empty()) {
+                names_out->push_back(cur);
+                cur.clear();
+            }
+        } else
+            cur += c;
+    }
+    if (!cur.empty()) names_out->push_back(cur);
+    return !names_out->empty();
+}
+
+static std::string lower_ascii_copy(std::string_view s) {
+    std::string o;
+    o.reserve(s.size());
+    for (unsigned char c : s) o.push_back(static_cast<char>(std::tolower(c)));
+    return o;
+}
+
+// Map VRT column label → Pando token attribute; empty = drop column (e.g. CWB duplicate "lc").
+static std::string map_vrt_col_to_token_attr(const std::string& raw) {
+    std::string n = lower_ascii_copy(raw);
+    if (n == "word") return "form";
+    if (n == "lc") return "";  // lowercase copy of word; flexiconv skips
+    if (n == "lemma") return "lemma";
+    if (n == "upos") return "upos";
+    if (n == "xpos") return "xpos";
+    if (n == "pos") return "xpos";  // often PTB in CWB; use "upos" in header for UD
+    if (n == "deprel") return "deprel";
+    if (n == "msd" || n == "feats") return "feats";
+    if (is_region_attr_key_token(n)) return n;
+    return "";
+}
+
 void CorpusBuilder::read_vertical(const std::string& path) {
     std::ifstream in(path);
     if (!in) throw std::runtime_error("Cannot open " + path);
@@ -502,10 +552,23 @@ void CorpusBuilder::read_vertical(const std::string& path) {
     std::unordered_map<std::string, std::string> attrs;
     attrs.reserve(8);
     bool in_sentence = false;
+    std::vector<std::string> vrt_column_names;
 
     while (std::getline(in, line)) {
         // Trim trailing CR
         if (!line.empty() && line.back() == '\r') line.pop_back();
+
+        // XML / VRT preamble (must run before generic "<" handling: <!-- is not an element tag).
+        if (!line.empty() && line.rfind("<!--", 0) == 0) {
+            try_parse_vrt_positional_header(line, &vrt_column_names);
+            continue;
+        }
+        if (!line.empty() && line.rfind("<?", 0) == 0) {
+            // XML declaration or processing instruction (ignored by CWB with -x).
+            continue;
+        }
+        // Hash comment line (CWB -n / -N style); avoid treating tabular data as comments.
+        if (!line.empty() && line[0] == '#' && line.find('\t') == std::string::npos) continue;
 
         // XML-style region tags: generic <tag ...> and </tag>
         if (!line.empty() && line[0] == '<') {
@@ -596,36 +659,53 @@ void CorpusBuilder::read_vertical(const std::string& path) {
 
         if (cols.empty()) continue;
 
-        std::string form = cols[0];
-        attrs["form"] = form;
-
-        // Heuristic for UD-style VRT (form, id, lemma, UPOS, ...):
-        auto looks_like_upos = [](const std::string& s) {
-            if (s.empty()) return false;
-            for (char c : s)
-                if (!(c >= 'A' && c <= 'Z')) return false;
-            return true;
-        };
-
-        if (cols.size() >= 4 && looks_like_upos(cols[3])) {
-            // form, id, lemma, upos, ...
-            std::string lemma = cols[2];
-            std::string upos  = cols[3];
-            attrs["lemma"] = lemma.empty() ? form : lemma;
-            attrs["upos"]  = upos.empty()  ? "_"  : upos;
-        } else if (cols.size() >= 3) {
-            // form, lemma, upos
-            std::string lemma = cols[1];
-            std::string upos  = cols[2];
-            attrs["lemma"] = lemma.empty() ? form : lemma;
-            attrs["upos"]  = upos.empty()  ? "_"  : upos;
-        } else if (cols.size() == 2) {
-            std::string lemma = cols[1];
-            attrs["lemma"] = lemma.empty() ? form : lemma;
-            attrs["upos"]  = "_";
+        if (!vrt_column_names.empty()) {
+            for (size_t i = 0; i < vrt_column_names.size() && i < cols.size(); ++i) {
+                std::string key = map_vrt_col_to_token_attr(vrt_column_names[i]);
+                if (key.empty()) continue;
+                std::string val = cols[i];
+                if (val.empty()) val = "_";
+                attrs[key] = std::move(val);
+            }
+            if (!attrs.count("form") && !cols.empty()) {
+                std::string form = cols[0];
+                attrs["form"] = form.empty() ? "_" : std::move(form);
+            }
+            if (!attrs.count("lemma"))
+                attrs["lemma"] = attrs["form"];
+            if (!attrs.count("upos")) attrs["upos"] = "_";
         } else {
-            attrs["lemma"] = form;
-            attrs["upos"]  = "_";
+            std::string form = cols[0];
+            attrs["form"] = form;
+
+            // Heuristic for UD-style VRT (form, id, lemma, UPOS, ...):
+            auto looks_like_upos = [](const std::string& s) {
+                if (s.empty()) return false;
+                for (char c : s)
+                    if (!(c >= 'A' && c <= 'Z')) return false;
+                return true;
+            };
+
+            if (cols.size() >= 4 && looks_like_upos(cols[3])) {
+                // form, id, lemma, upos, ...
+                std::string lemma = cols[2];
+                std::string upos  = cols[3];
+                attrs["lemma"] = lemma.empty() ? form : lemma;
+                attrs["upos"]  = upos.empty()  ? "_"  : upos;
+            } else if (cols.size() >= 3) {
+                // form, lemma, upos
+                std::string lemma = cols[1];
+                std::string upos  = cols[2];
+                attrs["lemma"] = lemma.empty() ? form : lemma;
+                attrs["upos"]  = upos.empty()  ? "_"  : upos;
+            } else if (cols.size() == 2) {
+                std::string lemma = cols[1];
+                attrs["lemma"] = lemma.empty() ? form : lemma;
+                attrs["upos"]  = "_";
+            } else {
+                attrs["lemma"] = form;
+                attrs["upos"]  = "_";
+            }
         }
         if (!in_sentence) in_sentence = true;
         builder_.add_token(attrs, -1);  // no dependency info
@@ -1305,4 +1385,4 @@ void CorpusBuilder::finalize() {
     builder_.finalize();
 }
 
-} // namespace manatree
+} // namespace pando

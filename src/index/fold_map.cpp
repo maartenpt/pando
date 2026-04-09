@@ -2,7 +2,7 @@
 #include <algorithm>
 #include <cctype>
 
-namespace manatree {
+namespace pando {
 
 const std::vector<LexiconId> FoldMap::empty_;
 
@@ -96,4 +96,4 @@ FoldMap FoldMap::build_lc_no_accents(const Lexicon& lex) {
     return fm;
 }
 
-} // namespace manatree
+} // namespace pando

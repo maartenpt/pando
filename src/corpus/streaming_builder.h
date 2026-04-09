@@ -11,7 +11,7 @@
 #include <limits>
 #include <utility>
 
-namespace manatree {
+namespace pando {
 
 // Streaming corpus builder: writes index files incrementally as tokens
 // arrive, then sorts lexicons and builds reverse indexes at finalize.
@@ -217,4 +217,4 @@ private:
     void detect_structure_mode(const std::string& type, CorpusPos start, CorpusPos end);
 };
 
-} // namespace manatree
+} // namespace pando

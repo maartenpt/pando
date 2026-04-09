@@ -56,7 +56,7 @@ static std::vector<std::string> find_vertical_files(const std::string& path) {
     return files;
 }
 
-static manatree::CorpusPos read_corpus_size_from_info(const std::string& main_dir) {
+static pando::CorpusPos read_corpus_size_from_info(const std::string& main_dir) {
     std::ifstream in(main_dir + "/corpus.info");
     if (!in) throw std::runtime_error("Cannot open " + main_dir + "/corpus.info");
     std::string line;
@@ -64,7 +64,7 @@ static manatree::CorpusPos read_corpus_size_from_info(const std::string& main_di
         if (line.rfind("size=", 0) == 0) {
             long long n = std::stoll(line.substr(5));
             if (n < 0) throw std::runtime_error("Invalid size= in corpus.info");
-            return static_cast<manatree::CorpusPos>(n);
+            return static_cast<pando::CorpusPos>(n);
         }
     }
     throw std::runtime_error("corpus.info missing size= line in " + main_dir);
@@ -132,7 +132,8 @@ int main(int argc, char* argv[]) {
                   << "  For each region attribute (e.g. text_langcode.val), the indexer also writes\n"
                   << "  .lex / .rev / .rev.idx (value → region ids) for fast :: metadata filters.\n\n"
                   << "  --split-feats     Split FEATS into feats_X (default: combined)\n"
-                  << "  --format vertical Read CWB-style vertical (one token/line, <s> </s>)\n"
+                  << "  --format vertical Read CWB-style vertical (one token/line, <s> </s>);\n"
+                  << "                    optional <!-- positional-attributes: ... --> (Korp/Kielipankki)\n"
                   << "  --format jsonl    Read streaming JSONL events (tokens/regions)\n"
                   << "  --overlay-index   Standoff-only JSONL: emit token-group columns + groups/ into\n"
                   << "                    output_dir (no full corpus). Requires --format jsonl and\n"
@@ -155,11 +156,11 @@ int main(int argc, char* argv[]) {
 
     try {
         if (overlay_index) {
-            manatree::CorpusPos main_size = read_corpus_size_from_info(index_dir);
+            pando::CorpusPos main_size = read_corpus_size_from_info(index_dir);
             std::cerr << "Overlay index: main corpus size=" << main_size << " (from "
                       << index_dir << "/corpus.info)\n";
             std::cerr << "Reading overlay JSONL from " << input_path << "\n";
-            manatree::CorpusBuilder builder(output_dir, true);
+            pando::CorpusBuilder builder(output_dir, true);
             builder.read_jsonl_overlay(input_path, main_size);
             builder.finalize();
             write_overlay_info(output_dir, index_dir, input_path);
@@ -167,7 +168,7 @@ int main(int argc, char* argv[]) {
             return 0;
         }
 
-        manatree::CorpusBuilder builder(output_dir);
+        pando::CorpusBuilder builder(output_dir);
         builder.set_split_feats(split_feats);
 
         auto t0 = std::chrono::steady_clock::now();

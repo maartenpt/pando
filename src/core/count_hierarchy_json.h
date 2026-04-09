@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-namespace manatree {
+namespace pando {
 
 // JSON hierarchy for count/group by multiple fields: first field = outer layer,
 // nested children for each subsequent field (sorted by count descending at each level).
@@ -15,4 +15,4 @@ void emit_count_result_hierarchy_json(std::ostream& out,
                                       size_t total,
                                       size_t group_limit);
 
-} // namespace manatree
+} // namespace pando

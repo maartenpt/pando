@@ -6,7 +6,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace manatree {
+namespace pando {
 
 namespace {
 
@@ -131,4 +131,4 @@ Program translate_tiger_program(const std::string& input, int debug_level,
     return parser.parse();
 }
 
-} // namespace manatree
+} // namespace pando

@@ -27,7 +27,7 @@
 #include <stdexcept>
 #include <filesystem>
 
-using namespace manatree;
+using namespace pando;
 
 namespace fs = std::filesystem;
 
@@ -1035,9 +1035,10 @@ static void emit_freq(const Corpus& corpus, const MatchSet& ms,
         if (split_region_attr_name(cmd.fields[0], parts) &&
             corpus.has_structure(parts.struct_name)) {
             const auto& sa = corpus.structure(parts.struct_name);
-            if (sa.has_region_attr(parts.attr_name)) {
+            auto rkey = resolve_region_attr_key(sa, parts.struct_name, parts.attr_name);
+            if (rkey) {
                 freq_sa = &sa;
-                freq_region_attr = parts.attr_name;
+                freq_region_attr = *rkey;
             }
         }
     }
@@ -2115,10 +2116,11 @@ static void run_query(const Corpus& corpus, const std::string& input,
                     std::string region_attr = attr_name.substr(us + 1);
                     if (corpus.has_structure(struct_name)) {
                         const auto& sa = corpus.structure(struct_name);
-                        if (sa.has_region_attr(region_attr)) {
+                        auto rkey = resolve_region_attr_key(sa, struct_name, region_attr);
+                        if (rkey) {
                             bool is_mv = corpus.is_multivalue(attr_name);
                             std::vector<std::pair<std::string, size_t>> entries =
-                                region_attr_show_values_mv(sa, region_attr, is_mv);
+                                region_attr_show_values_mv(sa, *rkey, is_mv);
 
                             size_t limit = std::min(entries.size(), opts.group_limit > 0 ? opts.group_limit : entries.size());
 

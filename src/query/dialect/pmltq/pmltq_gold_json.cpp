@@ -4,7 +4,7 @@
 #include <cstdio>
 #include <stdexcept>
 
-namespace manatree::pmltq {
+namespace pando::pmltq {
 
 namespace {
 
@@ -260,4 +260,4 @@ bool parse_json(std::string_view in, JsonValue& out, std::string& err) {
     return true;
 }
 
-} // namespace manatree::pmltq
+} // namespace pando::pmltq

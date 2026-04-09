@@ -6,7 +6,7 @@
 #include <sstream>
 #include <utility>
 
-namespace manatree::pmltq {
+namespace pando::pmltq {
 
 namespace {
 
@@ -208,4 +208,4 @@ Program lower_gold_ast_to_program(const JsonValue& gold_response, std::string& e
     return prog;
 }
 
-} // namespace manatree::pmltq
+} // namespace pando::pmltq

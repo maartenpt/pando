@@ -9,7 +9,7 @@
 #include <vector>
 #include <memory>
 
-namespace manatree {
+namespace pando {
 
 struct CorpusInfo {
     CorpusPos size = 0;
@@ -116,4 +116,4 @@ private:
     std::unordered_map<std::string, std::string> group_index_path_override_;
 };
 
-} // namespace manatree
+} // namespace pando

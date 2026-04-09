@@ -22,7 +22,7 @@
 #include <mutex>
 #endif
 
-namespace manatree {
+namespace pando {
 
 /// Resolved structural region instance (RG-REG-2): type name + row index in that .rgn table.
 struct RegionRef {
@@ -37,6 +37,8 @@ struct Match {
     std::unordered_map<std::string, RegionRef> named_regions;
     /// Token-group sidecar props (`groups/<struct>.jsonl`), set for `<err>` / overlay group matches.
     std::vector<std::pair<std::string, std::string>> token_group_props;
+    /// True when this match comes from token-group expansion (`<err>` etc.), not token chain.
+    bool token_group_match = false;
 
     // Overall match extent: min/max across ALL positions and span_ends.
     // Safe for dependency queries where positions may not be in corpus order.
@@ -117,12 +119,159 @@ inline std::optional<std::string> evaluate_tcnt_tabulate_field(
         return std::to_string(static_cast<long long>(rg.end - rg.start + 1));
     }
     if (resolve_name(m, name_map, inner) != NO_HEAD) {
+        // For token-group anchor matches (`n:<err>; ...`), the label is represented in the
+        // stripped name map as slot 0 so group-aware commands can project `n.*`. Here that
+        // should count group member tokens, not be rejected as a query-token label.
+        if (m.token_group_match)
+            return std::to_string(static_cast<long long>(m.matched_positions().size()));
         throw std::runtime_error(
             "tcnt(...) counts tokens inside a named region anchor; '" + inner +
             "' refers to a query token, not a region binding");
     }
     throw std::runtime_error(
         "tcnt(...) requires a named region binding; '" + inner +
+        "' does not refer to a region anchor from the query");
+}
+
+/// If `field` is `forms(region_label)`, returns token forms for that label.
+/// For token-group matches, disjoint spans are joined as " ... " (e.g. "booked ... over").
+inline std::optional<std::string> evaluate_forms_tabulate_field(
+    const Corpus& corpus, const Match& m, const NameIndexMap& name_map,
+    const std::string& field) {
+    if (field.size() < 8 || field.compare(0, 6, "forms(") != 0 || field.back() != ')')
+        return std::nullopt;
+    const std::string inner = field.substr(6, field.size() - 7);
+    if (inner.empty() || inner.find('.') != std::string::npos)
+        throw std::runtime_error("Invalid forms(...) field: expected forms(region_name)");
+    if (!corpus.has_attr("form"))
+        throw std::runtime_error("forms(...) requires positional attribute 'form'");
+    const auto& form = corpus.attr("form");
+
+    auto emit_span = [&](CorpusPos start, CorpusPos end, std::string& out) {
+        bool first = out.empty();
+        for (CorpusPos p = start; p <= end; ++p) {
+            if (!first) out += " ";
+            out += std::string(form.value_at(p));
+            first = false;
+        }
+    };
+
+    auto nr = m.named_regions.find(inner);
+    if (nr != m.named_regions.end()) {
+        const RegionRef& rr = nr->second;
+        if (!corpus.has_structure(rr.struct_name)) return std::string{};
+        const auto& sa = corpus.structure(rr.struct_name);
+        Region rg = sa.get(rr.region_idx);
+        if (rg.start > rg.end) return std::string{};
+        std::string out;
+        emit_span(rg.start, rg.end, out);
+        return out;
+    }
+
+    if (resolve_name(m, name_map, inner) != NO_HEAD && m.token_group_match) {
+        std::vector<std::pair<CorpusPos, CorpusPos>> spans;
+        spans.reserve(m.positions.size());
+        for (size_t i = 0; i < m.positions.size(); ++i) {
+            if (m.positions[i] == NO_HEAD) continue;
+            CorpusPos e = (!m.span_ends.empty()) ? m.span_ends[i] : m.positions[i];
+            spans.emplace_back(m.positions[i], e);
+        }
+        if (spans.empty()) return std::string{};
+        std::sort(spans.begin(), spans.end());
+        std::string out;
+        for (size_t i = 0; i < spans.size(); ++i) {
+            if (i) out += " ... ";
+            std::string part;
+            emit_span(spans[i].first, spans[i].second, part);
+            out += part;
+        }
+        return out;
+    }
+
+    if (resolve_name(m, name_map, inner) != NO_HEAD) {
+        throw std::runtime_error(
+            "forms(...) requires a named region anchor; '" + inner +
+            "' refers to a query token, not a region binding");
+    }
+    throw std::runtime_error(
+        "forms(...) requires a named region binding; '" + inner +
+        "' does not refer to a region anchor from the query");
+}
+
+/// If `field` is `spellout(region_label,attr)`, returns token spellout text from
+/// positional attr `attr` for that region/group, joining disjoint spans with " ... ".
+inline std::optional<std::string> evaluate_spellout_tabulate_field(
+    const Corpus& corpus, const Match& m, const NameIndexMap& name_map,
+    const std::string& field) {
+    if (field.size() < 13 || field.compare(0, 9, "spellout(") != 0 || field.back() != ')')
+        return std::nullopt;
+    const std::string inner = field.substr(9, field.size() - 10);
+    size_t comma = inner.find(',');
+    if (comma == std::string::npos || comma == 0 || comma + 1 >= inner.size())
+        throw std::runtime_error("Invalid spellout(...) field: expected spellout(region_name,attr)");
+    auto trim_spaces = [](std::string s) {
+        while (!s.empty() && (s.back() == ' ' || s.back() == '\t')) s.pop_back();
+        size_t i = 0;
+        while (i < s.size() && (s[i] == ' ' || s[i] == '\t')) ++i;
+        if (i) s.erase(0, i);
+        return s;
+    };
+    std::string label = trim_spaces(inner.substr(0, comma));
+    std::string attr = trim_spaces(inner.substr(comma + 1));
+    if (label.find('.') != std::string::npos || attr.find('.') != std::string::npos)
+        throw std::runtime_error("Invalid spellout(...) field: expected spellout(region_name,attr)");
+    if (!corpus.has_attr(attr))
+        throw std::runtime_error("spellout(...) requires a positional attribute '" + attr + "'");
+    const auto& pa = corpus.attr(attr);
+
+    auto emit_span = [&](CorpusPos start, CorpusPos end, std::string& out) {
+        bool first = out.empty();
+        for (CorpusPos p = start; p <= end; ++p) {
+            if (!first) out += " ";
+            out += std::string(pa.value_at(p));
+            first = false;
+        }
+    };
+
+    auto nr = m.named_regions.find(label);
+    if (nr != m.named_regions.end()) {
+        const RegionRef& rr = nr->second;
+        if (!corpus.has_structure(rr.struct_name)) return std::string{};
+        const auto& sa = corpus.structure(rr.struct_name);
+        Region rg = sa.get(rr.region_idx);
+        if (rg.start > rg.end) return std::string{};
+        std::string out;
+        emit_span(rg.start, rg.end, out);
+        return out;
+    }
+
+    if (resolve_name(m, name_map, label) != NO_HEAD && m.token_group_match) {
+        std::vector<std::pair<CorpusPos, CorpusPos>> spans;
+        spans.reserve(m.positions.size());
+        for (size_t i = 0; i < m.positions.size(); ++i) {
+            if (m.positions[i] == NO_HEAD) continue;
+            CorpusPos e = (!m.span_ends.empty()) ? m.span_ends[i] : m.positions[i];
+            spans.emplace_back(m.positions[i], e);
+        }
+        if (spans.empty()) return std::string{};
+        std::sort(spans.begin(), spans.end());
+        std::string out;
+        for (size_t i = 0; i < spans.size(); ++i) {
+            if (i) out += " ... ";
+            std::string part;
+            emit_span(spans[i].first, spans[i].second, part);
+            out += part;
+        }
+        return out;
+    }
+
+    if (resolve_name(m, name_map, label) != NO_HEAD) {
+        throw std::runtime_error(
+            "spellout(...) requires a named region anchor; '" + label +
+            "' refers to a query token, not a region binding");
+    }
+    throw std::runtime_error(
+        "spellout(...) requires a named region binding; '" + label +
         "' does not refer to a region anchor from the query");
 }
 
@@ -516,4 +665,4 @@ private:
 #endif
 };
 
-} // namespace manatree
+} // namespace pando

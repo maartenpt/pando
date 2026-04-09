@@ -7,7 +7,7 @@
 #include <filesystem>
 #include <fstream>
 
-using namespace manatree;
+using namespace pando;
 namespace fs = std::filesystem;
 
 static std::vector<std::string> split(const std::string& s, char delim) {

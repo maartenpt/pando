@@ -4,7 +4,7 @@
 #include <string_view>
 #include <utility>
 
-namespace manatree::pmltq {
+namespace pando::pmltq {
 
 namespace {
 
@@ -113,4 +113,4 @@ ConditionPtr lower_pmltq_test_strings(const std::string& field_in, const std::st
     return ConditionNode::make_leaf(std::move(ac));
 }
 
-} // namespace manatree::pmltq
+} // namespace pando::pmltq

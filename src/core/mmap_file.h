@@ -6,7 +6,7 @@
 #include <vector>
 #include <stdexcept>
 
-namespace manatree {
+namespace pando {
 
 class MmapFile {
 public:
@@ -51,4 +51,4 @@ void write_strings(const std::string& path,
                    const std::vector<std::string>& strs,
                    std::vector<int64_t>& offsets_out);
 
-} // namespace manatree
+} // namespace pando

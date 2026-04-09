@@ -5,7 +5,7 @@
 
 namespace fs = std::filesystem;
 
-namespace manatree {
+namespace pando {
 
 // ── PositionalAttr (read-only) ──────────────────────────────────────────
 
@@ -252,4 +252,4 @@ std::vector<LexiconId> PositionalAttr::mv_fwd_at(CorpusPos pos) const {
     return out;
 }
 
-} // namespace manatree
+} // namespace pando

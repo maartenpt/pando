@@ -3,7 +3,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace manatree {
+namespace pando {
 
 Program translate_pmltq_program(const std::string&, int, std::string*) {
     throw std::runtime_error(
@@ -17,4 +17,4 @@ bool translate_pmltq_export_click_sql(const std::string&, std::string*, std::str
     return false;
 }
 
-} // namespace manatree
+} // namespace pando

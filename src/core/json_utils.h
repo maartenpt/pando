@@ -9,7 +9,7 @@
 #include <string_view>
 #include <cstdio>
 
-namespace manatree {
+namespace pando {
 
 inline std::string json_escape(std::string_view s) {
     std::string out;
@@ -83,4 +83,4 @@ inline std::string_view lookup_doc_id(const Corpus& corpus, CorpusPos pos) {
     return text.region_value(static_cast<size_t>(ri));
 }
 
-} // namespace manatree
+} // namespace pando

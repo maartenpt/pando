@@ -4,7 +4,7 @@
 #include <stdexcept>
 #include <vector>
 
-namespace manatree::pmltq {
+namespace pando::pmltq {
 
 namespace {
 
@@ -231,4 +231,4 @@ std::vector<PmltqToken> tokenize_pmltq_all(std::string_view input) {
     return out;
 }
 
-} // namespace manatree::pmltq
+} // namespace pando::pmltq

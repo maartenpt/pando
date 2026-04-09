@@ -16,7 +16,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-namespace manatree {
+namespace pando {
 namespace fs = std::filesystem;
 
 static constexpr size_t IO_CHUNK = 4 * 1024 * 1024; // 4M elements per chunk
@@ -1749,4 +1749,4 @@ void StreamingBuilder::build_mv_forward_index(const std::string& base,
               << "\n";
 }
 
-} // namespace manatree
+} // namespace pando

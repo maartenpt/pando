@@ -3,13 +3,17 @@
 #include <string>
 #include <optional>
 
-namespace manatree {
+namespace pando {
 
 std::string read_tabulate_field(const Corpus& corpus, const Match& m,
                                 const NameIndexMap& name_map,
                                 const std::string& field) {
     if (auto tc = evaluate_tcnt_tabulate_field(corpus, m, name_map, field))
         return *tc;
+    if (auto fs = evaluate_forms_tabulate_field(corpus, m, name_map, field))
+        return *fs;
+    if (auto sp = evaluate_spellout_tabulate_field(corpus, m, name_map, field))
+        return *sp;
 
     CorpusPos pos = m.first_pos();
     std::string attr_spec = field;
@@ -35,8 +39,9 @@ std::string read_tabulate_field(const Corpus& corpus, const Match& m,
                 std::string rattr = rest;
                 if (rattr.size() > 5 && rattr.substr(0, 5) == "feats" && rattr.find('.') != std::string::npos)
                     rattr[rattr.find('.')] = '_';
-                if (sa.has_region_attr(rattr))
-                    return std::string(sa.region_value(rattr, rr.region_idx));
+                auto rkey = resolve_region_attr_key(sa, rr.struct_name, rattr);
+                if (rkey)
+                    return std::string(sa.region_value(*rkey, rr.region_idx));
                 throw std::runtime_error(
                     "Tabulate field '" + field + "': no region attribute '" + rattr
                     + "' on structure '" + rr.struct_name + "' (binding '" + name + "')");
@@ -87,7 +92,8 @@ std::string read_tabulate_field(const Corpus& corpus, const Match& m,
                 "Tabulate field '" + field + "': unknown token or region attribute");
         }
         const auto& sa = corpus.structure(parts.struct_name);
-        if (!sa.has_region_attr(parts.attr_name)) {
+        auto rkey = resolve_region_attr_key(sa, parts.struct_name, parts.attr_name);
+        if (!rkey) {
             throw std::runtime_error(
                 "Tabulate field '" + field + "': no region attribute '" + parts.attr_name
                 + "' on structure '" + parts.struct_name + "'");
@@ -97,7 +103,7 @@ std::string read_tabulate_field(const Corpus& corpus, const Match& m,
         if (multi) {
             std::string result;
             sa.for_each_region_at(pos, [&](size_t rgn_idx) -> bool {
-                std::string_view v = sa.region_value(parts.attr_name, rgn_idx);
+                std::string_view v = sa.region_value(*rkey, rgn_idx);
                 if (v.empty()) return true;
                 std::string vs(v);
                 if (result.empty()) {
@@ -112,7 +118,7 @@ std::string read_tabulate_field(const Corpus& corpus, const Match& m,
         }
         int64_t rgn = sa.find_region(pos);
         if (rgn < 0) return "";
-        return std::string(sa.region_value(parts.attr_name, static_cast<size_t>(rgn)));
+        return std::string(sa.region_value(*rkey, static_cast<size_t>(rgn)));
     }
 
     if (named_token_label.has_value()) {
@@ -152,4 +158,4 @@ std::string decode_aggregate_bucket_key(const AggregateBucketData& data,
     return out;
 }
 
-} // namespace manatree
+} // namespace pando

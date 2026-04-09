@@ -3,7 +3,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace manatree {
+namespace pando {
 
 Program translate_cwb_program(const std::string&, int, std::string*) {
     throw std::runtime_error(
@@ -11,4 +11,4 @@ Program translate_cwb_program(const std::string&, int, std::string*) {
         "Configure with -DPANDO_CWB_DIALECT=ON (see dev/CQL-DIALECT-LICENSING.md).");
 }
 
-} // namespace manatree
+} // namespace pando

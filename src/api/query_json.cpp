@@ -12,7 +12,7 @@
 #include <iomanip>
 #include <string_view>
 
-namespace manatree {
+namespace pando {
 
 // Same pipe boundaries as query/executor multivalue_eq (RG-5f).
 static void add_mv_counts(std::string_view stored, size_t weight,
@@ -101,7 +101,7 @@ std::string to_query_result_json(const Corpus& corpus,
 
     out << "{\n";
     out << "  \"ok\": true,\n";
-    out << "  \"backend\": \"manatree\",\n";
+    out << "  \"backend\": \"pando\",\n";
     out << "  \"operation\": \"query\",\n";
     out << "  \"result\": {\n";
     out << "    \"query\": {\"language\": \"clickcql\", \"text\": " << jstr(query_text) << "},\n";
@@ -237,10 +237,11 @@ std::string to_values_json(const Corpus& corpus, const std::string& attr_name, s
         std::string region_attr = attr_name.substr(us + 1);
         if (corpus.has_structure(struct_name)) {
             const auto& sa = corpus.structure(struct_name);
-            if (sa.has_region_attr(region_attr)) {
+            auto rkey = resolve_region_attr_key(sa, struct_name, region_attr);
+            if (rkey) {
                 bool is_mv = corpus.is_multivalue(attr_name);
                 std::vector<std::pair<std::string, size_t>> entries =
-                    region_attr_show_values_mv(sa, region_attr, is_mv);
+                    region_attr_show_values_mv(sa, *rkey, is_mv);
 
                 size_t cap = (limit > 0) ? std::min(entries.size(), limit) : entries.size();
                 out << "{\n  \"ok\": true,\n  \"operation\": \"values\",\n";
@@ -298,4 +299,4 @@ std::string to_regions_json(const Corpus& corpus, const std::string& type_name, 
     return out.str();
 }
 
-} // namespace manatree
+} // namespace pando

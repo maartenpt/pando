@@ -4,7 +4,7 @@
 #include <stdexcept>
 #include <unordered_map>
 
-namespace manatree::cwb {
+namespace pando::cwb {
 
 namespace {
 
@@ -511,4 +511,4 @@ CwbToken CwbLexer::next() {
     }
 }
 
-} // namespace manatree::cwb
+} // namespace pando::cwb

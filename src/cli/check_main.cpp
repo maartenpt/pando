@@ -9,7 +9,7 @@
 #include <vector>
 #include <cstdint>
 
-namespace manatree {
+namespace pando {
 
 // Minimal corpus.info reader (duplicated from corpus.cpp to avoid loading full index).
 struct CorpusInfoLite {
@@ -147,12 +147,12 @@ static int run_check(const std::string& dir) {
     return 0;
 }
 
-} // namespace manatree
+} // namespace pando
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
         std::cerr << "Usage: pando-check <corpus_dir>\n";
         return 1;
     }
-    return manatree::run_check(argv[1]);
+    return pando::run_check(argv[1]);
 }

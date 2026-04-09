@@ -2,7 +2,7 @@
 #include <stdexcept>
 #include <algorithm>
 
-namespace manatree {
+namespace pando {
 
 // ── DependencyIndex (read-only) ─────────────────────────────────────────
 
@@ -147,4 +147,4 @@ bool DependencyIndex::is_ancestor(CorpusPos anc, CorpusPos desc) const {
     return euler_in(anc) < euler_in(desc) && euler_out(anc) > euler_out(desc);
 }
 
-} // namespace manatree
+} // namespace pando

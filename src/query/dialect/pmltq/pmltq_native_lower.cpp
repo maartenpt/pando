@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-namespace manatree::pmltq {
+namespace pando::pmltq {
 
 namespace {
 
@@ -127,4 +127,4 @@ Program lower_native_pmltq_query(const PmltqQuery& q, std::string& err) {
     return prog;
 }
 
-} // namespace manatree::pmltq
+} // namespace pando::pmltq

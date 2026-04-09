@@ -11,7 +11,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace manatree {
+namespace pando {
 
 // PML-TQ: JSON ast → lower_gold_ast_to_program() → native Program → QueryExecutor on
 // the loaded Corpus. Optional Node only supplies a reference PEG parse until the C++
@@ -138,4 +138,4 @@ bool translate_pmltq_export_click_sql(const std::string& input, std::string* out
     return false;
 }
 
-} // namespace manatree
+} // namespace pando

@@ -7,7 +7,7 @@
 #include <stdexcept>
 #include <unistd.h>
 
-namespace manatree::pmltq {
+namespace pando::pmltq {
 
 namespace {
 
@@ -92,4 +92,4 @@ bool pmltq_gold_run_node(const std::string& query, const std::string& js_dir,
     return true;
 }
 
-} // namespace manatree::pmltq
+} // namespace pando::pmltq

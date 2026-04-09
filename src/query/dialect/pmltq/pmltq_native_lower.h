@@ -6,8 +6,8 @@
 
 #include <string>
 
-namespace manatree::pmltq {
+namespace pando::pmltq {
 
 Program lower_native_pmltq_query(const PmltqQuery& q, std::string& err);
 
-} // namespace manatree::pmltq
+} // namespace pando::pmltq

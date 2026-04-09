@@ -7,7 +7,7 @@
 #include <utility>
 #include <vector>
 
-namespace manatree {
+namespace pando {
 
 // Convenience wrapper: reads CoNLL-U and feeds StreamingBuilder.
 class CorpusBuilder {
@@ -17,7 +17,10 @@ public:
 
     void read_conllu(const std::string& path);
     /// Read CWB-style vertical: one token per line, tab-separated; <s> </s> for sentence boundaries.
-    /// Columns: form [lemma [upos]]; no dependency info.
+    /// Optional Korp/Kielipankki header line in an XML comment lists column names, e.g.
+    ///   <!-- #vrt positional-attributes: word ref lemma pos ... -->
+    /// Without that line, columns are inferred by count (form; form+lemma; form+lemma+upos; or UD 4+).
+    /// No dependency head resolution from dephead columns yet (stored as token attrs if present).
     void read_vertical(const std::string& path);
 
     /// Read JSONL event stream (from file or "-" = stdin) and feed StreamingBuilder.
@@ -89,4 +92,4 @@ private:
     int         mwt_remaining_ = 0;  // sub-tokens left before closing the contr region
 };
 
-} // namespace manatree
+} // namespace pando

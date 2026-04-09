@@ -6,7 +6,7 @@
 #include <string>
 #include <string_view>
 
-namespace manatree {
+namespace pando {
 
 // Same character set as CWB dialect (cwb_parser.cpp): if absent, treat as literal for "=".
 inline bool string_has_regex_metachar(std::string_view s) {
@@ -64,4 +64,4 @@ inline void validate_neq_quoted_string(const std::string& value, bool strict_quo
             "literal or /pattern/, or pass --strict-quoted-strings for literal-only quotes)");
 }
 
-} // namespace manatree
+} // namespace pando

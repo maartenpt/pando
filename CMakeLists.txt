@@ -96,6 +96,8 @@ add_library(pando_core STATIC
     src/query/parser.cpp
     src/query/dialect/tiger/tiger_translate.cpp
     src/query/executor.cpp
+    src/query/executor_aggregate.cpp
+    src/query/executor_anchors.cpp
     src/query/executor_tabulate.cpp
     src/api/index_api.cpp
 )
