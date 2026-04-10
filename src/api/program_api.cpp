@@ -880,9 +880,16 @@ std::string run_program_json(Corpus& corpus, ProgramSession& ps,
             bool count_t = false;
             size_t max_total_cap = 0;
             if (!next_is_command) {
-                max_m = opts.offset + opts.limit;
-                count_t = opts.total;
-                max_total_cap = (opts.total && opts.max_total > 0) ? opts.max_total : 0;
+                // See query_main.cpp: do not page-limit named assignments (stored for freq/count).
+                if (!stmt.name.empty()) {
+                    max_m = 0;
+                    count_t = opts.total;
+                    max_total_cap = (opts.total && opts.max_total > 0) ? opts.max_total : 0;
+                } else {
+                    max_m = opts.offset + opts.limit;
+                    count_t = opts.total;
+                    max_total_cap = (opts.total && opts.max_total > 0) ? opts.max_total : 0;
+                }
             }
 
             const std::vector<std::string>* aggregate_by = nullptr;

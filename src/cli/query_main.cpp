@@ -1843,9 +1843,18 @@ static void run_query(const Corpus& corpus, const std::string& input,
                 max_m = 0;
                 count_t = true;  // need full count for reservoir sampling
             } else if (!next_is_command) {
-                max_m = opts.offset + opts.limit;
-                count_t = opts.total;
-                max_total_cap = (opts.total && opts.max_total > 0) ? opts.max_total : 0;
+                // Concordance page limit (offset+limit) applies to anonymous queries only.
+                // Named binds (Q1 = …) are stored for later freq/count; truncating here makes
+                // Q1 a tiny sample while Q2 before `freq` uses max_m=0 (full set).
+                if (!stmt.name.empty()) {
+                    max_m = 0;
+                    count_t = opts.total;
+                    max_total_cap = (opts.total && opts.max_total > 0) ? opts.max_total : 0;
+                } else {
+                    max_m = opts.offset + opts.limit;
+                    count_t = opts.total;
+                    max_total_cap = (opts.total && opts.max_total > 0) ? opts.max_total : 0;
+                }
             }
 
             const std::vector<std::string>* aggregate_by = nullptr;
