@@ -354,7 +354,12 @@ static void emit_freq_compare_json(std::ostream& out, const Corpus& corpus, Prog
             double ipm = 1e6 * static_cast<double>(c) / denom;
             out << jstr(srcs[qi].label) << ": {\"count\": " << c
                       << ", \"pct\": " << pct
-                      << ", \"ipm\": " << std::fixed << std::setprecision(2) << ipm << "}";
+                      << ", \"ipm\": " << std::fixed << std::setprecision(2) << ipm;
+            if (freq_sa) {
+                double rf_pct = denom > 0 ? 100.0 * static_cast<double>(c) / denom : 0.0;
+                out << ", \"rf_pct\": " << std::setprecision(4) << rf_pct;
+            }
+            out << "}";
         }
         out << "}}";
     }
@@ -425,8 +430,13 @@ static void emit_freq_json(std::ostream& out, const Corpus& corpus, const MatchS
         out << "    {\"key\": " << jstr(sorted[i].first) << ", \"count\": " << sorted[i].second
             << ", \"pct\": " << pct
             << ", \"ipm\": " << std::fixed << std::setprecision(2) << ipm;
-        if (freq_sa)
-            out << ", \"subcorpus_size\": " << static_cast<size_t>(denom);
+        if (freq_sa) {
+            double rf_pct = denom > 0
+                ? 100.0 * static_cast<double>(sorted[i].second) / denom
+                : 0.0;
+            out << ", \"rf_pct\": " << std::setprecision(4) << rf_pct
+                << ", \"subcorpus_size\": " << static_cast<size_t>(denom);
+        }
         out << "}";
     }
     out << "\n  ]\n}}\n";

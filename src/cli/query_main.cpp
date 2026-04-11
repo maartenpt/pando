@@ -1125,7 +1125,12 @@ static void emit_freq_compare(const Corpus& corpus, Session& session,
                 double ipm = 1e6 * static_cast<double>(c) / denom;
                 std::cout << jstr(srcs[qi].label) << ": {\"count\": " << c
                           << ", \"pct\": " << pct
-                          << ", \"ipm\": " << std::fixed << std::setprecision(2) << ipm << "}";
+                          << ", \"ipm\": " << std::fixed << std::setprecision(2) << ipm;
+                if (freq_sa) {
+                    double rf_pct = denom > 0 ? 100.0 * static_cast<double>(c) / denom : 0.0;
+                    std::cout << ", \"rf_pct\": " << std::setprecision(4) << rf_pct;
+                }
+                std::cout << "}";
             }
             std::cout << "}}";
         }
@@ -1137,10 +1142,13 @@ static void emit_freq_compare(const Corpus& corpus, Session& session,
             std::cout << srcs[i].label;
         }
         std::cout << "\n";
+        if (freq_sa)
+            std::cout << "# Qn_% = share of that query's hits across rows; Qn_ipm and Qn_rf% = relative frequency per subcorpus (tokens)\n";
         for (const auto& f : cmd.fields) std::cout << f << "\t";
         for (size_t i = 0; i < srcs.size(); ++i) {
             std::cout << srcs[i].label << "_count\t" << srcs[i].label << "_%\t" << srcs[i].label
                       << "_ipm\t";
+            if (freq_sa) std::cout << srcs[i].label << "_rf%\t";
         }
         if (freq_sa) std::cout << "subcorpus";
         std::cout << "\n";
@@ -1157,6 +1165,10 @@ static void emit_freq_compare(const Corpus& corpus, Session& session,
                 double ipm = 1e6 * static_cast<double>(c) / denom;
                 std::cout << c << "\t" << std::fixed << std::setprecision(1) << pct << "%\t"
                           << std::setprecision(2) << ipm << "\t";
+                if (freq_sa) {
+                    double rf_pct = denom > 0 ? 100.0 * static_cast<double>(c) / denom : 0.0;
+                    std::cout << std::setprecision(2) << rf_pct << "%\t";
+                }
             }
             if (freq_sa) std::cout << static_cast<size_t>(denom);
             std::cout << "\n";
@@ -1241,14 +1253,21 @@ static void emit_freq(const Corpus& corpus, const MatchSet& ms,
                       << ", \"count\": " << sorted[i].second
                       << ", \"pct\": " << pct
                       << ", \"ipm\": " << std::fixed << std::setprecision(2) << ipm;
-            if (freq_sa)
-                std::cout << ", \"subcorpus_size\": " << static_cast<size_t>(denom);
+            if (freq_sa) {
+                double rf_pct = denom > 0
+                    ? 100.0 * static_cast<double>(sorted[i].second) / denom
+                    : 0.0;
+                std::cout << ", \"rf_pct\": " << std::setprecision(4) << rf_pct
+                          << ", \"subcorpus_size\": " << static_cast<size_t>(denom);
+            }
             std::cout << "}";
         }
         std::cout << "\n  ]\n}}\n";
     } else {
         for (const auto& f : cmd.fields) std::cout << f << "\t";
-        std::cout << "count\t%\tipm" << (freq_sa ? "\tsubcorpus" : "") << "\n";
+        std::cout << "count\t%\tipm";
+        if (freq_sa) std::cout << "\trf%\tsubcorpus";
+        std::cout << "\n";
         for (const auto& [key, count] : sorted) {
             double pct = total_matches > 0
                 ? 100.0 * static_cast<double>(count) / static_cast<double>(total_matches)
@@ -1257,6 +1276,10 @@ static void emit_freq(const Corpus& corpus, const MatchSet& ms,
             double ipm = 1e6 * static_cast<double>(count) / denom;
             std::cout << key << "\t" << count << "\t" << std::fixed << std::setprecision(1) << pct
                       << "%\t" << std::setprecision(2) << ipm;
+            if (freq_sa) {
+                double rf_pct = denom > 0 ? 100.0 * static_cast<double>(count) / denom : 0.0;
+                std::cout << "\t" << std::setprecision(2) << rf_pct << "%";
+            }
             if (freq_sa) std::cout << "\t" << static_cast<size_t>(denom);
             std::cout << "\n";
         }
