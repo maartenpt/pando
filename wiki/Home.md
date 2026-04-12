@@ -21,7 +21,7 @@ Use `pando --help` for the current option list. Important query options include 
 
 - **Pando CQL**: CWB-style token sequences and region constraints, extended with dependencies, named tokens, global `::` filters, `within` / `containing`, collocations, keyness, and more. Full tutorial: [PANDO-CQL.md](PANDO-CQL.md). Short guides: [Collocations and keyness](Collocations-and-Keyness.md).
 - **Dependency index**: When the corpus has sentence structure `s` and dependency data, queries can use governors/dependents, `child`/`parent`/tree restrictions, and `dcoll`. See [Dependency queries](Dependency-Queries.md).
-- **Multivalue attributes**: Pipe-separated values at index time; EQ/NEQ match any component; reverse indexes for components (RG-5f). See [Multivalue attributes](Multivalue-Attributes.md).
+- **Multivalue attributes**: Pipe-separated **sets** at index time; EQ/NEQ match any component; **`.mv.*`** sidecars (RG-5f). **UD `feats`** uses a different **KV pipe** encoding (`Key=Val|…`); combined vs split columns — see [Multivalue attributes](Multivalue-Attributes.md) (MV + [KV pipe section](Multivalue-Attributes.md#kv-pipe-attributes-ud-feats)).
 - **Structural regions**: Texts, sentences, docs, and custom region types; optional nested vs overlapping behavior per type. See [Overlapping and nested regions](Overlapping-and-Nested-Regions.md). Phrase-structure (constituency) trees as nested regions: [Constituency grammar and nested regions](Constituency-and-Nested-Regions.md).
 - **Aligned corpora**: Shared translation-unit ids (`s_tuid`, token `tuid`); pipe-separated **multivalue** ids for n:n bitext; `query1 with query2` for simple sentence-aligned search. See [Aligned corpora and parallel queries](Aligned-Corpora-and-Parallel-Queries.md).
 - **On-disk format**: Memory-mapped files under one directory; `corpus.info` describes attributes and flags. See [Index and corpus layout](Index-and-Corpus-Layout.md).
@@ -33,7 +33,7 @@ Use `pando --help` for the current option list. Important query options include 
 - [Sample corpora](Sample-Corpora.md) — CoNLL-U, JSONL fixture, full UD via `build_ud_corpus.py`
 - [Quick Start](Quick-Start.md)
 - [Query language (Pando CQL)](Query-Language-and-CQL.md)
-- [Multivalue attributes](Multivalue-Attributes.md)
+- [Multivalue attributes](Multivalue-Attributes.md) — MV sets + **KV pipe** (`feats`)
 - [Overlapping and nested regions](Overlapping-and-Nested-Regions.md)
 - [Constituency grammar and nested regions](Constituency-and-Nested-Regions.md)
 - [Aligned corpora and parallel queries](Aligned-Corpora-and-Parallel-Queries.md)

@@ -72,7 +72,15 @@ std::string read_tabulate_field(const Corpus& corpus, const Match& m,
         if (attr_spec == "type" && !tg_val(m, "type") && tg_val(m, "code")) return *tg_val(m, "code");
     }
 
-    std::string attr = attr_spec;
+    std::string attr = normalize_query_attr_name(corpus, attr_spec);
+    std::string feat_name;
+    if (feats_is_subkey(attr, feat_name) && corpus.has_attr("feats")) {
+        std::string split_col = "feats_" + feat_name;
+        if (!corpus.has_attr(split_col)) {
+            const auto& pa = corpus.attr("feats");
+            return std::string(feats_extract_value(pa.value_at(pos), feat_name));
+        }
+    }
     if (attr.size() > 5 && attr.substr(0, 5) == "feats" && attr.find('.') != std::string::npos)
         attr[attr.find('.')] = '_';
     if (corpus.has_attr(attr))

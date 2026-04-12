@@ -269,6 +269,13 @@ std::string to_info_json(const Corpus& corpus, std::string_view operation) {
         if (i > 0) out << ", ";
         out << jstr(mv[i]);
     }
+    out << "],\n";
+    out << "    \"kv_pipe\": [";
+    const auto& kvp = corpus.kv_pipe_attrs();
+    for (size_t i = 0; i < kvp.size(); ++i) {
+        if (i > 0) out << ", ";
+        out << jstr(kvp[i]);
+    }
     out << "]\n  }\n}\n";
     return out.str();
 }

@@ -27,6 +27,10 @@ bool QueryExecutor::try_fast_aggregate(
     if (q.tokens[0].min_repeat != 1 || q.tokens[0].max_repeat != 1) return false;
     if (!q.global_function_filters.empty()) return false;
 
+    for (const auto& col : agg.columns) {
+        if (col.kind == AggregateBucketData::Column::Kind::FeatsComposite) return false;
+    }
+
     // ── Anchor constraints (RG-REG-7): only the "simple" subset is supported ─
     struct AnchorFastInfo {
         const AnchorConstraint* ac = nullptr;
@@ -345,7 +349,18 @@ bool build_aggregate_plan_impl(const Corpus& corpus, const std::vector<std::stri
                 attr_spec = std::move(rest);
             }
         }
-        std::string attr = attr_spec;
+        std::string attr = normalize_query_attr_name(corpus, attr_spec);
+        std::string feat_name;
+        if (feats_is_subkey(attr, feat_name) && corpus.has_attr("feats")) {
+            std::string split_col = "feats_" + feat_name;
+            if (!corpus.has_attr(split_col)) {
+                col.kind = AggregateBucketData::Column::Kind::FeatsComposite;
+                col.pa = &corpus.attr("feats");
+                col.feats_sub_key = feat_name;
+                out.columns.push_back(std::move(col));
+                continue;
+            }
+        }
         if (attr.size() > 5 && attr.substr(0, 5) == "feats" && attr.find('.') != std::string::npos)
             attr[attr.find('.')] = '_';
         if (corpus.has_attr(attr)) {
@@ -398,7 +413,22 @@ bool fill_aggregate_key_impl(AggregateBucketData& data, const Corpus& corpus, co
     key_out.resize(data.columns.size());
     for (size_t i = 0; i < data.columns.size(); ++i) {
         const auto& col = data.columns[i];
-        if (col.kind == AggregateBucketData::Column::Kind::Positional) {
+        if (col.kind == AggregateBucketData::Column::Kind::FeatsComposite) {
+            CorpusPos pos = col.named_anchor.empty() ? m.first_pos()
+                                                     : resolve_name(m, nm, col.named_anchor);
+            if (pos == NO_HEAD) return false;
+            std::string val = std::string(feats_extract_value(col.pa->value_at(pos), col.feats_sub_key));
+            auto& st = data.region_intern[i];
+            auto it = st.str_to_id.find(val);
+            if (it != st.str_to_id.end()) {
+                key_out[i] = it->second;
+            } else {
+                int64_t id = static_cast<int64_t>(st.id_to_str.size() + 1);
+                st.str_to_id.emplace(val, id);
+                st.id_to_str.push_back(std::move(val));
+                key_out[i] = id;
+            }
+        } else if (col.kind == AggregateBucketData::Column::Kind::Positional) {
             CorpusPos pos = col.named_anchor.empty() ? m.first_pos()
                                                      : resolve_name(m, nm, col.named_anchor);
             if (pos == NO_HEAD) return false;

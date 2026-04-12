@@ -481,17 +481,27 @@ const FoldMap& QueryExecutor::get_fold_map(const std::string& attr, bool case_fo
 
 // ── Attribute name normalization ────────────────────────────────────────
 
+std::string normalize_query_attr_name(const Corpus& corpus, const std::string& attr) {
+    std::string a;
+    a.reserve(attr.size());
+    for (char c : attr) {
+        if (c == '/') a += '.';
+        else a += c;
+    }
+    if (a.size() > 6 && a.compare(0, 6, "feats.") == 0) {
+        std::string split_name = "feats_" + a.substr(6);
+        if (corpus.has_attr(split_name)) return split_name;
+        return a;
+    }
+    if (a.size() > 6 && a.compare(0, 6, "feats_") == 0) {
+        if (corpus.has_attr(a)) return a;
+        return "feats." + a.substr(6);
+    }
+    return a;
+}
+
 std::string QueryExecutor::normalize_attr(const std::string& attr) const {
-    if (attr.size() > 6 && attr.compare(0, 6, "feats.") == 0) {
-        std::string split_name = "feats_" + attr.substr(6);
-        if (corpus_.has_attr(split_name)) return split_name;
-        return attr;
-    }
-    if (attr.size() > 6 && attr.compare(0, 6, "feats_") == 0) {
-        if (corpus_.has_attr(attr)) return attr;
-        return "feats." + attr.substr(6);
-    }
-    return attr;
+    return normalize_query_attr_name(corpus_, attr);
 }
 
 // ── Combined feats helpers ──────────────────────────────────────────────
@@ -499,7 +509,7 @@ std::string QueryExecutor::normalize_attr(const std::string& attr) const {
 // When feats is stored as a single string like "Case=Nom|Number=Sing",
 // extract the value for a specific feature name.
 
-static bool is_feats_sub(const std::string& name, std::string& feat_name) {
+bool feats_is_subkey(const std::string& name, std::string& feat_name) {
     if (name.size() > 6 && name.compare(0, 6, "feats.") == 0) {
         feat_name = name.substr(6);
         return true;
@@ -507,7 +517,7 @@ static bool is_feats_sub(const std::string& name, std::string& feat_name) {
     return false;
 }
 
-static std::string extract_feat(std::string_view feats,
+std::string feats_extract_value(std::string_view feats,
                                 const std::string& feat_name) {
     if (feats == "_" || feats.empty()) return "_";
 
@@ -530,7 +540,7 @@ static std::string extract_feat(std::string_view feats,
 static bool feats_entry_matches(std::string_view feats,
                                 const std::string& feat_name,
                                 const std::string& value) {
-    return extract_feat(feats, feat_name) == value;
+    return feats_extract_value(feats, feat_name) == value;
 }
 
 // ── Condition compilation (#25): pre-resolve EQ values to LexiconIds ────
@@ -548,7 +558,7 @@ void QueryExecutor::compile_conditions(const ConditionPtr& cond) const {
             && !ac.case_insensitive && !ac.diacritics_insensitive) {
             std::string name = normalize_attr(ac.attr);
             std::string feat_name;
-            if (!is_feats_sub(name, feat_name) && corpus_.has_attr(name)
+            if (!feats_is_subkey(name, feat_name) && corpus_.has_attr(name)
                 && corpus_.is_multivalue(name)) {
                 ac.resolved_mv_component_id =
                     corpus_.attr(name).mv_lookup(ac.value);
@@ -558,7 +568,7 @@ void QueryExecutor::compile_conditions(const ConditionPtr& cond) const {
             std::string name = normalize_attr(ac.attr);
             // Only resolve for positional attrs (not feats sub, not region attrs)
             std::string feat_name;
-            if (!is_feats_sub(name, feat_name) && corpus_.has_attr(name)
+            if (!feats_is_subkey(name, feat_name) && corpus_.has_attr(name)
                 && !corpus_.is_multivalue(name)) {
                 ac.resolved_id = corpus_.attr(name).lexicon().lookup(ac.value);
             }
@@ -655,7 +665,7 @@ size_t QueryExecutor::estimate_leaf(const AttrCondition& ac) const {
 
     // Combined feats mode: scan the feats lexicon for matching entries
     std::string feat_name;
-    if (is_feats_sub(name, feat_name) && !corpus_.has_attr(name)
+    if (feats_is_subkey(name, feat_name) && !corpus_.has_attr(name)
         && corpus_.has_attr("feats")) {
         const auto& pa = corpus_.attr("feats");
         size_t total = 0;
@@ -813,11 +823,11 @@ std::optional<int64_t> QueryExecutor::nvals_cardinality_at(
     std::string name = normalize_attr(name_in);
 
     std::string feat_name;
-    if (is_feats_sub(name, feat_name) && !corpus_.has_attr(name)
+    if (feats_is_subkey(name, feat_name) && !corpus_.has_attr(name)
         && corpus_.has_attr("feats")) {
         const auto& pa = corpus_.attr("feats");
         std::string_view feats_str = pa.value_at(pos);
-        std::string feat_val = extract_feat(feats_str, feat_name);
+        std::string feat_val = feats_extract_value(feats_str, feat_name);
         int64_t n = (feat_val.empty() || feat_val == "_") ? 0 : 1;
         return n;
     }
@@ -866,11 +876,11 @@ bool QueryExecutor::check_leaf(CorpusPos pos, const AttrCondition& ac) const {
 
     // Combined feats mode: feats.Number="Sing" → check within combined feats string
     std::string feat_name;
-    if (is_feats_sub(name, feat_name) && !corpus_.has_attr(name)
+    if (feats_is_subkey(name, feat_name) && !corpus_.has_attr(name)
         && corpus_.has_attr("feats")) {
         const auto& pa = corpus_.attr("feats");
         std::string_view feats_str = pa.value_at(pos);
-        std::string feat_val = extract_feat(feats_str, feat_name);
+        std::string feat_val = feats_extract_value(feats_str, feat_name);
         switch (ac.op) {
             case CompOp::EQ:  return feat_val == ac.value;
             case CompOp::NEQ: return feat_val != ac.value;
@@ -1222,7 +1232,7 @@ void QueryExecutor::for_each_seed_position_impl(const ConditionPtr& cond,
         }
         std::string name = normalize_attr(ac.attr);
         std::string feat_name;
-        if (is_feats_sub(name, feat_name) && !corpus_.has_attr(name)
+        if (feats_is_subkey(name, feat_name) && !corpus_.has_attr(name)
             && corpus_.has_attr("feats")) {
             auto vec = resolve_leaf(ac);
             for (CorpusPos p : vec)
@@ -1321,7 +1331,7 @@ std::vector<CorpusPos> QueryExecutor::resolve_leaf(
 
     // Combined feats mode: scan feats lexicon, union matching position lists
     std::string feat_name;
-    if (is_feats_sub(name, feat_name) && !corpus_.has_attr(name)
+    if (feats_is_subkey(name, feat_name) && !corpus_.has_attr(name)
         && corpus_.has_attr("feats")) {
         const auto& pa = corpus_.attr("feats");
         LexiconId n = pa.lexicon().size();
@@ -1582,6 +1592,10 @@ bool QueryExecutor::try_fast_aggregate(
         if (!ac.binding_name.empty())
             binding_to_anchor_idx[ac.binding_name] = anchor_infos.size();
         anchor_infos.push_back(std::move(ai));
+    }
+
+    for (const auto& col : agg.columns) {
+        if (col.kind == AggregateBucketData::Column::Kind::FeatsComposite) return false;
     }
 
     // Named anchors in aggregate columns must refer either to this single query token
@@ -1932,7 +1946,18 @@ bool build_aggregate_plan(const Corpus& corpus, const std::vector<std::string>& 
                 attr_spec = std::move(rest);
             }
         }
-        std::string attr = attr_spec;
+        std::string attr = normalize_query_attr_name(corpus, attr_spec);
+        std::string feat_name;
+        if (feats_is_subkey(attr, feat_name) && corpus.has_attr("feats")) {
+            std::string split_col = "feats_" + feat_name;
+            if (!corpus.has_attr(split_col)) {
+                col.kind = AggregateBucketData::Column::Kind::FeatsComposite;
+                col.pa = &corpus.attr("feats");
+                col.feats_sub_key = feat_name;
+                out.columns.push_back(std::move(col));
+                continue;
+            }
+        }
         if (attr.size() > 5 && attr.substr(0, 5) == "feats" && attr.find('.') != std::string::npos)
             attr[attr.find('.')] = '_';
         if (corpus.has_attr(attr)) {
@@ -1990,7 +2015,22 @@ bool fill_aggregate_key(AggregateBucketData& data, const Corpus& corpus, const M
     key_out.resize(data.columns.size());
     for (size_t i = 0; i < data.columns.size(); ++i) {
         const auto& col = data.columns[i];
-        if (col.kind == AggregateBucketData::Column::Kind::Positional) {
+        if (col.kind == AggregateBucketData::Column::Kind::FeatsComposite) {
+            CorpusPos pos = col.named_anchor.empty() ? m.first_pos()
+                                                     : resolve_name(m, nm, col.named_anchor);
+            if (pos == NO_HEAD) return false;
+            std::string val = std::string(feats_extract_value(col.pa->value_at(pos), col.feats_sub_key));
+            auto& st = data.region_intern[i];
+            auto it = st.str_to_id.find(val);
+            if (it != st.str_to_id.end()) {
+                key_out[i] = it->second;
+            } else {
+                int64_t id = static_cast<int64_t>(st.id_to_str.size() + 1);
+                st.str_to_id.emplace(val, id);
+                st.id_to_str.push_back(std::move(val));
+                key_out[i] = id;
+            }
+        } else if (col.kind == AggregateBucketData::Column::Kind::Positional) {
             CorpusPos pos = col.named_anchor.empty() ? m.first_pos()
                                                      : resolve_name(m, nm, col.named_anchor);
             if (pos == NO_HEAD) return false;

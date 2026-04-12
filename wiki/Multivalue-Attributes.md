@@ -2,6 +2,8 @@
 
 Multivalue (MV) attributes store **sets** of atomic values as a single string using **`|`** as separator (e.g. `Poem|Song`, `artist|writer`). The corpus header (`corpus.info` / JSONL header) lists which attributes are multivalue.
 
+**Not the same as UD `feats`:** the pipe character is also used in **morphological feature bundles** (`Case=Nom|Number=Sing`), but semantics and indexing differ. See [KV pipe attributes (UD `feats`)](#kv-pipe-attributes-ud-feats) below.
+
 ## Semantics
 
 - **Equality / inequality**: `[wsd="artist"]` matches if the token’s `wsd` field contains **artist** as a component (not only the full string `artist|writer`). The same logic applies to region attributes like `text_genre` when declared multivalue: comparisons use component membership, not exact string equality.
@@ -26,7 +28,32 @@ For **single-column** `count` / `freq` on a **multivalue** positional attribute,
 
 - **`--no-mv-explode`**: skip that explosion; keep **lexicon** keys as returned from the bucket decoder (often pipe-joined strings).
 
+## KV pipe attributes (UD `feats`)
+
+**KV pipe** fields store **Universal Dependencies**-style morphological bundles: several **`Name=Value`** pairs in one string, separated by **`|`** (e.g. `Number=Plur|Mood=Ind|Tense=Pres`). That is **not** MV “pick one sense from a set”: the pipe **joins features**, not alternate labels.
+
+### Declaration
+
+- **`corpus.info`**: `kv_pipe=feats` (comma-separated if several columns use this encoding).
+- **JSONL v2 header**: `"kv_pipe": ["feats"]` — each name must appear in `positional` and must **not** appear in `multivalue` (see [PANDO-JSONL-V2.md](../dev/PANDO-JSONL-V2.md)).
+
+### Combined `feats` (default)
+
+With **`split_feats` false** (the usual case for UD), the indexer keeps a **single** positional attribute **`feats`**. On disk you get the normal positional family: `feats.dat`, `feats.lex`, `feats.rev`, … — one lexicon entry per **full** bundle string.
+
+Queries use **`feats/Feature`** or **`feats.Feature`** (see [PANDO-CQL.md](PANDO-CQL.md)). For those sub-keys the engine **does not** require a separate indexed column per feature: it resolves the value **at query time** by parsing the stored UD string on each candidate token (and uses the same logic for **`freq` / `tabulate` / aggregates** on `feats/Feature`). There are **no** `feats_Number.mv.*` style component indexes like MV: the “special filenames” story is different from multivalue sidecars.
+
+### Split feats (optional)
+
+With **`pando-index --split-feats`** or JSONL **`split_feats: true`**, the indexer **decomposes** each bundle into **separate positional attributes** named **`feats_<FeatureName>`** (e.g. `feats_Number`, `feats_Mood`). Each of those gets its **own** `.dat` / `.lex` / `.rev` files like any other positional column. When a split column exists for a feature, the query normalizer can prefer it, so lookups may hit materialized **`feats_Number`** data instead of parsing the combined string.
+
+### Relation to multivalue
+
+- **`feats`** must **not** be listed under **`multivalue`**: the pipe means **feature pairs**, not a multivalue set.
+- MV **`|`** = unordered set of components with **`.mv.*`** indexes; KV **`|`** = ordered **Key=Val** pairs inside one morphological field.
+
 ## See also
 
-- [PANDO-CQL.md](PANDO-CQL.md) — “Multivalue fields and overlapping regions”
-- [CLI reference](CLI-Reference.md) — `pando` flags
+- [PANDO-CQL.md](PANDO-CQL.md) — `feats/…` syntax and aggregates
+- [Index and corpus layout](Index-and-Corpus-Layout.md) — `corpus.info` keys
+- [CLI reference](CLI-Reference.md) — `pando` flags, `pando-index --split-feats`

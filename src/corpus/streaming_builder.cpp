@@ -998,6 +998,16 @@ void StreamingBuilder::finalize() {
             }
             info << "\n";
         }
+        if (!declared_kv_pipe_.empty()) {
+            std::vector<std::string> kv(declared_kv_pipe_.begin(), declared_kv_pipe_.end());
+            std::sort(kv.begin(), kv.end());
+            info << "kv_pipe=";
+            for (size_t i = 0; i < kv.size(); ++i) {
+                if (i > 0) info << ",";
+                info << kv[i];
+            }
+            info << "\n";
+        }
         if (!token_group_struct_.empty()) {
             std::vector<std::string> tg(token_group_struct_.begin(), token_group_struct_.end());
             std::sort(tg.begin(), tg.end());

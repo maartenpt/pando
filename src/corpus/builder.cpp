@@ -1196,8 +1196,23 @@ void CorpusBuilder::read_jsonl(const std::string& path, CorpusPos* overlay_expec
             builder_.declare_overlapping(s);
         for (const auto& s : json_get_string_array(ln, "zerowidth"))
             builder_.declare_zerowidth(s);
-        for (const auto& s : json_get_string_array(ln, "multivalue"))
+        std::unordered_set<std::string> multivalue_set;
+        for (const auto& s : json_get_string_array(ln, "multivalue")) {
             builder_.declare_multivalue(s);
+            multivalue_set.insert(s);
+        }
+
+        for (const auto& s : json_get_string_array(ln, "kv_pipe")) {
+            if (positional_set.count(s) == 0)
+                throw std::runtime_error(
+                        "JSONL header: kv_pipe attribute '" + s +
+                        "' must be listed in positional.");
+            if (multivalue_set.count(s))
+                throw std::runtime_error(
+                        "JSONL header: attribute '" + s +
+                        "' cannot be both multivalue and kv_pipe.");
+            builder_.declare_kv_pipe(s);
+        }
 
         // REQ-TOKEN-GROUPS: TEITOK-style standoff — region type does not get .rgn rows.
         {

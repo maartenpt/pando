@@ -8,5 +8,9 @@ int main() {
     ParserOptions strict;
     strict.strict_quoted_strings = true;
     Parser(R"([form = "th.*"])", strict).parse();
+    // UD-style feats: slash form (feats/Key) is a single identifier; same as feats.Key after normalize
+    Parser(R"([feats/Definite="Ind"])", {}).parse();
+    Parser(R"([feats.Number="Sing"])", {}).parse();
+    Parser(R"([form=/foo/])", {}).parse();
     return 0;
 }

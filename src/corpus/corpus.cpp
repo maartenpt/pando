@@ -62,6 +62,11 @@ static CorpusInfo read_info(const std::string& path) {
             std::string tok;
             while (std::getline(ss, tok, ','))
                 if (!tok.empty()) info.multivalue_attrs.push_back(tok);
+        } else if (key == "kv_pipe") {
+            std::istringstream ss(val);
+            std::string tok;
+            while (std::getline(ss, tok, ','))
+                if (!tok.empty()) info.kv_pipe_attrs.push_back(tok);
         } else if (key == "token_groups") {
             std::istringstream ss(val);
             std::string tok;
@@ -115,6 +120,12 @@ std::string read_overlay_layer_id(const std::string& overlay_dir) {
 
 bool overlay_attr_is_multivalue(const CorpusInfo& oi, const std::string& name) {
     for (const auto& m : oi.multivalue_attrs)
+        if (m == name) return true;
+    return false;
+}
+
+bool overlay_attr_is_kv_pipe(const CorpusInfo& oi, const std::string& name) {
+    for (const auto& m : oi.kv_pipe_attrs)
         if (m == name) return true;
     return false;
 }
@@ -198,6 +209,11 @@ void Corpus::open(const std::string& dir, bool preload,
                 std::find(info_.multivalue_attrs.begin(), info_.multivalue_attrs.end(), merged) ==
                     info_.multivalue_attrs.end())
                 info_.multivalue_attrs.push_back(merged);
+            const bool is_kvp = overlay_attr_is_kv_pipe(oi, name);
+            if (is_kvp &&
+                std::find(info_.kv_pipe_attrs.begin(), info_.kv_pipe_attrs.end(), merged) ==
+                    info_.kv_pipe_attrs.end())
+                info_.kv_pipe_attrs.push_back(merged);
         }
         for (const auto& st : oi.token_group_structs) {
             const std::string ms = overlay_merged_struct(layer, st);
@@ -386,6 +402,16 @@ bool Corpus::is_multivalue(const std::string& name) const {
     if (dot != std::string_view::npos)
         bare = bare.substr(dot + 1);
     for (const auto& s : info_.multivalue_attrs)
+        if (bare == s) return true;
+    return false;
+}
+
+bool Corpus::is_kv_pipe(const std::string& name) const {
+    std::string_view bare = name;
+    auto dot = bare.find('.');
+    if (dot != std::string_view::npos)
+        bare = bare.substr(dot + 1);
+    for (const auto& s : info_.kv_pipe_attrs)
         if (bare == s) return true;
     return false;
 }

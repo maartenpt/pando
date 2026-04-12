@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <optional>
 #include <stdexcept>
+#include <string_view>
 
 #include "index/fold_map.h"
 
@@ -94,6 +95,15 @@ inline CorpusPos resolve_name(const Match& m, const NameIndexMap& names,
     if (it == names.end() || it->second >= m.positions.size()) return NO_HEAD;
     return m.positions[it->second];
 }
+
+/// Normalize attribute names from queries: `namespace/key` → `namespace.key`;
+/// `feats.Key` ↔ `feats_Key` when a split column exists (same rules as QueryExecutor::normalize_attr).
+std::string normalize_query_attr_name(const Corpus& corpus, const std::string& attr);
+
+/// True if `name` is `feats.<Feat>` (UD sub-key on combined `feats` column).
+bool feats_is_subkey(const std::string& name, std::string& feat_name_out);
+/// Value for one UD feature from a combined `feats` blob (`Key=Val|…`), or `"_"` if absent.
+std::string feats_extract_value(std::string_view feats_blob, const std::string& feat_name);
 
 /// If `field` is `tcnt(region_label)`, returns the number of token positions in that named
 /// region binding as a decimal string. Returns `std::nullopt` if `field` is not `tcnt(...)`.
@@ -299,10 +309,13 @@ struct AggregateBucketData {
     struct Column {
         /// RegionFromBinding: `n.form` where `n` labels `<contr>` — same disambiguation as
         /// read_tabulate_field (named region before positional when both exist).
-        enum class Kind { Positional, Region, RegionFromBinding } kind = Kind::Positional;
+        enum class Kind { Positional, Region, RegionFromBinding, FeatsComposite } kind =
+                Kind::Positional;
         const PositionalAttr* pa = nullptr;
         const StructuralAttr* sa = nullptr;
         std::string region_attr_name;
+        /// When kind == FeatsComposite: UD feature name (e.g. `Number`); `pa` is combined `feats`.
+        std::string feats_sub_key;
         /// Named token for field anchor; empty = match start (first_pos).
         std::string named_anchor;
     };

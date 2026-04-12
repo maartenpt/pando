@@ -71,6 +71,9 @@ public:
     void declare_zerowidth(const std::string& s)    { declared_zerowidth_.insert(s); }
     void declare_multivalue(const std::string& s)   { declared_multivalue_.insert(s); }
 
+    /// Positional attrs whose values use `|` between Key=Val pairs (UD `feats`), not MV alternates.
+    void declare_kv_pipe(const std::string& s) { declared_kv_pipe_.insert(s); }
+
     /// REQ-TOKEN-GROUPS / TEITOK standoff: `struct_name` region events in JSONL are **not**
     /// indexed as StructuralAttr intervals; they assign multivalued `membership_attr` on tokens
     /// and append rows to `group_table.jsonl`. Call from JSONL header (before tokens).
@@ -179,6 +182,7 @@ private:
     std::unordered_set<std::string> declared_overlapping_;
     std::unordered_set<std::string> declared_zerowidth_;
     std::unordered_set<std::string> declared_multivalue_;
+    std::unordered_set<std::string> declared_kv_pipe_;
 
     // REQ-TOKEN-GROUPS: struct type → positional multivalue column (e.g. err → err_gid).
     std::unordered_set<std::string> token_group_struct_;

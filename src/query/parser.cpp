@@ -979,7 +979,7 @@ ConditionPtr Parser::parse_primary_condition() {
     // attr op value
     AttrCondition ac;
 
-    // Attribute name, possibly with dot (feats.Number)
+    // Attribute name: ident, optionally "a.b", or a single ident "feats/Number" (slash form)
     Token t = lexer_.expect(TokType::IDENT);
     ac.attr = t.text;
     if (lexer_.peek().type == TokType::DOT) {

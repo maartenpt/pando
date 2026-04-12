@@ -117,6 +117,11 @@ int main(int argc, char* argv[]) {
             std::string fmt = argv[++i];
             if (fmt == "vertical") format_vertical = true;
             else if (fmt == "jsonl") format_jsonl = true;
+            else {
+                std::cerr << "Error: unknown --format value '" << fmt
+                          << "'. Use 'jsonl' (JSONL events) or 'vertical' (VRT/vert).\n";
+                return 1;
+            }
         } else if (a == "--format") {
             /* missing arg */
         } else {

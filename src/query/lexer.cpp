@@ -136,12 +136,26 @@ Token Lexer::next() {
         return {TokType::NUMBER, text, start};
     }
 
-    // Identifier (letters, digits, underscore, hyphen after first char)
+    // Identifier (letters, digits, underscore, hyphen after first char).
+    // Composite "namespace/key" paths: one or more segments separated by '/'
+    // (e.g. feats/Definite). Leading '/' is still handled as regex below.
     if (std::isalpha(c) || c == '_') {
         std::string text;
-        while (pos_ < input_.size() &&
-               (std::isalnum(input_[pos_]) || input_[pos_] == '_' || input_[pos_] == '-'))
-            text += input_[pos_++];
+        auto read_segment = [&]() {
+            while (pos_ < input_.size() &&
+                   (std::isalnum(static_cast<unsigned char>(input_[pos_])) ||
+                    input_[pos_] == '_' || input_[pos_] == '-'))
+                text += input_[pos_++];
+        };
+        read_segment();
+        while (pos_ < input_.size() && input_[pos_] == '/') {
+            if (pos_ + 1 >= input_.size()) break;
+            char nc = input_[pos_ + 1];
+            if (!std::isalnum(static_cast<unsigned char>(nc)) && nc != '_') break;
+            text += '/';
+            ++pos_;
+            read_segment();
+        }
         return {TokType::IDENT, text, start};
     }
 

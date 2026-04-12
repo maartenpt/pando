@@ -27,6 +27,9 @@ struct CorpusInfo {
     // RG-5f: Attributes declared as pipe-separated multivalue.
     std::vector<std::string> multivalue_attrs;       // e.g. "wsd","vowels"
 
+    // Positional attrs whose `|` separates Key=Val pairs (UD feats-style), not MV alternates.
+    std::vector<std::string> kv_pipe_attrs;          // e.g. "feats"
+
     // REQ-TOKEN-GROUPS: structural names routed to standoff (no .rgn index).
     std::vector<std::string> token_group_structs;
 };
@@ -84,6 +87,10 @@ public:
     // RG-5f: multivalue attribute queries
     bool is_multivalue(const std::string& name) const;
     const std::vector<std::string>& multivalue_attrs() const { return info_.multivalue_attrs; }
+
+    // Key=Val pipe fields (UD-style `feats`; `|` joins pairs, not MV senses)
+    bool is_kv_pipe(const std::string& name) const;
+    const std::vector<std::string>& kv_pipe_attrs() const { return info_.kv_pipe_attrs; }
 
     // REQ-TOKEN-GROUPS: token-group structs are non-contiguous standoff annotations
     // and must be rejected by operators that assume contiguous regions.

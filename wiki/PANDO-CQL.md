@@ -193,6 +193,11 @@ Stand-off annotations are not treated as full regions, since there are various r
 Stand-off annotations can also be added as external additions to a corpus. Say we have a large online corpus, to which a user wants to add some custom annotations. In that case, we can have a separate folder with a "dependent" corpus that specifies additional annotations. Such corpora are called *overlay* corpora. When querying a corpus, we can specify one or more overlay corpora, that we can then search as if it was part of the main corpus. If I have an overlay corpus called *mine*, in which I annotate multi-word-expressions (mwe), with an attribute *type*, I can find all split phrasal verbs I annotated by using `<overlay-mine-mwe type="split-phrasal">`. 
 
 
+## Key-Value fields
+
+The pando system was built with support for UD in mind, and in UD, the features are stored as a single, structured field. To provide support for this, pando fields can be kv_pipe fileds, which are exactly of the type of the features in UD. To use those in searches, pando uses the syntax followed by PML-TQ: `[feats/Number="Plur"]` looks for all tokens that have a *Number=Plur* in the feats attribute. And this notation can be used like any other token attribute, so you can also look for the distribution of number over number for adjectives: `[upos="ADJ"]; freq by feats/Number`.
+
+
 ## Tokens to Regions
 
 There are two types of result groups in pando: token results and region results, and it depends on what we want to count or see which of the two we should use. We can directly name a region query item, and aggregate over it, so we can count all error annotations by type simply as follows: `n:<err>; count by n.type`. 
