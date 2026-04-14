@@ -494,6 +494,11 @@ const FoldMap& QueryExecutor::get_fold_map(const std::string& attr, bool case_fo
 // ── Attribute name normalization ────────────────────────────────────────
 
 std::string normalize_query_attr_name(const Corpus& corpus, const std::string& attr) {
+    // Compatibility alias: many external tools/front-ends use `word`, while
+    // TEITOK/UD-oriented corpora commonly expose only `form`.
+    if (attr == "word" && !corpus.has_attr("word") && corpus.has_attr("form"))
+        return "form";
+
     // UD positional sub-key: feats/Feature — never fold slash to dot; map to materialized split
     // column when present (feats#Feature preferred, feats_Feature legacy).
     if (attr.size() > 6 && attr.compare(0, 6, "feats/") == 0) {

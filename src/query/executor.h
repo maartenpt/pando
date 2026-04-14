@@ -191,6 +191,33 @@ inline std::optional<std::string> evaluate_forms_tabulate_field(
         return out;
     }
 
+    auto ds_forms = m.named_dep_subtrees.find(inner);
+    if (ds_forms != m.named_dep_subtrees.end()) {
+        const auto& tok_positions = ds_forms->second;
+        if (tok_positions.empty()) return std::string{};
+        std::vector<CorpusPos> sorted = tok_positions;
+        std::sort(sorted.begin(), sorted.end());
+        std::vector<std::pair<CorpusPos, CorpusPos>> spans;
+        CorpusPos rs = sorted[0], re = sorted[0];
+        for (size_t i = 1; i < sorted.size(); ++i) {
+            if (sorted[i] <= re + 1) {
+                if (sorted[i] > re) re = sorted[i];
+            } else {
+                spans.emplace_back(rs, re);
+                rs = re = sorted[i];
+            }
+        }
+        spans.emplace_back(rs, re);
+        std::string out;
+        for (size_t i = 0; i < spans.size(); ++i) {
+            if (i) out += " ... ";
+            std::string part;
+            emit_span(spans[i].first, spans[i].second, part);
+            out += part;
+        }
+        return out;
+    }
+
     if (resolve_name(m, name_map, inner) != NO_HEAD && m.token_group_match) {
         std::vector<std::pair<CorpusPos, CorpusPos>> spans;
         spans.reserve(m.positions.size());
@@ -265,6 +292,33 @@ inline std::optional<std::string> evaluate_spellout_tabulate_field(
         if (rg.start > rg.end) return std::string{};
         std::string out;
         emit_span(rg.start, rg.end, out);
+        return out;
+    }
+
+    auto ds_sp = m.named_dep_subtrees.find(label);
+    if (ds_sp != m.named_dep_subtrees.end()) {
+        const auto& tok_positions = ds_sp->second;
+        if (tok_positions.empty()) return std::string{};
+        std::vector<CorpusPos> sorted = tok_positions;
+        std::sort(sorted.begin(), sorted.end());
+        std::vector<std::pair<CorpusPos, CorpusPos>> spans;
+        CorpusPos rs = sorted[0], re = sorted[0];
+        for (size_t i = 1; i < sorted.size(); ++i) {
+            if (sorted[i] <= re + 1) {
+                if (sorted[i] > re) re = sorted[i];
+            } else {
+                spans.emplace_back(rs, re);
+                rs = re = sorted[i];
+            }
+        }
+        spans.emplace_back(rs, re);
+        std::string out;
+        for (size_t i = 0; i < spans.size(); ++i) {
+            if (i) out += " ... ";
+            std::string part;
+            emit_span(spans[i].first, spans[i].second, part);
+            out += part;
+        }
         return out;
     }
 
