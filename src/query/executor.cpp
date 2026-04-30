@@ -1,5 +1,6 @@
 #include "query/executor.h"
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdint>
 #include <iostream>
@@ -13,6 +14,7 @@
 #include <functional>
 #include <optional>
 #include <string>
+#include <string_view>
 
 #ifndef PANDO_USE_RE2
 #include <mutex>
@@ -174,6 +176,12 @@ static void append_func_call_token_args(const GlobalFuncCall& fc, std::vector<st
             break;
         case GlobalFunctionType::STRLEN:
         case GlobalFunctionType::FREQ:
+        case GlobalFunctionType::YEAR:
+        case GlobalFunctionType::CENTURY:
+        case GlobalFunctionType::DECADE:
+        case GlobalFunctionType::MONTH:
+        case GlobalFunctionType::WEEK:
+        case GlobalFunctionType::DAY:
         case GlobalFunctionType::NVALS:
             if (!fc.args.empty()) {
                 auto dot = fc.args[0].find('.');
@@ -212,6 +220,33 @@ static void validate_global_func_filter_token_labels(const GlobalFunctionFilter&
                                                      const std::unordered_set<std::string>& token_labels,
                                                      const std::unordered_set<std::string>& region_labels) {
     auto check_call = [&](const GlobalFuncCall& fc) {
+        if (fc.func == GlobalFunctionType::YEAR || fc.func == GlobalFunctionType::CENTURY
+            || fc.func == GlobalFunctionType::DECADE || fc.func == GlobalFunctionType::MONTH
+            || fc.func == GlobalFunctionType::WEEK || fc.func == GlobalFunctionType::DAY) {
+            if (fc.args.size() != 1) {
+                const char* msg = "date function in global filter requires exactly one argument";
+                switch (fc.func) {
+                    case GlobalFunctionType::YEAR:    msg = "year(...) in global filter requires exactly one argument"; break;
+                    case GlobalFunctionType::CENTURY: msg = "century(...) in global filter requires exactly one argument"; break;
+                    case GlobalFunctionType::DECADE:  msg = "decade(...) in global filter requires exactly one argument"; break;
+                    case GlobalFunctionType::MONTH:   msg = "month(...) in global filter requires exactly one argument"; break;
+                    case GlobalFunctionType::WEEK:    msg = "week(...) in global filter requires exactly one argument"; break;
+                    case GlobalFunctionType::DAY:     msg = "day(...) in global filter requires exactly one argument"; break;
+                    default: break;
+                }
+                throw std::runtime_error(msg);
+            }
+            const std::string& spec = fc.args[0];
+            auto dot = spec.find('.');
+            if (dot != std::string::npos && dot > 0) {
+                const std::string prefix = spec.substr(0, dot);
+                if (!token_labels.count(prefix) && !region_labels.count(prefix)) {
+                    throw std::runtime_error(
+                            "Global filter (:: ...): unknown name '" + prefix + "' in date function");
+                }
+            }
+            return;
+        }
         if (fc.func == GlobalFunctionType::TCNT) {
             if (fc.args.size() != 1)
                 throw std::runtime_error("tcnt(...) in global filter requires exactly one label");
@@ -245,6 +280,131 @@ static void validate_global_func_filter_token_labels(const GlobalFunctionFilter&
 /// True iff `inner`'s inclusive token span lies inside `outer`'s (Layer A geometry).
 static bool region_span_contains(const Region& outer, const Region& inner) {
     return inner.start >= outer.start && inner.end <= outer.end;
+}
+
+static std::optional<int64_t> parse_year_prefix(std::string_view text) {
+    size_t i = 0;
+    while (i < text.size() && std::isspace(static_cast<unsigned char>(text[i]))) ++i;
+    if (i >= text.size()) return std::nullopt;
+
+    bool neg = false;
+    if (text[i] == '+' || text[i] == '-') {
+        neg = text[i] == '-';
+        ++i;
+    }
+
+    if (i + 4 > text.size()) return std::nullopt;
+    for (size_t k = 0; k < 4; ++k) {
+        if (!std::isdigit(static_cast<unsigned char>(text[i + k])))
+            return std::nullopt;
+    }
+    if (i + 4 < text.size() && std::isdigit(static_cast<unsigned char>(text[i + 4])))
+        return std::nullopt;
+
+    int64_t year = 0;
+    for (size_t k = 0; k < 4; ++k)
+        year = year * 10 + static_cast<int64_t>(text[i + k] - '0');
+    if (neg) year = -year;
+    return year;
+}
+
+static std::optional<int64_t> century_from_year(int64_t year) {
+    if (year <= 0) return std::nullopt;
+    return ((year - 1) / 100) + 1;
+}
+
+static int64_t decade_from_year(int64_t year) {
+    return (year / 10) * 10;
+}
+
+struct ParsedDateParts {
+    int64_t year = 0;
+    int month = 0;
+    int day = 0;
+    bool has_month = false;
+    bool has_day = false;
+};
+
+static bool is_leap_year(int64_t y) {
+    return (y % 4 == 0) && ((y % 100 != 0) || (y % 400 == 0));
+}
+
+static int days_in_month(int64_t y, int m) {
+    static const int kDays[12] = {31,28,31,30,31,30,31,31,30,31,30,31};
+    if (m == 2) return is_leap_year(y) ? 29 : 28;
+    return kDays[m - 1];
+}
+
+static std::optional<ParsedDateParts> parse_date_parts_prefix(std::string_view text) {
+    size_t i = 0;
+    while (i < text.size() && std::isspace(static_cast<unsigned char>(text[i]))) ++i;
+    if (i + 4 > text.size()) return std::nullopt;
+    for (size_t k = 0; k < 4; ++k) {
+        if (!std::isdigit(static_cast<unsigned char>(text[i + k])))
+            return std::nullopt;
+    }
+    ParsedDateParts out;
+    out.year = 0;
+    for (size_t k = 0; k < 4; ++k)
+        out.year = out.year * 10 + static_cast<int64_t>(text[i + k] - '0');
+    i += 4;
+    if (i >= text.size() || (text[i] != '-' && text[i] != '/'))
+        return out;
+    char sep = text[i++];
+    if (i + 2 > text.size()) return std::nullopt;
+    if (!std::isdigit(static_cast<unsigned char>(text[i]))
+        || !std::isdigit(static_cast<unsigned char>(text[i + 1])))
+        return std::nullopt;
+    out.month = static_cast<int>((text[i] - '0') * 10 + (text[i + 1] - '0'));
+    if (out.month < 1 || out.month > 12) return std::nullopt;
+    out.has_month = true;
+    i += 2;
+    if (i >= text.size() || text[i] != sep)
+        return out;
+    ++i;
+    if (i + 2 > text.size()) return std::nullopt;
+    if (!std::isdigit(static_cast<unsigned char>(text[i]))
+        || !std::isdigit(static_cast<unsigned char>(text[i + 1])))
+        return std::nullopt;
+    out.day = static_cast<int>((text[i] - '0') * 10 + (text[i + 1] - '0'));
+    if (out.day < 1 || out.day > days_in_month(out.year, out.month))
+        return std::nullopt;
+    out.has_day = true;
+    return out;
+}
+
+static int weekday_iso(int64_t y, int m, int d) {
+    // Sakamoto: 0=Sunday..6=Saturday
+    static const int t[12] = {0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4};
+    int64_t yy = y;
+    if (m < 3) --yy;
+    int w = static_cast<int>((yy + yy/4 - yy/100 + yy/400 + t[m - 1] + d) % 7);
+    if (w < 0) w += 7;
+    return w == 0 ? 7 : w; // Monday=1..Sunday=7
+}
+
+static int iso_weeks_in_year(int64_t y) {
+    const int jan1 = weekday_iso(y, 1, 1);
+    if (jan1 == 4) return 53;
+    if (jan1 == 3 && is_leap_year(y)) return 53;
+    return 52;
+}
+
+static int day_of_year(int64_t y, int m, int d) {
+    int doy = d;
+    for (int mm = 1; mm < m; ++mm)
+        doy += days_in_month(y, mm);
+    return doy;
+}
+
+static int iso_week_number(int64_t y, int m, int d) {
+    int doy = day_of_year(y, m, d);
+    int dow = weekday_iso(y, m, d); // Mon=1..Sun=7
+    int week = (doy - dow + 10) / 7;
+    if (week < 1) return iso_weeks_in_year(y - 1);
+    int wiy = iso_weeks_in_year(y);
+    if (week > wiy) return 1;
+    return week;
 }
 
 static std::optional<Region> named_region_span(const Corpus& corpus, const Match& m,
@@ -1639,6 +1799,7 @@ bool QueryExecutor::try_fast_aggregate(
 
     for (const auto& col : agg.columns) {
         if (col.kind == AggregateBucketData::Column::Kind::FeatsComposite) return false;
+        if (col.date_transform != AggregateBucketData::Column::DateTransform::None) return false;
     }
 
     // Named anchors in aggregate columns must refer either to this single query token
@@ -1951,6 +2112,90 @@ bool QueryExecutor::try_fast_aggregate(
 
 namespace {
 
+static std::optional<AggregateBucketData::Column::DateTransform> parse_date_transform_prefix(
+        const std::string& field, std::string& inner_attr) {
+    struct Prefix {
+        const char* name;
+        AggregateBucketData::Column::DateTransform tx;
+    };
+    static const Prefix kPrefixes[] = {
+        {"year(", AggregateBucketData::Column::DateTransform::Year},
+        {"century(", AggregateBucketData::Column::DateTransform::Century},
+        {"decade(", AggregateBucketData::Column::DateTransform::Decade},
+        {"month(", AggregateBucketData::Column::DateTransform::Month},
+        {"week(", AggregateBucketData::Column::DateTransform::Week},
+        {"day(", AggregateBucketData::Column::DateTransform::Day},
+        {"strlen(", AggregateBucketData::Column::DateTransform::Strlen},
+    };
+    if (field.size() < 7 || field.back() != ')')
+        return std::nullopt;
+    for (const auto& p : kPrefixes) {
+        const std::string_view pref(p.name);
+        if (field.rfind(pref, 0) == 0 && field.size() > pref.size() + 1) {
+            inner_attr = field.substr(pref.size(), field.size() - pref.size() - 1);
+            if (!inner_attr.empty())
+                return p.tx;
+        }
+    }
+    return std::nullopt;
+}
+
+static std::string apply_date_transform_bucket(
+        std::string_view raw,
+        AggregateBucketData::Column::DateTransform transform) {
+    if (transform == AggregateBucketData::Column::DateTransform::None)
+        return std::string(raw);
+    if (transform == AggregateBucketData::Column::DateTransform::Strlen) {
+        int64_t cp_count = 0;
+        for (unsigned char c : raw)
+            if ((c & 0xC0) != 0x80) ++cp_count;
+        return std::to_string(cp_count);
+    }
+    auto parse_year_prefix = [](std::string_view text) -> std::optional<int64_t> {
+        size_t i = 0;
+        while (i < text.size() && std::isspace(static_cast<unsigned char>(text[i]))) ++i;
+        if (i >= text.size()) return std::nullopt;
+        bool neg = false;
+        if (text[i] == '+' || text[i] == '-') {
+            neg = text[i] == '-';
+            ++i;
+        }
+        if (i + 4 > text.size()) return std::nullopt;
+        for (size_t k = 0; k < 4; ++k) {
+            if (!std::isdigit(static_cast<unsigned char>(text[i + k])))
+                return std::nullopt;
+        }
+        if (i + 4 < text.size() && std::isdigit(static_cast<unsigned char>(text[i + 4])))
+            return std::nullopt;
+        int64_t y = 0;
+        for (size_t k = 0; k < 4; ++k)
+            y = y * 10 + static_cast<int64_t>(text[i + k] - '0');
+        return neg ? -y : y;
+    };
+
+    auto y = parse_year_prefix(raw);
+    if (!y) return "";
+    switch (transform) {
+        case AggregateBucketData::Column::DateTransform::Year:
+            return std::to_string(*y);
+        case AggregateBucketData::Column::DateTransform::Century:
+            return (*y > 0) ? std::to_string(((*y - 1) / 100) + 1) : "";
+        case AggregateBucketData::Column::DateTransform::Decade:
+            return (*y > 0) ? std::to_string((*y / 10) * 10) : "";
+        case AggregateBucketData::Column::DateTransform::Month:
+        case AggregateBucketData::Column::DateTransform::Week:
+        case AggregateBucketData::Column::DateTransform::Day:
+            return "";
+        case AggregateBucketData::Column::DateTransform::Strlen:
+            return std::to_string(std::count_if(
+                    raw.begin(), raw.end(),
+                    [](unsigned char c) { return (c & 0xC0) != 0x80; }));
+        case AggregateBucketData::Column::DateTransform::None:
+            return std::string(raw);
+    }
+    return "";
+}
+
 bool build_aggregate_plan(const Corpus& corpus, const std::vector<std::string>& fields,
                           AggregateBucketData& out) {
     out.columns.clear();
@@ -1962,13 +2207,18 @@ bool build_aggregate_plan(const Corpus& corpus, const std::vector<std::string>& 
     for (const std::string& field : fields) {
         AggregateBucketData::Column col;
         std::string attr_spec = field;
-        if (field.rfind("match.", 0) == 0 && field.size() > 6) {
-            attr_spec = field.substr(6);
+        std::string date_inner;
+        if (auto tx = parse_date_transform_prefix(field, date_inner)) {
+            col.date_transform = *tx;
+            attr_spec = std::move(date_inner);
+        }
+        if (attr_spec.rfind("match.", 0) == 0 && attr_spec.size() > 6) {
+            attr_spec = attr_spec.substr(6);
         } else {
-            auto dot = field.find('.');
+            auto dot = attr_spec.find('.');
             if (dot != std::string::npos && dot > 0) {
-                std::string prefix = field.substr(0, dot);
-                std::string rest = field.substr(dot + 1);
+                std::string prefix = attr_spec.substr(0, dot);
+                std::string rest = attr_spec.substr(dot + 1);
                 std::string rattr = rest;
                 if (rattr.size() > 5 && rattr.substr(0, 5) == "feats" && rattr.find('.') != std::string::npos)
                     rattr[rattr.find('.')] = '_';
@@ -2055,26 +2305,36 @@ bool fill_aggregate_key(AggregateBucketData& data, const Corpus& corpus, const M
     key_out.resize(data.columns.size());
     for (size_t i = 0; i < data.columns.size(); ++i) {
         const auto& col = data.columns[i];
+        auto intern_value = [&](std::string value) {
+            auto& st = data.region_intern[i];
+            auto it = st.str_to_id.find(value);
+            if (it != st.str_to_id.end()) {
+                key_out[i] = it->second;
+            } else {
+                int64_t id = static_cast<int64_t>(st.id_to_str.size() + 1);
+                st.str_to_id.emplace(value, id);
+                st.id_to_str.push_back(std::move(value));
+                key_out[i] = id;
+            }
+        };
         if (col.kind == AggregateBucketData::Column::Kind::FeatsComposite) {
             CorpusPos pos = col.named_anchor.empty() ? m.first_pos()
                                                      : resolve_name(m, nm, col.named_anchor);
             if (pos == NO_HEAD) return false;
             std::string val = std::string(feats_extract_value(col.pa->value_at(pos), col.feats_sub_key));
-            auto& st = data.region_intern[i];
-            auto it = st.str_to_id.find(val);
-            if (it != st.str_to_id.end()) {
-                key_out[i] = it->second;
-            } else {
-                int64_t id = static_cast<int64_t>(st.id_to_str.size() + 1);
-                st.str_to_id.emplace(val, id);
-                st.id_to_str.push_back(std::move(val));
-                key_out[i] = id;
-            }
+            if (col.date_transform != AggregateBucketData::Column::DateTransform::None)
+                val = apply_date_transform_bucket(val, col.date_transform);
+            intern_value(std::move(val));
         } else if (col.kind == AggregateBucketData::Column::Kind::Positional) {
             CorpusPos pos = col.named_anchor.empty() ? m.first_pos()
                                                      : resolve_name(m, nm, col.named_anchor);
             if (pos == NO_HEAD) return false;
-            key_out[i] = static_cast<int64_t>(col.pa->id_at(pos));
+            if (col.date_transform != AggregateBucketData::Column::DateTransform::None) {
+                std::string val(col.pa->value_at(pos));
+                intern_value(apply_date_transform_bucket(val, col.date_transform));
+            } else {
+                key_out[i] = static_cast<int64_t>(col.pa->id_at(pos));
+            }
         } else if (col.kind == AggregateBucketData::Column::Kind::RegionFromBinding) {
             auto nr = m.named_regions.find(col.named_anchor);
             if (nr == m.named_regions.end()) return false;
@@ -2082,16 +2342,9 @@ bool fill_aggregate_key(AggregateBucketData& data, const Corpus& corpus, const M
             auto rk = resolve_region_attr_key(sa, nr->second.struct_name, col.region_attr_name);
             if (!rk) return false;
             std::string val(sa.region_value(*rk, nr->second.region_idx));
-            auto& st = data.region_intern[i];
-            auto it = st.str_to_id.find(val);
-            if (it != st.str_to_id.end()) {
-                key_out[i] = it->second;
-            } else {
-                int64_t id = static_cast<int64_t>(st.id_to_str.size() + 1);
-                st.str_to_id.emplace(val, id);
-                st.id_to_str.push_back(std::move(val));
-                key_out[i] = id;
-            }
+            if (col.date_transform != AggregateBucketData::Column::DateTransform::None)
+                val = apply_date_transform_bucket(val, col.date_transform);
+            intern_value(std::move(val));
         } else {
             int64_t rgn = -1;
             if (!col.named_anchor.empty()) {
@@ -2109,16 +2362,9 @@ bool fill_aggregate_key(AggregateBucketData& data, const Corpus& corpus, const M
                 if (rgn < 0) return false;
             }
             std::string val(col.sa->region_value(col.region_attr_name, static_cast<size_t>(rgn)));
-            auto& st = data.region_intern[i];
-            auto it = st.str_to_id.find(val);
-            if (it != st.str_to_id.end()) {
-                key_out[i] = it->second;
-            } else {
-                int64_t id = static_cast<int64_t>(st.id_to_str.size() + 1);
-                st.str_to_id.emplace(val, id);
-                st.id_to_str.push_back(std::move(val));
-                key_out[i] = id;
-            }
+            if (col.date_transform != AggregateBucketData::Column::DateTransform::None)
+                val = apply_date_transform_bucket(val, col.date_transform);
+            intern_value(std::move(val));
         }
     }
     return true;
@@ -3350,6 +3596,47 @@ void QueryExecutor::apply_global_filters(const TokenQuery& query, const NameInde
             // Evaluate a single GlobalFuncCall against a match.
             // Returns {true, value} on success, {false, 0} on failure (match rejected).
             auto eval_func = [&](const GlobalFuncCall& fc) -> std::pair<bool, int64_t> {
+                auto resolve_date_spec = [&](const std::string& spec) -> std::optional<std::string> {
+                    auto dot = spec.find('.');
+                    if (dot != std::string::npos) {
+                        if (dot == 0 || dot + 1 >= spec.size()) return std::nullopt;
+                        std::string prefix = spec.substr(0, dot);
+                        std::string suffix = spec.substr(dot + 1);
+
+                        CorpusPos p = resolve_name(m, name_map, prefix);
+                        std::string attr_name = normalize_attr(suffix);
+                        if (p != NO_HEAD && corpus_.has_attr(attr_name)) {
+                            return std::string(corpus_.attr(attr_name).value_at(p));
+                        }
+
+                        auto nr = m.named_regions.find(prefix);
+                        if (nr != m.named_regions.end() && corpus_.has_structure(nr->second.struct_name)) {
+                            const auto& sa = corpus_.structure(nr->second.struct_name);
+                            auto rkey = resolve_region_attr_key(sa, nr->second.struct_name, suffix);
+                            if (!rkey) return std::nullopt;
+                            if (nr->second.region_idx >= sa.region_count()) return std::nullopt;
+                            return std::string(sa.region_value(*rkey, nr->second.region_idx));
+                        }
+                        return std::nullopt;
+                    }
+
+                    std::string attr_name = normalize_attr(spec);
+                    if (corpus_.has_attr(attr_name)) {
+                        return std::string(corpus_.attr(attr_name).value_at(m.first_pos()));
+                    }
+
+                    RegionAttrParts parts;
+                    if (split_region_attr_name(spec, parts) && corpus_.has_structure(parts.struct_name)) {
+                        const auto& sa = corpus_.structure(parts.struct_name);
+                        auto rkey = resolve_region_attr_key(sa, parts.struct_name, parts.attr_name);
+                        if (!rkey) return std::nullopt;
+                        int64_t rgn = sa.find_region(m.first_pos());
+                        if (rgn < 0) return std::nullopt;
+                        return std::string(sa.region_value(*rkey, static_cast<size_t>(rgn)));
+                    }
+                    return std::nullopt;
+                };
+
                 switch (fc.func) {
                 case GlobalFunctionType::DISTANCE:
                 case GlobalFunctionType::DISTABS: {
@@ -3387,6 +3674,56 @@ void QueryExecutor::apply_global_filters(const TokenQuery& query, const NameInde
                     LexiconId lid = pa.id_at(p);
                     if (lid == UNKNOWN_LEX) return {false, 0};
                     return {true, static_cast<int64_t>(pa.count_of_id(lid))};
+                }
+                case GlobalFunctionType::YEAR: {
+                    if (fc.args.size() != 1) return {false, 0};
+                    auto val = resolve_date_spec(fc.args[0]);
+                    if (!val) return {false, 0};
+                    auto y = parse_year_prefix(*val);
+                    if (!y) return {false, 0};
+                    return {true, *y};
+                }
+                case GlobalFunctionType::CENTURY: {
+                    if (fc.args.size() != 1) return {false, 0};
+                    auto val = resolve_date_spec(fc.args[0]);
+                    if (!val) return {false, 0};
+                    auto y = parse_year_prefix(*val);
+                    if (!y) return {false, 0};
+                    auto c = century_from_year(*y);
+                    if (!c) return {false, 0};
+                    return {true, *c};
+                }
+                case GlobalFunctionType::DECADE: {
+                    if (fc.args.size() != 1) return {false, 0};
+                    auto val = resolve_date_spec(fc.args[0]);
+                    if (!val) return {false, 0};
+                    auto y = parse_year_prefix(*val);
+                    if (!y) return {false, 0};
+                    return {true, decade_from_year(*y)};
+                }
+                case GlobalFunctionType::MONTH: {
+                    if (fc.args.size() != 1) return {false, 0};
+                    auto val = resolve_date_spec(fc.args[0]);
+                    if (!val) return {false, 0};
+                    auto p = parse_date_parts_prefix(*val);
+                    if (!p || !p->has_month) return {false, 0};
+                    return {true, static_cast<int64_t>(p->month)};
+                }
+                case GlobalFunctionType::DAY: {
+                    if (fc.args.size() != 1) return {false, 0};
+                    auto val = resolve_date_spec(fc.args[0]);
+                    if (!val) return {false, 0};
+                    auto p = parse_date_parts_prefix(*val);
+                    if (!p || !p->has_day) return {false, 0};
+                    return {true, static_cast<int64_t>(p->day)};
+                }
+                case GlobalFunctionType::WEEK: {
+                    if (fc.args.size() != 1) return {false, 0};
+                    auto val = resolve_date_spec(fc.args[0]);
+                    if (!val) return {false, 0};
+                    auto p = parse_date_parts_prefix(*val);
+                    if (!p || !p->has_day) return {false, 0};
+                    return {true, static_cast<int64_t>(iso_week_number(p->year, p->month, p->day))};
                 }
                 case GlobalFunctionType::NCHILDREN: {
                     if (fc.args.empty() || !corpus_.has_deps()) return {false, 0};

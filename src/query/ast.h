@@ -222,6 +222,12 @@ enum class GlobalFunctionType {
     DISTABS,
     STRLEN,
     FREQ,
+    YEAR,
+    CENTURY,
+    DECADE,
+    MONTH,
+    WEEK,
+    DAY,
     NCHILDREN,
     DEPTH,
     NDESCENDANTS,
@@ -299,6 +305,7 @@ enum class CommandType {
     SHOW_INFO,
     SHOW_VALUES,   // show values <attr> — unique values + counts
     TABULATE,
+    STATS,         // stats avg(expr), median(expr) [by field[, ...]]
     KEYNESS,       // keyness by <attr> — subcorpus keyword extraction (#40)
     SET,           // set <name> <value> — change runtime option (#41)
     SHOW_SETTINGS, // show settings — display all runtime options (#41)
@@ -306,10 +313,16 @@ enum class CommandType {
 };
 
 struct GroupCommand {
+    struct StatMetric {
+        enum class Kind { AVG, MEDIAN } kind = Kind::AVG;
+        std::string expr;  // numeric expression, e.g. strlen(form)
+    };
+
     CommandType type;
     std::string query_name;          // which named query to operate on
     std::vector<std::string> query_names; // multiple named queries for comparison (freq Q1, Q2 by attr)
     std::vector<std::string> fields; // fields to group/sort/coll by
+    std::vector<StatMetric> stats_metrics; // stats metric expressions
 
     // dcoll-specific: unified relation list
     // Special names: "head" (go up), "descendants" (full subtree)

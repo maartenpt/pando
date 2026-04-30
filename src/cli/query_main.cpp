@@ -819,7 +819,7 @@ static void emit_count(const Corpus& corpus, const MatchSet& ms,
         g_end = opts.group_limit;
 
     if (opts.json) {
-        std::cout << "{\"ok\": true, \"operation\": \"count\", \"result\": {\n";
+        std::cout << "{\"ok\": true, \"operation\": \"count\", \"last_command\": \"count\", \"result\": {\n";
         std::cout << "  \"total_matches\": " << total << ",\n";
         std::cout << "  \"groups\": " << sorted.size() << ",\n";
         std::cout << "  \"groups_returned\": " << (g_end - g_start) << ",\n";
@@ -884,9 +884,93 @@ static void emit_sort(const Corpus& corpus, MatchSet& ms,
 static void emit_size(const MatchSet& ms, const Options& opts) {
     size_t n = ms.aggregate_buckets ? ms.aggregate_buckets->total_hits : ms.matches.size();
     if (opts.json) {
-        std::cout << "{\"ok\": true, \"operation\": \"size\", \"result\": " << n << "}\n";
+        std::cout << "{\"ok\": true, \"operation\": \"size\", \"last_command\": \"size\", \"result\": " << n << "}\n";
     } else {
         std::cout << n << " matches\n";
+    }
+}
+
+static void emit_stats(const Corpus& corpus, const MatchSet& ms,
+                       const GroupCommand& cmd, const Options& opts,
+                       const NameIndexMap& name_map) {
+    if (cmd.stats_metrics.empty()) {
+        std::cerr << "Error: stats requires at least one metric\n";
+        return;
+    }
+    std::vector<StatsMetricSpec> metrics;
+    metrics.reserve(cmd.stats_metrics.size());
+    for (const auto& sm : cmd.stats_metrics) {
+        StatsMetricSpec spec;
+        spec.kind = (sm.kind == GroupCommand::StatMetric::Kind::AVG)
+                        ? StatsMetricSpec::Kind::Avg
+                        : StatsMetricSpec::Kind::Median;
+        spec.expr = sm.expr;
+        metrics.push_back(std::move(spec));
+    }
+    std::vector<StatsRowResult> rows;
+    if (!compute_stats_rows(corpus, ms, name_map, cmd.fields, metrics, rows)) {
+        std::cerr << "Error: failed to compute stats\n";
+        return;
+    }
+    auto metric_name = [](const GroupCommand::StatMetric& sm) {
+        return std::string(sm.kind == GroupCommand::StatMetric::Kind::AVG ? "avg(" : "median(")
+             + sm.expr + ")";
+    };
+    if (opts.json) {
+        std::cout << "{\"ok\": true, \"operation\": \"stats\", \"last_command\": \"stats\", \"result\": {\n";
+        std::cout << "  \"by\": [";
+        for (size_t i = 0; i < cmd.fields.size(); ++i) {
+            if (i) std::cout << ", ";
+            std::cout << jstr(cmd.fields[i]);
+        }
+        std::cout << "],\n  \"metrics\": [";
+        for (size_t i = 0; i < cmd.stats_metrics.size(); ++i) {
+            if (i) std::cout << ", ";
+            std::cout << jstr(metric_name(cmd.stats_metrics[i]));
+        }
+        std::cout << "],\n  \"rows\": [\n";
+        for (size_t ri = 0; ri < rows.size(); ++ri) {
+            if (ri) std::cout << ",\n";
+            const auto& row = rows[ri];
+            std::cout << "    {\"key\": " << jstr(row.key) << ", \"n_total\": " << row.n_total << ", \"values\": [";
+            for (size_t mi = 0; mi < row.metrics.size(); ++mi) {
+                if (mi) std::cout << ", ";
+                const auto& mr = row.metrics[mi];
+                std::cout << "{\"n_valid\": " << mr.n_valid << ", \"value\": ";
+                if (mr.has_value) std::cout << mr.value;
+                else std::cout << "null";
+                std::cout << "}";
+            }
+            std::cout << "]}";
+        }
+        std::cout << "\n  ]\n}}\n";
+    } else {
+        bool first_col = true;
+        if (!cmd.fields.empty()) {
+            for (const auto& f : cmd.fields) {
+                if (!first_col) std::cout << '\t';
+                first_col = false;
+                std::cout << f;
+            }
+        } else {
+            std::cout << "group";
+            first_col = false;
+        }
+        std::cout << '\t' << "n_total";
+        for (const auto& sm : cmd.stats_metrics) {
+            std::cout << '\t' << "n_valid(" << metric_name(sm) << ")";
+            std::cout << '\t' << metric_name(sm);
+        }
+        std::cout << '\n';
+        for (const auto& row : rows) {
+            std::cout << (row.key.empty() ? "*" : row.key) << '\t' << row.n_total;
+            for (const auto& mr : row.metrics) {
+                std::cout << '\t' << mr.n_valid << '\t';
+                if (mr.has_value) std::cout << mr.value;
+                else std::cout << "NA";
+            }
+            std::cout << '\n';
+        }
     }
 }
 
@@ -912,7 +996,7 @@ static void emit_tabulate(const Corpus& corpus, const MatchSet& ms,
             field_is_multi[f] = is_multi_value_field(corpus, cmd.fields[f]);
 
         std::ostringstream json;
-        json << "{\"ok\": true, \"operation\": \"tabulate\", \"result\": {\n";
+        json << "{\"ok\": true, \"operation\": \"tabulate\", \"last_command\": \"tabulate\", \"result\": {\n";
         json << "  \"fields\": [";
         for (size_t i = 0; i < cmd.fields.size(); ++i) {
             if (i > 0) json << ", ";
@@ -1002,6 +1086,225 @@ static void freq_build_counts(const Corpus& corpus, const MatchSet& ms,
     total_matches = ms.aggregate_buckets ? ms.aggregate_buckets->total_hits : ms.matches.size();
 }
 
+enum class FreqDateTransform { None, Year, Century, Decade, Month, Week, Day };
+
+struct FreqSubcorpusSpec {
+    const StructuralAttr* sa = nullptr;
+    struct FieldSpec {
+        std::string region_attr;
+        FreqDateTransform transform = FreqDateTransform::None;
+    };
+    std::vector<FieldSpec> fields;
+};
+
+static std::optional<std::string> apply_date_bucket(std::string_view raw, FreqDateTransform t) {
+    if (t == FreqDateTransform::None) return std::string(raw);
+    struct ParsedDateParts {
+        int64_t year = 0;
+        int month = 0;
+        int day = 0;
+        bool has_month = false;
+        bool has_day = false;
+    };
+    auto is_leap_year = [](int64_t y) {
+        return (y % 4 == 0) && ((y % 100 != 0) || (y % 400 == 0));
+    };
+    auto days_in_month = [&](int64_t y, int m) {
+        static const int kDays[12] = {31,28,31,30,31,30,31,31,30,31,30,31};
+        if (m == 2) return is_leap_year(y) ? 29 : 28;
+        return kDays[m - 1];
+    };
+    auto parse_date_parts_prefix = [&](std::string_view text) -> std::optional<ParsedDateParts> {
+        size_t i = 0;
+        while (i < text.size() && std::isspace(static_cast<unsigned char>(text[i]))) ++i;
+        if (i + 4 > text.size()) return std::nullopt;
+        for (size_t k = 0; k < 4; ++k) {
+            if (!std::isdigit(static_cast<unsigned char>(text[i + k])))
+                return std::nullopt;
+        }
+        ParsedDateParts out;
+        for (size_t k = 0; k < 4; ++k)
+            out.year = out.year * 10 + static_cast<int64_t>(text[i + k] - '0');
+        i += 4;
+        if (i >= text.size() || (text[i] != '-' && text[i] != '/'))
+            return out;
+        char sep = text[i++];
+        if (i + 2 > text.size()) return std::nullopt;
+        if (!std::isdigit(static_cast<unsigned char>(text[i]))
+            || !std::isdigit(static_cast<unsigned char>(text[i + 1])))
+            return std::nullopt;
+        out.month = static_cast<int>((text[i] - '0') * 10 + (text[i + 1] - '0'));
+        if (out.month < 1 || out.month > 12) return std::nullopt;
+        out.has_month = true;
+        i += 2;
+        if (i >= text.size() || text[i] != sep)
+            return out;
+        ++i;
+        if (i + 2 > text.size()) return std::nullopt;
+        if (!std::isdigit(static_cast<unsigned char>(text[i]))
+            || !std::isdigit(static_cast<unsigned char>(text[i + 1])))
+            return std::nullopt;
+        out.day = static_cast<int>((text[i] - '0') * 10 + (text[i + 1] - '0'));
+        if (out.day < 1 || out.day > days_in_month(out.year, out.month))
+            return std::nullopt;
+        out.has_day = true;
+        return out;
+    };
+    auto weekday_iso = [](int64_t y, int m, int d) {
+        static const int tt[12] = {0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4};
+        int64_t yy = y;
+        if (m < 3) --yy;
+        int w = static_cast<int>((yy + yy/4 - yy/100 + yy/400 + tt[m - 1] + d) % 7);
+        if (w < 0) w += 7;
+        return w == 0 ? 7 : w;
+    };
+    auto iso_weeks_in_year = [&](int64_t y) {
+        int jan1 = weekday_iso(y, 1, 1);
+        if (jan1 == 4) return 53;
+        if (jan1 == 3 && is_leap_year(y)) return 53;
+        return 52;
+    };
+    auto day_of_year = [&](int64_t y, int m, int d) {
+        int doy = d;
+        for (int mm = 1; mm < m; ++mm)
+            doy += days_in_month(y, mm);
+        return doy;
+    };
+    auto iso_week_number = [&](int64_t y, int m, int d) {
+        int doy = day_of_year(y, m, d);
+        int dow = weekday_iso(y, m, d);
+        int week = (doy - dow + 10) / 7;
+        if (week < 1) return iso_weeks_in_year(y - 1);
+        int wiy = iso_weeks_in_year(y);
+        if (week > wiy) return 1;
+        return week;
+    };
+
+    auto p = parse_date_parts_prefix(raw);
+    if (!p) return std::nullopt;
+    switch (t) {
+        case FreqDateTransform::Year:
+            return std::to_string(p->year);
+        case FreqDateTransform::Century:
+            if (p->year <= 0) return std::nullopt;
+            return std::to_string(((p->year - 1) / 100) + 1);
+        case FreqDateTransform::Decade:
+            return std::to_string((p->year / 10) * 10);
+        case FreqDateTransform::Month:
+            if (!p->has_month) return std::nullopt;
+            return std::to_string(p->month);
+        case FreqDateTransform::Week:
+            if (!p->has_day) return std::nullopt;
+            return std::to_string(iso_week_number(p->year, p->month, p->day));
+        case FreqDateTransform::Day:
+            if (!p->has_day) return std::nullopt;
+            return std::to_string(p->day);
+        case FreqDateTransform::None:
+            break;
+    }
+    return std::nullopt;
+}
+
+static std::optional<FreqSubcorpusSpec> resolve_freq_subcorpus_spec(
+        const Corpus& corpus, const std::vector<std::string>& fields) {
+    if (fields.empty()) return std::nullopt;
+    auto resolve_region = [&](const std::string& attr_spec, FreqDateTransform tr,
+                              const StructuralAttr** expected_sa)
+            -> std::optional<FreqSubcorpusSpec::FieldSpec> {
+        RegionAttrParts parts;
+        if (!split_region_attr_name(attr_spec, parts) || !corpus.has_structure(parts.struct_name))
+            return std::nullopt;
+        const auto& sa = corpus.structure(parts.struct_name);
+        if (*expected_sa && *expected_sa != &sa) return std::nullopt;
+        *expected_sa = &sa;
+        auto rkey = resolve_region_attr_key(sa, parts.struct_name, parts.attr_name);
+        if (!rkey) return std::nullopt;
+        FreqSubcorpusSpec::FieldSpec fs;
+        fs.region_attr = *rkey;
+        fs.transform = tr;
+        return fs;
+    };
+
+    auto parse_wrapped = [&](const std::string& f, const char* name)
+            -> std::optional<std::string> {
+        const size_t n = std::strlen(name);
+        if (f.size() <= n + 2 || f.compare(0, n, name) != 0 || f[n] != '(' || f.back() != ')')
+            return std::nullopt;
+        std::string inner = f.substr(n + 1, f.size() - n - 2);
+        if (inner.rfind("match.", 0) == 0 && inner.size() > 6)
+            inner = inner.substr(6);
+        return inner;
+    };
+    auto parse_field = [&](const std::string& f, const StructuralAttr** expected_sa)
+            -> std::optional<FreqSubcorpusSpec::FieldSpec> {
+        if (auto base = resolve_region(f, FreqDateTransform::None, expected_sa)) return base;
+        if (auto inner = parse_wrapped(f, "year"))
+            return resolve_region(*inner, FreqDateTransform::Year, expected_sa);
+        if (auto inner = parse_wrapped(f, "century"))
+            return resolve_region(*inner, FreqDateTransform::Century, expected_sa);
+        if (auto inner = parse_wrapped(f, "decade"))
+            return resolve_region(*inner, FreqDateTransform::Decade, expected_sa);
+        if (auto inner = parse_wrapped(f, "month"))
+            return resolve_region(*inner, FreqDateTransform::Month, expected_sa);
+        if (auto inner = parse_wrapped(f, "week"))
+            return resolve_region(*inner, FreqDateTransform::Week, expected_sa);
+        if (auto inner = parse_wrapped(f, "day"))
+            return resolve_region(*inner, FreqDateTransform::Day, expected_sa);
+        return std::nullopt;
+    };
+
+    const StructuralAttr* common_sa = nullptr;
+    FreqSubcorpusSpec spec;
+    for (const auto& f : fields) {
+        auto fs = parse_field(f, &common_sa);
+        if (!fs) return std::nullopt;
+        spec.fields.push_back(std::move(*fs));
+    }
+    spec.sa = common_sa;
+    if (!spec.sa || spec.fields.empty()) return std::nullopt;
+    return spec;
+}
+
+static std::unordered_map<std::string, double> build_freq_subcorpus_sizes(
+        const FreqSubcorpusSpec& spec,
+        const std::vector<std::string>& keys,
+        double corpus_size) {
+    std::unordered_map<std::string, double> out;
+    if (!spec.sa) return out;
+
+    if (spec.fields.size() == 1 && spec.fields[0].transform == FreqDateTransform::None) {
+        const auto& f0 = spec.fields[0];
+        for (const auto& key : keys) {
+            size_t span = spec.sa->token_span_sum_for_attr_eq(f0.region_attr, key);
+            out[key] = (span > 0 && span != SIZE_MAX) ? static_cast<double>(span) : corpus_size;
+        }
+        return out;
+    }
+
+    std::unordered_map<std::string, size_t> span_by_key;
+    for (size_t ri = 0; ri < spec.sa->region_count(); ++ri) {
+        std::string key;
+        bool ok = true;
+        for (size_t i = 0; i < spec.fields.size(); ++i) {
+            const auto& fs = spec.fields[i];
+            auto bucket = apply_date_bucket(spec.sa->region_value(fs.region_attr, ri), fs.transform);
+            if (!bucket) { ok = false; break; }
+            if (i) key.push_back('\t');
+            key += *bucket;
+        }
+        if (!ok) continue;
+        Region rg = spec.sa->get(ri);
+        if (rg.end < rg.start) continue;
+        span_by_key[key] += static_cast<size_t>(rg.end - rg.start + 1);
+    }
+    for (const auto& key : keys) {
+        auto it = span_by_key.find(key);
+        size_t span = (it != span_by_key.end()) ? it->second : 0;
+        out[key] = (span > 0 && span != SIZE_MAX) ? static_cast<double>(span) : corpus_size;
+    }
+    return out;
+}
+
 static bool session_lookup_ms(Session& session, const std::string& qn,
                               MatchSet*& ms, NameIndexMap*& nm) {
     if (qn == "Last") {
@@ -1067,30 +1370,14 @@ static void emit_freq_compare(const Corpus& corpus, Session& session,
               });
 
     double corpus_size = static_cast<double>(corpus.size());
-    const StructuralAttr* freq_sa = nullptr;
-    std::string freq_region_attr;
-    if (cmd.fields.size() == 1) {
-        RegionAttrParts parts;
-        if (split_region_attr_name(cmd.fields[0], parts) &&
-            corpus.has_structure(parts.struct_name)) {
-            const auto& sa = corpus.structure(parts.struct_name);
-            auto rkey = resolve_region_attr_key(sa, parts.struct_name, parts.attr_name);
-            if (rkey) {
-                freq_sa = &sa;
-                freq_region_attr = *rkey;
-            }
-        }
-    }
-    std::unordered_map<std::string, double> subcorpus_sizes;
-    if (freq_sa) {
-        for (const auto& key : sorted_keys) {
-            size_t span = freq_sa->token_span_sum_for_attr_eq(freq_region_attr, key);
-            subcorpus_sizes[key] = (span > 0 && span != SIZE_MAX)
-                ? static_cast<double>(span) : corpus_size;
-        }
-    }
+    auto freq_spec = resolve_freq_subcorpus_spec(corpus, cmd.fields);
+    const bool use_subcorpus_ipm = freq_spec.has_value();
+    std::unordered_map<std::string, double> subcorpus_sizes =
+            use_subcorpus_ipm
+                ? build_freq_subcorpus_sizes(*freq_spec, sorted_keys, corpus_size)
+                : std::unordered_map<std::string, double>{};
     auto ipm_denom = [&](const std::string& key) -> double {
-        if (freq_sa) {
+        if (use_subcorpus_ipm) {
             auto it = subcorpus_sizes.find(key);
             if (it != subcorpus_sizes.end()) return it->second;
         }
@@ -1098,14 +1385,14 @@ static void emit_freq_compare(const Corpus& corpus, Session& session,
     };
 
     if (opts.json) {
-        std::cout << "{\"ok\": true, \"operation\": \"freq\", \"result\": {\n";
+        std::cout << "{\"ok\": true, \"operation\": \"freq\", \"last_command\": \"freq\", \"result\": {\n";
         std::cout << "  \"compare_queries\": [";
         for (size_t i = 0; i < srcs.size(); ++i) {
             if (i > 0) std::cout << ", ";
             std::cout << jstr(srcs[i].label);
         }
         std::cout << "],\n  \"corpus_size\": " << corpus.size() << ",\n";
-        std::cout << "  \"per_subcorpus_ipm\": " << (freq_sa ? "true" : "false") << ",\n";
+        std::cout << "  \"per_subcorpus_ipm\": " << (use_subcorpus_ipm ? "true" : "false") << ",\n";
         std::cout << "  \"fields\": [";
         for (size_t i = 0; i < cmd.fields.size(); ++i) {
             if (i > 0) std::cout << ", ";
@@ -1122,7 +1409,7 @@ static void emit_freq_compare(const Corpus& corpus, Session& session,
             if (ri > 0) std::cout << ",\n";
             double denom = ipm_denom(key);
             std::cout << "    {\"key\": " << jstr(key);
-            if (freq_sa) std::cout << ", \"subcorpus_size\": " << static_cast<size_t>(denom);
+            if (use_subcorpus_ipm) std::cout << ", \"subcorpus_size\": " << static_cast<size_t>(denom);
             std::cout << ", \"queries\": {";
             for (size_t qi = 0; qi < srcs.size(); ++qi) {
                 if (qi > 0) std::cout << ", ";
@@ -1131,10 +1418,14 @@ static void emit_freq_compare(const Corpus& corpus, Session& session,
                 if (it != counts_per[qi].end()) c = it->second;
                 double pct = totals[qi] > 0 ? 100.0 * static_cast<double>(c) / static_cast<double>(totals[qi]) : 0.0;
                 double ipm = 1e6 * static_cast<double>(c) / denom;
+                double q_ipm = totals[qi] > 0
+                    ? 1e6 * static_cast<double>(c) / static_cast<double>(totals[qi])
+                    : 0.0;
                 std::cout << jstr(srcs[qi].label) << ": {\"count\": " << c
                           << ", \"pct\": " << pct
-                          << ", \"ipm\": " << std::fixed << std::setprecision(2) << ipm;
-                if (freq_sa) {
+                          << ", \"ipm\": " << std::fixed << std::setprecision(2) << ipm
+                          << ", \"q_ipm\": " << q_ipm;
+                if (use_subcorpus_ipm) {
                     double rf_pct = denom > 0 ? 100.0 * static_cast<double>(c) / denom : 0.0;
                     std::cout << ", \"rf_pct\": " << std::setprecision(4) << rf_pct;
                 }
@@ -1150,15 +1441,15 @@ static void emit_freq_compare(const Corpus& corpus, Session& session,
             std::cout << srcs[i].label;
         }
         std::cout << "\n";
-        if (freq_sa)
+        if (use_subcorpus_ipm)
             std::cout << "# Qn_% = share of that query's hits across rows; Qn_ipm and Qn_rf% = relative frequency per subcorpus (tokens)\n";
         for (const auto& f : cmd.fields) std::cout << f << "\t";
         for (size_t i = 0; i < srcs.size(); ++i) {
             std::cout << srcs[i].label << "_count\t" << srcs[i].label << "_%\t" << srcs[i].label
                       << "_ipm\t";
-            if (freq_sa) std::cout << srcs[i].label << "_rf%\t";
+            if (use_subcorpus_ipm) std::cout << srcs[i].label << "_rf%\t";
         }
-        if (freq_sa) std::cout << "subcorpus";
+        if (use_subcorpus_ipm) std::cout << "subcorpus";
         std::cout << "\n";
         for (const std::string& key : sorted_keys) {
             double denom = ipm_denom(key);
@@ -1173,12 +1464,12 @@ static void emit_freq_compare(const Corpus& corpus, Session& session,
                 double ipm = 1e6 * static_cast<double>(c) / denom;
                 std::cout << c << "\t" << std::fixed << std::setprecision(1) << pct << "%\t"
                           << std::setprecision(2) << ipm << "\t";
-                if (freq_sa) {
+                if (use_subcorpus_ipm) {
                     double rf_pct = denom > 0 ? 100.0 * static_cast<double>(c) / denom : 0.0;
                     std::cout << std::setprecision(2) << rf_pct << "%\t";
                 }
             }
-            if (freq_sa) std::cout << static_cast<size_t>(denom);
+            if (use_subcorpus_ipm) std::cout << static_cast<size_t>(denom);
             std::cout << "\n";
         }
     }
@@ -1205,34 +1496,19 @@ static void emit_freq(const Corpus& corpus, const MatchSet& ms,
     // Per-subcorpus IPM: when grouping by a single region attribute (e.g. text_langcode),
     // use the token count of each subcorpus as the IPM denominator instead of the full
     // corpus size. This gives meaningful relative frequencies per group.
-    const StructuralAttr* freq_sa = nullptr;
-    std::string freq_region_attr;
-    if (cmd.fields.size() == 1) {
-        RegionAttrParts parts;
-        if (split_region_attr_name(cmd.fields[0], parts) &&
-            corpus.has_structure(parts.struct_name)) {
-            const auto& sa = corpus.structure(parts.struct_name);
-            auto rkey = resolve_region_attr_key(sa, parts.struct_name, parts.attr_name);
-            if (rkey) {
-                freq_sa = &sa;
-                freq_region_attr = *rkey;
-            }
-        }
-    }
-
-    // Precompute per-key subcorpus sizes when grouping by region attr.
-    std::unordered_map<std::string, double> subcorpus_sizes;
-    if (freq_sa) {
-        for (const auto& [key, count] : sorted) {
-            size_t span = freq_sa->token_span_sum_for_attr_eq(freq_region_attr, key);
-            subcorpus_sizes[key] = (span > 0 && span != SIZE_MAX)
-                ? static_cast<double>(span) : corpus_size;
-        }
-    }
+    auto freq_spec = resolve_freq_subcorpus_spec(corpus, cmd.fields);
+    const bool use_subcorpus_ipm = freq_spec.has_value();
+    std::vector<std::string> sorted_keys;
+    sorted_keys.reserve(sorted.size());
+    for (const auto& kv : sorted) sorted_keys.push_back(kv.first);
+    std::unordered_map<std::string, double> subcorpus_sizes =
+            use_subcorpus_ipm
+                ? build_freq_subcorpus_sizes(*freq_spec, sorted_keys, corpus_size)
+                : std::unordered_map<std::string, double>{};
 
     // Helper: get IPM denominator for a given key.
     auto ipm_denom = [&](const std::string& key) -> double {
-        if (freq_sa) {
+        if (use_subcorpus_ipm) {
             auto it = subcorpus_sizes.find(key);
             if (it != subcorpus_sizes.end()) return it->second;
         }
@@ -1240,10 +1516,10 @@ static void emit_freq(const Corpus& corpus, const MatchSet& ms,
     };
 
     if (opts.json) {
-        std::cout << "{\"ok\": true, \"operation\": \"freq\", \"result\": {\n";
+        std::cout << "{\"ok\": true, \"operation\": \"freq\", \"last_command\": \"freq\", \"result\": {\n";
         std::cout << "  \"corpus_size\": " << corpus.size() << ",\n";
         std::cout << "  \"total_matches\": " << total_matches << ",\n";
-        std::cout << "  \"per_subcorpus_ipm\": " << (freq_sa ? "true" : "false") << ",\n";
+        std::cout << "  \"per_subcorpus_ipm\": " << (use_subcorpus_ipm ? "true" : "false") << ",\n";
         std::cout << "  \"fields\": [";
         for (size_t i = 0; i < cmd.fields.size(); ++i) {
             if (i > 0) std::cout << ", ";
@@ -1261,7 +1537,7 @@ static void emit_freq(const Corpus& corpus, const MatchSet& ms,
                       << ", \"count\": " << sorted[i].second
                       << ", \"pct\": " << pct
                       << ", \"ipm\": " << std::fixed << std::setprecision(2) << ipm;
-            if (freq_sa) {
+            if (use_subcorpus_ipm) {
                 double rf_pct = denom > 0
                     ? 100.0 * static_cast<double>(sorted[i].second) / denom
                     : 0.0;
@@ -1274,7 +1550,7 @@ static void emit_freq(const Corpus& corpus, const MatchSet& ms,
     } else {
         for (const auto& f : cmd.fields) std::cout << f << "\t";
         std::cout << "count\t%\tipm";
-        if (freq_sa) std::cout << "\trf%\tsubcorpus";
+        if (use_subcorpus_ipm) std::cout << "\trf%\tsubcorpus";
         std::cout << "\n";
         for (const auto& [key, count] : sorted) {
             double pct = total_matches > 0
@@ -1284,11 +1560,11 @@ static void emit_freq(const Corpus& corpus, const MatchSet& ms,
             double ipm = 1e6 * static_cast<double>(count) / denom;
             std::cout << key << "\t" << count << "\t" << std::fixed << std::setprecision(1) << pct
                       << "%\t" << std::setprecision(2) << ipm;
-            if (freq_sa) {
+            if (use_subcorpus_ipm) {
                 double rf_pct = denom > 0 ? 100.0 * static_cast<double>(count) / denom : 0.0;
                 std::cout << "\t" << std::setprecision(2) << rf_pct << "%";
             }
-            if (freq_sa) std::cout << "\t" << static_cast<size_t>(denom);
+            if (use_subcorpus_ipm) std::cout << "\t" << static_cast<size_t>(denom);
             std::cout << "\n";
         }
     }
@@ -1297,7 +1573,7 @@ static void emit_freq(const Corpus& corpus, const MatchSet& ms,
 static void emit_raw(const Corpus& corpus, const MatchSet& ms, const Options& opts) {
     const auto& form = corpus.attr("form");
     if (opts.json) {
-        std::cout << "{\"ok\": true, \"operation\": \"raw\", \"result\": [\n";
+        std::cout << "{\"ok\": true, \"operation\": \"raw\", \"last_command\": \"raw\", \"result\": [\n";
         for (size_t i = 0; i < ms.matches.size(); ++i) {
             if (i > 0) std::cout << ",\n";
             const auto& m = ms.matches[i];
@@ -1468,7 +1744,7 @@ static void emit_coll(const Corpus& corpus, const MatchSet& ms,
     size_t show = std::min(entries.size(), opts.coll_max_items);
 
     if (opts.json) {
-        std::cout << "{\"ok\": true, \"operation\": \"coll\", \"result\": {\n";
+        std::cout << "{\"ok\": true, \"operation\": \"coll\", \"last_command\": \"coll\", \"result\": {\n";
         std::cout << "  \"attribute\": " << jstr(coll_attr) << ",\n";
         std::cout << "  \"window\": [" << opts.coll_left << ", " << opts.coll_right << "],\n";
         std::cout << "  \"matches\": " << ms.matches.size() << ",\n";
@@ -1617,7 +1893,7 @@ static void emit_dcoll(const Corpus& corpus, const MatchSet& ms,
     }
 
     if (opts.json) {
-        std::cout << "{\"ok\": true, \"operation\": \"dcoll\", \"result\": {\n";
+        std::cout << "{\"ok\": true, \"operation\": \"dcoll\", \"last_command\": \"dcoll\", \"result\": {\n";
         std::cout << "  \"attribute\": " << jstr(coll_attr) << ",\n";
         std::cout << "  \"relations\": [";
         for (size_t i = 0; i < cmd.relations.size(); ++i) {
@@ -1710,7 +1986,7 @@ static void emit_keyness(const Corpus& corpus, const MatchSet& ms,
 
     if (focus_size == 0) {
         if (opts.json) {
-            std::cout << "{\"ok\": true, \"operation\": \"keyness\", \"result\": {\"rows\": []}}\n";
+            std::cout << "{\"ok\": true, \"operation\": \"keyness\", \"last_command\": \"keyness\", \"result\": {\"rows\": []}}\n";
         } else {
             std::cout << "(no matches)\n";
         }
@@ -1767,15 +2043,18 @@ static void emit_keyness(const Corpus& corpus, const MatchSet& ms,
         entries.push_back({std::string(pa.lexicon().get(id)), ffreq, rfreq, g2});
     }
 
-    // Sort by absolute keyness descending (most key first), then by overuse first
+    // Sort by signed keyness descending: strongest focus-overrepresented items first.
+    // Keep strongest negative keywords at the bottom (most negative last).
     std::sort(entries.begin(), entries.end(), [](const KeynessEntry& a, const KeynessEntry& b) {
-        return std::abs(a.keyness) > std::abs(b.keyness);
+        if (a.keyness != b.keyness) return a.keyness > b.keyness;
+        if (a.focus_freq != b.focus_freq) return a.focus_freq > b.focus_freq;
+        return a.form < b.form;
     });
 
     size_t show = std::min(entries.size(), opts.coll_max_items);
 
     if (opts.json) {
-        std::cout << "{\"ok\": true, \"operation\": \"keyness\", \"result\": {\n";
+        std::cout << "{\"ok\": true, \"operation\": \"keyness\", \"last_command\": \"keyness\", \"result\": {\n";
         std::cout << "  \"attribute\": " << jstr(attr) << ",\n";
         std::cout << "  \"focus_size\": " << focus_size << ",\n";
         std::cout << "  \"ref_size\": " << ref_size << ",\n";
@@ -1874,6 +2153,48 @@ static void run_query(const Corpus& corpus, const std::string& input,
     executor.set_anchor_binding_mode(opts.anchor_binding == "innermost"
                                      ? QueryExecutor::AnchorBindingMode::Innermost
                                      : QueryExecutor::AnchorBindingMode::Fanout);
+
+    // In `--api` mode we must emit a single JSON object for the whole CQL program.
+    // We therefore determine the last statement that would produce JSON output, and
+    // suppress any earlier JSON-producing steps.
+    size_t last_json_output_si = prog.size();  // sentinel: no output
+    if (opts.api) {
+        auto command_emits_json = [&](CommandType t) -> bool {
+            switch (t) {
+                case CommandType::COUNT:
+                case CommandType::GROUP:
+                case CommandType::FREQ:
+                case CommandType::SIZE:
+                case CommandType::TABULATE:
+                case CommandType::STATS:
+                case CommandType::RAW:
+                case CommandType::COLL:
+                case CommandType::DCOLL:
+                case CommandType::KEYNESS:
+                    return true;
+                default:
+                    return false;  // e.g. SORT emits KWIC text, not JSON
+            }
+        };
+
+        for (size_t i = prog.size(); i-- > 0;) {
+            const auto& st = prog[i];
+            if (st.has_command) {
+                if (command_emits_json(st.command.type)) {
+                    last_json_output_si = i;
+                    break;
+                }
+            } else if (st.has_query) {
+                // For query (concordance) outputs, only the final query statement is printed
+                // in multi-step programs unless --print-all-steps is enabled.
+                const bool is_last_statement = (i + 1 == prog.size());
+                if (is_last_statement) {
+                    last_json_output_si = i;
+                    break;
+                }
+            }
+        }
+    }
 
     for (size_t si = 0; si < prog.size(); ++si) {
         auto& stmt = prog[si];
@@ -2014,10 +2335,12 @@ static void run_query(const Corpus& corpus, const std::string& input,
                 // final query step (intermediate steps feed `Last` / chaining). Use
                 // `--print-all-steps` to print every query step (e.g. while debugging pipelines).
                 const bool is_last_statement = (si + 1 == prog.size());
+                const bool is_named_assignment = !stmt.name.empty();
                 const bool emit_query_concordance =
-                        stmt.name.empty()
+                        (!is_named_assignment || (opts.api && is_last_statement))
                         && (is_last_statement || opts.print_all_program_steps);
-                if (emit_query_concordance) {
+                const bool should_emit_output = !opts.api || si == last_json_output_si;
+                if (emit_query_concordance && should_emit_output) {
                     if (out_timing) {
                         auto t2 = std::chrono::high_resolution_clock::now();
                         if (opts.json)
@@ -2452,34 +2775,44 @@ static void run_query(const Corpus& corpus, const std::string& input,
             // Commands that need a MatchSet
             MatchSet* ms_to_use = nullptr;
             const NameIndexMap* nm_to_use = nullptr;
+            const bool should_emit_output = !opts.api || si == last_json_output_si;
+            GroupCommand cmd_to_run = stmt.command;
 
-            if (stmt.command.type == CommandType::FREQ && stmt.command.freq_query_names.size() >= 2) {
-                emit_freq_compare(corpus, session, stmt.command, opts);
+            if (cmd_to_run.type == CommandType::FREQ && cmd_to_run.freq_query_names.size() >= 2) {
+                if (should_emit_output) emit_freq_compare(corpus, session, cmd_to_run, opts);
                 continue;
             }
-            if (stmt.command.type == CommandType::FREQ && stmt.command.freq_query_names.size() == 1) {
+            if (cmd_to_run.type == CommandType::FREQ && cmd_to_run.freq_query_names.size() == 1) {
                 MatchSet* ms = nullptr;
                 NameIndexMap* nm = nullptr;
-                if (!session_lookup_ms(session, stmt.command.freq_query_names[0], ms, nm)) {
+                if (!session_lookup_ms(session, cmd_to_run.freq_query_names[0], ms, nm)) {
                     if (opts.json)
                         std::cout << "{\"ok\": false, \"error\": "
-                                  << jstr("Unknown named query: " + stmt.command.freq_query_names[0])
+                                  << jstr("Unknown named query: " + cmd_to_run.freq_query_names[0])
                                   << "}\n";
                     else
-                        std::cerr << "Error: unknown named query '" << stmt.command.freq_query_names[0]
+                        std::cerr << "Error: unknown named query '" << cmd_to_run.freq_query_names[0]
                                   << "'\n";
                     continue;
                 }
                 ms_to_use = ms;
                 nm_to_use = nm;
-            } else if (!stmt.command.query_name.empty()) {
-                auto it = session.named_results.find(stmt.command.query_name);
+            } else if (!cmd_to_run.query_name.empty()) {
+                auto it = session.named_results.find(cmd_to_run.query_name);
                 if (it != session.named_results.end()) {
                     ms_to_use = &it->second;
-                    auto nm_it = session.named_name_maps.find(stmt.command.query_name);
+                    auto nm_it = session.named_name_maps.find(cmd_to_run.query_name);
                     nm_to_use = (nm_it != session.named_name_maps.end()) ? &nm_it->second : &session.last_name_map;
                 } else {
-                    std::cerr << "Warning: named query '" << stmt.command.query_name << "' not found, using last result\n";
+                    // dcoll ambiguity fallback: parse-time may interpret
+                    // `dcoll amod by lemma` as query_name="amod".
+                    if (cmd_to_run.type == CommandType::DCOLL && cmd_to_run.relations.empty()) {
+                        cmd_to_run.relations.push_back(cmd_to_run.query_name);
+                        cmd_to_run.query_name.clear();
+                    } else {
+                        std::cerr << "Warning: named query '" << cmd_to_run.query_name
+                                  << "' not found, using last result\n";
+                    }
                     if (!session.has_last) { std::cerr << "No query to operate on\n"; continue; }
                     ms_to_use = &session.last_ms;
                     nm_to_use = &session.last_name_map;
@@ -2490,55 +2823,76 @@ static void run_query(const Corpus& corpus, const std::string& input,
                 nm_to_use = &session.last_name_map;
             }
 
-            switch (stmt.command.type) {
+            switch (cmd_to_run.type) {
                 case CommandType::COUNT:
                 case CommandType::GROUP:
-                    emit_count(corpus, *ms_to_use, stmt.command, opts, *nm_to_use);
+                    if (should_emit_output) emit_count(corpus, *ms_to_use, cmd_to_run, opts, *nm_to_use);
                     break;
 
                 case CommandType::SORT:
-                    emit_sort(corpus, *ms_to_use, stmt.command, opts, *nm_to_use);
+                    // SORT mutates the ordering of ms_to_use, so we always apply it.
+                    // In `--api` mode, we suppress KWIC text output unless this is the last JSON step.
+                    if (cmd_to_run.fields.empty()) {
+                        std::cerr << "Error: sort requires 'by' clause\n";
+                        return;
+                    }
+                    std::sort(ms_to_use->matches.begin(), ms_to_use->matches.end(),
+                              [&](const Match& a, const Match& b) {
+                                  return make_key(corpus, a, *nm_to_use, cmd_to_run.fields)
+                                       < make_key(corpus, b, *nm_to_use, cmd_to_run.fields);
+                              });
+                    if (should_emit_output) emit_hits_text(corpus, "(sorted)", *ms_to_use, opts, 0);
                     break;
 
                 case CommandType::SIZE:
-                    emit_size(*ms_to_use, opts);
+                    if (should_emit_output) emit_size(*ms_to_use, opts);
                     break;
 
                 case CommandType::TABULATE:
-                    emit_tabulate(corpus, *ms_to_use, stmt.command, opts, *nm_to_use);
+                    if (should_emit_output) {
+                        emit_tabulate(corpus, *ms_to_use, cmd_to_run, opts, *nm_to_use);
+                    }
+                    break;
+
+                case CommandType::STATS:
+                    if (should_emit_output) {
+                        emit_stats(corpus, *ms_to_use, cmd_to_run, opts, *nm_to_use);
+                    }
                     break;
 
                 case CommandType::FREQ:
-                    emit_freq(corpus, *ms_to_use, stmt.command, opts, *nm_to_use);
+                    if (should_emit_output) {
+                        emit_freq(corpus, *ms_to_use, cmd_to_run, opts, *nm_to_use);
+                    }
                     break;
 
                 case CommandType::RAW:
-                    emit_raw(corpus, *ms_to_use, opts);
+                    if (should_emit_output) emit_raw(corpus, *ms_to_use, opts);
                     break;
 
                 case CommandType::COLL:
-                    emit_coll(corpus, *ms_to_use, stmt.command, opts, *nm_to_use);
+                    if (should_emit_output) emit_coll(corpus, *ms_to_use, cmd_to_run, opts, *nm_to_use);
                     break;
 
                 case CommandType::DCOLL:
-                    emit_dcoll(corpus, *ms_to_use, stmt.command, opts, *nm_to_use);
+                    if (should_emit_output) emit_dcoll(corpus, *ms_to_use, cmd_to_run, opts, *nm_to_use);
                     break;
 
                 case CommandType::KEYNESS: {
                     const MatchSet* ref_ms = nullptr;
-                    if (!stmt.command.ref_query_name.empty()) {
-                        auto rit = session.named_results.find(stmt.command.ref_query_name);
+                    if (!cmd_to_run.ref_query_name.empty()) {
+                        auto rit = session.named_results.find(cmd_to_run.ref_query_name);
                         if (rit == session.named_results.end()) {
                             if (opts.json || opts.api)
                                 std::cout << "{\"ok\": false, \"error\": {\"stage\": \"keyness\", \"message\": "
-                                          << jstr("Unknown reference query: " + stmt.command.ref_query_name) << "}}\n";
+                                          << jstr("Unknown reference query: " + cmd_to_run.ref_query_name) << "}}\n";
                             else
-                                std::cerr << "Error: unknown reference query '" << stmt.command.ref_query_name << "'\n";
+                                std::cerr << "Error: unknown reference query '" << cmd_to_run.ref_query_name << "'\n";
                             break;
                         }
                         ref_ms = &rit->second;
                     }
-                    emit_keyness(corpus, *ms_to_use, stmt.command, opts, *nm_to_use, ref_ms);
+                    if (should_emit_output) emit_keyness(corpus, *ms_to_use, cmd_to_run, opts, *nm_to_use, ref_ms);
                     break;
                 }
 

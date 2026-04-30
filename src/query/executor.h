@@ -378,6 +378,8 @@ struct AggregateBucketData {
         /// read_tabulate_field (named region before positional when both exist).
         enum class Kind { Positional, Region, RegionFromBinding, FeatsComposite } kind =
                 Kind::Positional;
+        enum class DateTransform { None, Year, Century, Decade, Month, Week, Day, Strlen } date_transform =
+                DateTransform::None;
         const PositionalAttr* pa = nullptr;
         const StructuralAttr* sa = nullptr;
         std::string region_attr_name;
@@ -403,6 +405,30 @@ struct AggregateBucketData {
 /// Decode one bucket key to the same tab-separated string as make_key/read_field.
 std::string decode_aggregate_bucket_key(const AggregateBucketData& data,
                                           const std::vector<int64_t>& key);
+
+struct StatsMetricSpec {
+    enum class Kind { Avg, Median } kind = Kind::Avg;
+    std::string expr;
+};
+
+struct StatsMetricResult {
+    size_t n_valid = 0;
+    bool has_value = false;
+    double value = 0.0;
+};
+
+struct StatsRowResult {
+    std::string key;
+    size_t n_total = 0;
+    std::vector<StatsMetricResult> metrics;
+};
+
+struct MatchSet;
+
+bool compute_stats_rows(const Corpus& corpus, const MatchSet& ms, const NameIndexMap& name_map,
+                        const std::vector<std::string>& by_fields,
+                        const std::vector<StatsMetricSpec>& metrics,
+                        std::vector<StatsRowResult>& out_rows);
 
 // ── Region cursor for amortized O(1) region lookup ──────────────────────
 //

@@ -243,7 +243,7 @@ will give a table with those columns for query token *a* in a query named *Match
 
 ## Global condition functions
 
-We can add counts as global queries in, adding additional restrictions on tokens. Those include string functions, frequency functions, sequential functions, and tree functions. The use of those is hence always referring to a named token in the query: `a:[upos="NOUN"] :: f(a.lemma) > 100`. Multivalue cardinality also works as a global filter: `a:[] :: nvals(a.wsd) > 1` (same semantics as `[nvals(wsd) > 1]` on a single token, but the attribute is given as `namedtoken.attr`).
+We can add counts as global queries in, adding additional restrictions on tokens. Those include string functions, frequency functions, sequential functions, and tree functions. The use of those is hence always referring to a named token in the query: `a:[upos="NOUN"] :: f(a.lemma) > 100`. Multivalue cardinality also works as a global filter: `a:[] :: nvals(a.wsd) > 1` (same semantics as `[nvals(wsd) > 1]` on a single token, but the attribute is given as `namedtoken.attr`). Date-part helpers can target either `namedtoken.attr` or direct attribute specs such as `text_date`.
 
 | function | syntax | description |
 | ------ | ------ | ------ |
@@ -251,6 +251,12 @@ We can add counts as global queries in, adding additional restrictions on tokens
 | distabs  | distabs(a,b) < 5 | the sequential distance between tokens a and b is less than 5 |
 | strlen  | strlen(a.lemma) = 3 | the length of the lemma of a is 3  |
 | f | f(a.form) >= 100 | a.form occurs at least 100 times in the corpus |
+| year | year(text_date) >= 2000 | parses a 4-digit year prefix from a date-like text value |
+| century | century(a.text_date) = 21 | century computed from the parsed year (1-100 => 1, 2001 => 21) |
+| decade | decade(a.text_date) = 1990 | decade bucket computed from the parsed year (`(year/10)*10`) |
+| month | month(a.text_date) = 5 | month number from `YYYY-MM[-DD]` date values |
+| week | week(a.text_date) = 18 | ISO week number (1-53) from `YYYY-MM-DD` date values |
+| day | day(a.text_date) = 3 | day of month from `YYYY-MM-DD` date values |
 | nchildren | nchildren(a) > 3 | node a has more than 3 children |
 | ndescendants | ndescendants(a) < 3 | node a has less than 3 children |
 | depth | depth(a) < 4 | node a appears less than 4 levels below the root |
@@ -272,6 +278,7 @@ Between the frequency and the output functions, the following functions are supp
 | sort | sort [M] by att+ | sort the result on a token or region attribute |
 | cat | cat [M] | produce a KWIC list of the results of M |
 | freq | freq [M] by att | similar to count but gives instances per million (IPM) |
+| stats | stats avg(expr), median(expr) [by att+] | numeric aggregates per group (or globally without `by`) |
 | raw | raw [M] | one line per match with corpus positions and token forms |
 | tabulate | tabulate [M] att+ | produce a table with the given columns |
 | coll | coll [M] by att | window-based collocations sorted by association measure |
@@ -279,6 +286,9 @@ Between the frequency and the output functions, the following functions are supp
 | keyness | keyness [M] [vs N] by att | words overrepresented in M vs rest of corpus (or vs named query N), using log-likelihood G² |
 
 The tabulate command can also take a start and offset in the command: `M = a:[lemma="book"]; tabulate M 0 100 a.lemma, a.form` will tabulate the first 100 occurrences of *book* by lemma and form.
+Date-part functions are also supported in `tabulate` fields, e.g. `tabulate M year(a.text_date), month(a.text_date), week(a.text_date), day(a.text_date)`.
+
+The `stats` command computes numeric aggregates over query hits. In `stats avg(expr), median(expr) by ...`, each metric is computed per `by` bucket; without `by`, all hits are one global bucket. Values that cannot be parsed as numbers are skipped per metric (`n_valid`), while bucket size is tracked separately (`n_total`). Example: `a:[]; stats avg(strlen(a.form)), median(strlen(a.form)) by a.text_id`.
 
 ## Interactive settings
 

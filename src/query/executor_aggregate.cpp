@@ -1,18 +1,18 @@
 #include "query/executor.h"
 #include "query/executor_aggregate_internal.h"
 
+#include <algorithm>
+#include <cctype>
+#include <cerrno>
+#include <cstdlib>
+#include <map>
+#include <optional>
+#include <string_view>
 #include <unordered_map>
 
 namespace pando {
 
-// ── Fast aggregation path ────────────────────────────────────────────────
-//
-// For single-token queries with aggregation and no complex post-filters,
-// bypass Match construction entirely. The hot loop is:
-//   seed pos → RegionCursor.find(O(1) amortized) → array index → counter++
-//
-// Returns true if the fast path was taken; false = fall back to standard path.
-
+#if 0
 bool QueryExecutor::try_fast_aggregate(
         const TokenQuery& q,
         AggregateBucketData& agg,
@@ -29,6 +29,7 @@ bool QueryExecutor::try_fast_aggregate(
 
     for (const auto& col : agg.columns) {
         if (col.kind == AggregateBucketData::Column::Kind::FeatsComposite) return false;
+        if (col.date_transform != AggregateBucketData::Column::DateTransform::None) return false;
     }
 
     // ── Anchor constraints (RG-REG-7): only the "simple" subset is supported ─
@@ -309,8 +310,93 @@ bool QueryExecutor::try_fast_aggregate(
     result.total_exact = !capped;
     return true;
 }
+#endif
 
 namespace {
+
+static std::optional<AggregateBucketData::Column::DateTransform> parse_date_transform_prefix(
+        const std::string& field, std::string& inner_attr) {
+    struct Prefix {
+        const char* name;
+        AggregateBucketData::Column::DateTransform tx;
+    };
+    static const Prefix kPrefixes[] = {
+        {"year(", AggregateBucketData::Column::DateTransform::Year},
+        {"century(", AggregateBucketData::Column::DateTransform::Century},
+        {"decade(", AggregateBucketData::Column::DateTransform::Decade},
+        {"month(", AggregateBucketData::Column::DateTransform::Month},
+        {"week(", AggregateBucketData::Column::DateTransform::Week},
+        {"day(", AggregateBucketData::Column::DateTransform::Day},
+        {"strlen(", AggregateBucketData::Column::DateTransform::Strlen},
+    };
+    if (field.size() < 7 || field.back() != ')')
+        return std::nullopt;
+    for (const auto& p : kPrefixes) {
+        const std::string_view pref(p.name);
+        if (field.rfind(pref, 0) == 0 && field.size() > pref.size() + 1) {
+            inner_attr = field.substr(pref.size(), field.size() - pref.size() - 1);
+            if (!inner_attr.empty())
+                return p.tx;
+        }
+    }
+    return std::nullopt;
+}
+
+static std::string apply_date_transform_bucket(
+        std::string_view raw,
+        AggregateBucketData::Column::DateTransform transform) {
+    if (transform == AggregateBucketData::Column::DateTransform::None)
+        return std::string(raw);
+    if (transform == AggregateBucketData::Column::DateTransform::Strlen) {
+        int64_t cp_count = 0;
+        for (unsigned char c : raw)
+            if ((c & 0xC0) != 0x80) ++cp_count;
+        return std::to_string(cp_count);
+    }
+    auto parse_year_prefix = [](std::string_view text) -> std::optional<int64_t> {
+        size_t i = 0;
+        while (i < text.size() && std::isspace(static_cast<unsigned char>(text[i]))) ++i;
+        if (i >= text.size()) return std::nullopt;
+        bool neg = false;
+        if (text[i] == '+' || text[i] == '-') {
+            neg = text[i] == '-';
+            ++i;
+        }
+        if (i + 4 > text.size()) return std::nullopt;
+        for (size_t k = 0; k < 4; ++k) {
+            if (!std::isdigit(static_cast<unsigned char>(text[i + k])))
+                return std::nullopt;
+        }
+        if (i + 4 < text.size() && std::isdigit(static_cast<unsigned char>(text[i + 4])))
+            return std::nullopt;
+        int64_t y = 0;
+        for (size_t k = 0; k < 4; ++k)
+            y = y * 10 + static_cast<int64_t>(text[i + k] - '0');
+        return neg ? -y : y;
+    };
+
+    auto y = parse_year_prefix(raw);
+    if (!y) return "";
+    switch (transform) {
+        case AggregateBucketData::Column::DateTransform::Year:
+            return std::to_string(*y);
+        case AggregateBucketData::Column::DateTransform::Century:
+            return (*y > 0) ? std::to_string(((*y - 1) / 100) + 1) : "";
+        case AggregateBucketData::Column::DateTransform::Decade:
+            return (*y > 0) ? std::to_string((*y / 10) * 10) : "";
+        case AggregateBucketData::Column::DateTransform::Month:
+        case AggregateBucketData::Column::DateTransform::Week:
+        case AggregateBucketData::Column::DateTransform::Day:
+            return "";
+        case AggregateBucketData::Column::DateTransform::Strlen:
+            return std::to_string(std::count_if(
+                    raw.begin(), raw.end(),
+                    [](unsigned char c) { return (c & 0xC0) != 0x80; }));
+        case AggregateBucketData::Column::DateTransform::None:
+            return std::string(raw);
+    }
+    return "";
+}
 
 bool build_aggregate_plan_impl(const Corpus& corpus, const std::vector<std::string>& fields,
                                AggregateBucketData& out) {
@@ -323,13 +409,18 @@ bool build_aggregate_plan_impl(const Corpus& corpus, const std::vector<std::stri
     for (const std::string& field : fields) {
         AggregateBucketData::Column col;
         std::string attr_spec = field;
-        if (field.rfind("match.", 0) == 0 && field.size() > 6) {
-            attr_spec = field.substr(6);
+        std::string date_inner;
+        if (auto tx = parse_date_transform_prefix(field, date_inner)) {
+            col.date_transform = *tx;
+            attr_spec = std::move(date_inner);
+        }
+        if (attr_spec.rfind("match.", 0) == 0 && attr_spec.size() > 6) {
+            attr_spec = attr_spec.substr(6);
         } else {
-            auto dot = field.find('.');
+            auto dot = attr_spec.find('.');
             if (dot != std::string::npos && dot > 0) {
-                std::string prefix = field.substr(0, dot);
-                std::string rest = field.substr(dot + 1);
+                std::string prefix = attr_spec.substr(0, dot);
+                std::string rest = attr_spec.substr(dot + 1);
                 std::string rattr = rest;
                 if (rattr.size() > 5 && rattr.substr(0, 5) == "feats" && rattr.find('.') != std::string::npos)
                     rattr[rattr.find('.')] = '_';
@@ -410,26 +501,36 @@ bool fill_aggregate_key_impl(AggregateBucketData& data, const Corpus& corpus, co
     key_out.resize(data.columns.size());
     for (size_t i = 0; i < data.columns.size(); ++i) {
         const auto& col = data.columns[i];
+        auto intern_value = [&](std::string value) {
+            auto& st = data.region_intern[i];
+            auto it = st.str_to_id.find(value);
+            if (it != st.str_to_id.end()) {
+                key_out[i] = it->second;
+            } else {
+                int64_t id = static_cast<int64_t>(st.id_to_str.size() + 1);
+                st.str_to_id.emplace(value, id);
+                st.id_to_str.push_back(std::move(value));
+                key_out[i] = id;
+            }
+        };
         if (col.kind == AggregateBucketData::Column::Kind::FeatsComposite) {
             CorpusPos pos = col.named_anchor.empty() ? m.first_pos()
                                                      : resolve_name(m, nm, col.named_anchor);
             if (pos == NO_HEAD) return false;
             std::string val = std::string(feats_extract_value(col.pa->value_at(pos), col.feats_sub_key));
-            auto& st = data.region_intern[i];
-            auto it = st.str_to_id.find(val);
-            if (it != st.str_to_id.end()) {
-                key_out[i] = it->second;
-            } else {
-                int64_t id = static_cast<int64_t>(st.id_to_str.size() + 1);
-                st.str_to_id.emplace(val, id);
-                st.id_to_str.push_back(std::move(val));
-                key_out[i] = id;
-            }
+            if (col.date_transform != AggregateBucketData::Column::DateTransform::None)
+                val = apply_date_transform_bucket(val, col.date_transform);
+            intern_value(std::move(val));
         } else if (col.kind == AggregateBucketData::Column::Kind::Positional) {
             CorpusPos pos = col.named_anchor.empty() ? m.first_pos()
                                                      : resolve_name(m, nm, col.named_anchor);
             if (pos == NO_HEAD) return false;
-            key_out[i] = static_cast<int64_t>(col.pa->id_at(pos));
+            if (col.date_transform != AggregateBucketData::Column::DateTransform::None) {
+                std::string val(col.pa->value_at(pos));
+                intern_value(apply_date_transform_bucket(val, col.date_transform));
+            } else {
+                key_out[i] = static_cast<int64_t>(col.pa->id_at(pos));
+            }
         } else if (col.kind == AggregateBucketData::Column::Kind::RegionFromBinding) {
             auto nr = m.named_regions.find(col.named_anchor);
             if (nr == m.named_regions.end()) return false;
@@ -437,16 +538,9 @@ bool fill_aggregate_key_impl(AggregateBucketData& data, const Corpus& corpus, co
             auto rkey = resolve_region_attr_key(sa, nr->second.struct_name, col.region_attr_name);
             if (!rkey) return false;
             std::string val(sa.region_value(*rkey, nr->second.region_idx));
-            auto& st = data.region_intern[i];
-            auto it = st.str_to_id.find(val);
-            if (it != st.str_to_id.end()) {
-                key_out[i] = it->second;
-            } else {
-                int64_t id = static_cast<int64_t>(st.id_to_str.size() + 1);
-                st.str_to_id.emplace(val, id);
-                st.id_to_str.push_back(std::move(val));
-                key_out[i] = id;
-            }
+            if (col.date_transform != AggregateBucketData::Column::DateTransform::None)
+                val = apply_date_transform_bucket(val, col.date_transform);
+            intern_value(std::move(val));
         } else {
             int64_t rgn = -1;
             if (!col.named_anchor.empty()) {
@@ -464,16 +558,9 @@ bool fill_aggregate_key_impl(AggregateBucketData& data, const Corpus& corpus, co
                 if (rgn < 0) return false;
             }
             std::string val(col.sa->region_value(col.region_attr_name, static_cast<size_t>(rgn)));
-            auto& st = data.region_intern[i];
-            auto it = st.str_to_id.find(val);
-            if (it != st.str_to_id.end()) {
-                key_out[i] = it->second;
-            } else {
-                int64_t id = static_cast<int64_t>(st.id_to_str.size() + 1);
-                st.str_to_id.emplace(val, id);
-                st.id_to_str.push_back(std::move(val));
-                key_out[i] = id;
-            }
+            if (col.date_transform != AggregateBucketData::Column::DateTransform::None)
+                val = apply_date_transform_bucket(val, col.date_transform);
+            intern_value(std::move(val));
         }
     }
     return true;
@@ -491,6 +578,210 @@ bool fill_aggregate_key(AggregateBucketData& data, const Corpus& corpus, const M
     return fill_aggregate_key_impl(data, corpus, m, nm, key_out);
 }
 
+bool compute_stats_rows(const Corpus& corpus, const MatchSet& ms, const NameIndexMap& name_map,
+                        const std::vector<std::string>& by_fields,
+                        const std::vector<StatsMetricSpec>& metrics,
+                        std::vector<StatsRowResult>& out_rows) {
+    struct MetricAcc {
+        double sum = 0.0;
+        size_t n_valid = 0;
+        std::vector<double> values;
+    };
+    struct RowAcc {
+        size_t n_total = 0;
+        std::vector<MetricAcc> metrics;
+    };
+    auto utf8_cp_len = [](std::string_view raw) -> size_t {
+        size_t cp_count = 0;
+        for (unsigned char c : raw)
+            if ((c & 0xC0) != 0x80) ++cp_count;
+        return cp_count;
+    };
+
+    auto parse_number = [](const std::string& text, double& out) -> bool {
+        if (text.empty()) return false;
+        errno = 0;
+        char* end = nullptr;
+        const double val = std::strtod(text.c_str(), &end);
+        if (end == text.c_str()) return false;
+        while (*end != '\0' && std::isspace(static_cast<unsigned char>(*end))) ++end;
+        if (*end != '\0' || errno == ERANGE) return false;
+        out = val;
+        return true;
+    };
+    auto eval_numeric_expr = [&](const Match& m, const std::string& expr, double& out) -> bool {
+        if (expr.size() > 9 && expr.rfind("strlen(", 0) == 0 && expr.back() == ')') {
+            const std::string inner = expr.substr(7, expr.size() - 8);
+            std::string raw;
+            try {
+                raw = read_tabulate_field(corpus, m, name_map, inner);
+            } catch (...) {
+                return false;
+            }
+            out = static_cast<double>(utf8_cp_len(raw));
+            return true;
+        }
+        std::string rendered;
+        try {
+            rendered = read_tabulate_field(corpus, m, name_map, expr);
+        } catch (...) {
+            return false;
+        }
+        return parse_number(rendered, out);
+    };
+
+    // Fast path: by single region attr + metrics only on strlen(positional_attr)
+    // (no token-label anchors). This avoids read_tabulate_field/string key work per match.
+    struct StrlenMetricPlan {
+        StatsMetricSpec::Kind kind = StatsMetricSpec::Kind::Avg;
+        const PositionalAttr* pa = nullptr;
+    };
+    auto try_fast_strlen_grouped = [&]() -> bool {
+        if (by_fields.size() != 1 || metrics.empty()) return false;
+        std::string by = by_fields[0];
+        if (by.rfind("match.", 0) == 0 && by.size() > 6) by = by.substr(6);
+        auto us = by.find('_');
+        if (us == std::string::npos || us == 0 || us + 1 >= by.size()) return false;
+        const std::string struct_name = by.substr(0, us);
+        const std::string attr_name = by.substr(us + 1);
+        if (!corpus.has_structure(struct_name)) return false;
+        const auto& sa = corpus.structure(struct_name);
+        auto rkey = resolve_region_attr_key(sa, struct_name, attr_name);
+        if (!rkey) return false;
+
+        std::vector<StrlenMetricPlan> plans;
+        plans.reserve(metrics.size());
+        for (const auto& m : metrics) {
+            const std::string& expr = m.expr;
+            if (!(expr.size() > 9 && expr.rfind("strlen(", 0) == 0 && expr.back() == ')'))
+                return false;
+            std::string inner = expr.substr(7, expr.size() - 8);
+            auto dot = inner.find('.');
+            if (dot != std::string::npos) {
+                std::string prefix = inner.substr(0, dot);
+                if (prefix == "match") inner = inner.substr(dot + 1);
+                else return false;  // named-token anchored: fall back
+            }
+            std::string attr = normalize_query_attr_name(corpus, inner);
+            if (!corpus.has_attr(attr)) return false;
+            plans.push_back(StrlenMetricPlan{m.kind, &corpus.attr(attr)});
+        }
+
+        std::unordered_map<size_t, RowAcc> grouped_by_region;
+        grouped_by_region.reserve(1024);
+        for (const auto& m : ms.matches) {
+            CorpusPos pos = m.first_pos();
+            int64_t rgn = sa.find_region(pos);
+            if (rgn < 0) continue;
+            auto& row = grouped_by_region[static_cast<size_t>(rgn)];
+            ++row.n_total;
+            if (row.metrics.empty()) row.metrics.resize(metrics.size());
+            for (size_t i = 0; i < plans.size(); ++i) {
+                const auto* pa = plans[i].pa;
+                double num = static_cast<double>(utf8_cp_len(pa->value_at(pos)));
+                auto& acc = row.metrics[i];
+                acc.sum += num;
+                ++acc.n_valid;
+                if (plans[i].kind == StatsMetricSpec::Kind::Median)
+                    acc.values.push_back(num);
+            }
+        }
+
+        std::vector<std::pair<std::string, RowAcc>> materialized;
+        materialized.reserve(grouped_by_region.size());
+        for (auto& [ridx, row] : grouped_by_region) {
+            materialized.emplace_back(std::string(sa.region_value(*rkey, ridx)), std::move(row));
+        }
+        std::sort(materialized.begin(), materialized.end(),
+                  [](const auto& a, const auto& b) { return a.first < b.first; });
+
+        out_rows.clear();
+        out_rows.reserve(materialized.size());
+        for (auto& [key, row] : materialized) {
+            StatsRowResult out;
+            out.key = std::move(key);
+            out.n_total = row.n_total;
+            out.metrics.resize(metrics.size());
+            for (size_t i = 0; i < metrics.size(); ++i) {
+                auto& dst = out.metrics[i];
+                auto& src = row.metrics[i];
+                dst.n_valid = src.n_valid;
+                if (src.n_valid == 0) continue;
+                dst.has_value = true;
+                if (metrics[i].kind == StatsMetricSpec::Kind::Avg) {
+                    dst.value = src.sum / static_cast<double>(src.n_valid);
+                } else {
+                    std::sort(src.values.begin(), src.values.end());
+                    const size_t n = src.values.size();
+                    dst.value = (n % 2 == 1)
+                                    ? src.values[n / 2]
+                                    : (src.values[n / 2 - 1] + src.values[n / 2]) / 2.0;
+                }
+            }
+            out_rows.push_back(std::move(out));
+        }
+        return true;
+    };
+    if (try_fast_strlen_grouped())
+        return true;
+
+    auto build_group_key = [&](const Match& m) {
+        std::string key;
+        for (size_t i = 0; i < by_fields.size(); ++i) {
+            if (i) key.push_back('\t');
+            key += read_tabulate_field(corpus, m, name_map, by_fields[i]);
+        }
+        return key;
+    };
+
+    std::map<std::string, RowAcc> grouped;
+    for (const auto& m : ms.matches) {
+        std::string key;
+        if (!by_fields.empty())
+            key = build_group_key(m);
+        auto& row = grouped[key];
+        ++row.n_total;
+        if (row.metrics.empty()) row.metrics.resize(metrics.size());
+        for (size_t i = 0; i < metrics.size(); ++i) {
+            double num = 0.0;
+            if (!eval_numeric_expr(m, metrics[i].expr, num)) continue;
+            auto& acc = row.metrics[i];
+            acc.sum += num;
+            ++acc.n_valid;
+            if (metrics[i].kind == StatsMetricSpec::Kind::Median)
+                acc.values.push_back(num);
+        }
+    }
+
+    out_rows.clear();
+    out_rows.reserve(grouped.size());
+    for (auto& [key, row] : grouped) {
+        StatsRowResult out;
+        out.key = key;
+        out.n_total = row.n_total;
+        out.metrics.resize(metrics.size());
+        for (size_t i = 0; i < metrics.size(); ++i) {
+            auto& dst = out.metrics[i];
+            auto& src = row.metrics[i];
+            dst.n_valid = src.n_valid;
+            if (src.n_valid == 0) continue;
+            if (metrics[i].kind == StatsMetricSpec::Kind::Avg) {
+                dst.has_value = true;
+                dst.value = src.sum / static_cast<double>(src.n_valid);
+            } else {
+                std::sort(src.values.begin(), src.values.end());
+                const size_t n = src.values.size();
+                dst.has_value = true;
+                if (n % 2 == 1) dst.value = src.values[n / 2];
+                else dst.value = (src.values[n / 2 - 1] + src.values[n / 2]) / 2.0;
+            }
+        }
+        out_rows.push_back(std::move(out));
+    }
+    return true;
+}
+
+#if 0
 bool QueryExecutor::match_survives_post_filters_for_aggregate(
         const TokenQuery& query,
         const NameIndexMap& name_map,
@@ -513,5 +804,6 @@ bool QueryExecutor::match_survives_post_filters_for_aggregate(
     apply_global_filters(query, name_map, scratch);
     return !scratch.matches.empty();
 }
+#endif
 
 } // namespace pando

@@ -35,7 +35,7 @@ Program Parser::parse() {
 bool Parser::is_command_keyword(const std::string& text) const {
     static const std::vector<std::string> cmds = {
         "count", "group", "sort", "freq", "coll", "dcoll",
-        "cat", "size", "raw", "show", "tabulate", "keyness", "set", "drop"
+        "cat", "size", "raw", "show", "tabulate", "stats", "keyness", "set", "drop"
     };
     std::string lower = text;
     std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
@@ -200,6 +200,7 @@ GroupCommand Parser::parse_command() {
     else if (kw == "freq") cmd.type = CommandType::FREQ;
     else if (kw == "coll") cmd.type = CommandType::COLL;
     else if (kw == "keyness") cmd.type = CommandType::KEYNESS;
+    else if (kw == "stats") cmd.type = CommandType::STATS;
     else if (kw == "dcoll") {
         cmd.type = CommandType::DCOLL;
         // Syntax: dcoll [QueryName] [anchor.] rel1[, rel2, ...] by field[, field, ...]
@@ -210,6 +211,10 @@ GroupCommand Parser::parse_command() {
         // it's an anchor (e.g. "a.head" → anchor=a, rel=head).
         // If first IDENT is followed by another IDENT that is "by", it's a query name.
         // Otherwise it's a relation name.
+        auto is_builtin_dcoll_relation = [](std::string s) {
+            std::transform(s.begin(), s.end(), s.begin(), ::tolower);
+            return s == "head" || s == "children" || s == "descendants";
+        };
 
         // Step 1: try to parse optional query name and/or anchor
         if (lexer_.peek().type == TokType::IDENT && lexer_.peek().text != "by") {
@@ -229,8 +234,12 @@ GroupCommand Parser::parse_command() {
                 }
             } else if (lexer_.peek().type == TokType::IDENT &&
                        lexer_.peek().text == "by") {
-                // "dcoll QueryName by ..." — first is a query name
-                cmd.query_name = first;
+                // "dcoll QueryName by ..." OR "dcoll children by ..." / "dcoll head by ..."
+                // Prefer built-in relation keywords over query-name interpretation.
+                if (is_builtin_dcoll_relation(first))
+                    cmd.relations.push_back(first);
+                else
+                    cmd.query_name = first;
             } else if (lexer_.peek().type == TokType::COMMA ||
                        lexer_.peek().type == TokType::IDENT) {
                 // "dcoll nsubj, obj by ..." — first is a relation
@@ -288,7 +297,9 @@ GroupCommand Parser::parse_command() {
                 std::string first = lexer_.next().text;
                 std::string low = first;
                 std::transform(low.begin(), low.end(), low.begin(), ::tolower);
-                if ((low == "tcnt" || low == "forms" || low == "spellout")
+                if ((low == "tcnt" || low == "forms" || low == "spellout"
+                     || low == "year" || low == "century" || low == "decade"
+                     || low == "month" || low == "week" || low == "day")
                     && lexer_.peek().type == TokType::LPAREN) {
                     lexer_.consume();
                     std::string inner = lexer_.expect(TokType::IDENT).text;
@@ -298,6 +309,10 @@ GroupCommand Parser::parse_command() {
                         lexer_.expect(TokType::RPAREN);
                         cmd.fields.push_back("spellout(" + inner + "," + attr + ")");
                     } else {
+                        if (lexer_.peek().type == TokType::DOT) {
+                            lexer_.consume();
+                            inner += "." + lexer_.expect(TokType::IDENT).text;
+                        }
                         lexer_.expect(TokType::RPAREN);
                         cmd.fields.push_back(low + "(" + inner + ")");
                     }
@@ -325,7 +340,9 @@ GroupCommand Parser::parse_command() {
             {
                 std::string low = first;
                 std::transform(low.begin(), low.end(), low.begin(), ::tolower);
-                if ((low == "tcnt" || low == "forms" || low == "spellout")
+                if ((low == "tcnt" || low == "forms" || low == "spellout"
+                     || low == "year" || low == "century" || low == "decade"
+                     || low == "month" || low == "week" || low == "day")
                     && lexer_.peek().type == TokType::LPAREN) {
                     lexer_.consume();
                     std::string inner = lexer_.expect(TokType::IDENT).text;
@@ -335,6 +352,10 @@ GroupCommand Parser::parse_command() {
                         lexer_.expect(TokType::RPAREN);
                         cmd.fields.push_back("spellout(" + inner + "," + attr + ")");
                     } else {
+                        if (lexer_.peek().type == TokType::DOT) {
+                            lexer_.consume();
+                            inner += "." + lexer_.expect(TokType::IDENT).text;
+                        }
                         lexer_.expect(TokType::RPAREN);
                         cmd.fields.push_back(low + "(" + inner + ")");
                     }
@@ -367,7 +388,9 @@ GroupCommand Parser::parse_command() {
                 {
                     std::string low2 = second;
                     std::transform(low2.begin(), low2.end(), low2.begin(), ::tolower);
-                    if ((low2 == "tcnt" || low2 == "forms" || low2 == "spellout")
+                    if ((low2 == "tcnt" || low2 == "forms" || low2 == "spellout"
+                         || low2 == "year" || low2 == "century" || low2 == "decade"
+                         || low2 == "month" || low2 == "week" || low2 == "day")
                         && lexer_.peek().type == TokType::LPAREN) {
                         cmd.query_name = first;
                         lexer_.consume();
@@ -378,6 +401,10 @@ GroupCommand Parser::parse_command() {
                             lexer_.expect(TokType::RPAREN);
                             cmd.fields.push_back("spellout(" + inner + "," + attr + ")");
                         } else {
+                            if (lexer_.peek().type == TokType::DOT) {
+                                lexer_.consume();
+                                inner += "." + lexer_.expect(TokType::IDENT).text;
+                            }
                             lexer_.expect(TokType::RPAREN);
                             cmd.fields.push_back(low2 + "(" + inner + ")");
                         }
@@ -459,7 +486,8 @@ GroupCommand Parser::parse_command() {
             lexer_.consume();
             cmd.freq_query_names.push_back(lexer_.expect(TokType::IDENT).text);
         }
-    } else if (lexer_.peek().type == TokType::IDENT && lexer_.peek().text != "by"
+    } else if (cmd.type != CommandType::STATS
+               && lexer_.peek().type == TokType::IDENT && lexer_.peek().text != "by"
                && lexer_.peek().text != "vs") {
         cmd.query_name = lexer_.next().text;
     }
@@ -481,16 +509,15 @@ GroupCommand Parser::parse_command() {
         cmd.ref_query_name = lexer_.expect(TokType::IDENT).text;
     }
 
-    // "by" field_list
-    if (lexer_.peek().type == TokType::IDENT && lexer_.peek().text == "by") {
-        lexer_.consume();
-        // Parse comma-separated field list: field[.subfield], ...
-        std::string field;
+    auto parse_field_expr = [&]() -> std::string {
         Token ft = lexer_.next();
-        field = ft.text;
+        std::string field = ft.text;
         std::string low = field;
         std::transform(low.begin(), low.end(), low.begin(), ::tolower);
-        if ((low == "tcnt" || low == "forms" || low == "spellout")
+        if ((low == "tcnt" || low == "forms" || low == "spellout"
+             || low == "year" || low == "century" || low == "decade"
+             || low == "month" || low == "week" || low == "day"
+             || low == "strlen")
             && lexer_.peek().type == TokType::LPAREN) {
             lexer_.consume();
             std::string inner = lexer_.expect(TokType::IDENT).text;
@@ -498,41 +525,63 @@ GroupCommand Parser::parse_command() {
                 lexer_.expect(TokType::COMMA);
                 std::string attr = lexer_.expect(TokType::IDENT).text;
                 lexer_.expect(TokType::RPAREN);
-                field = "spellout(" + inner + "," + attr + ")";
-            } else {
-                lexer_.expect(TokType::RPAREN);
-                field = low + "(" + inner + ")";
+                return "spellout(" + inner + "," + attr + ")";
             }
-        } else if (lexer_.peek().type == TokType::DOT) {
+            if (lexer_.peek().type == TokType::DOT) {
+                lexer_.consume();
+                inner += "." + lexer_.expect(TokType::IDENT).text;
+            }
+            lexer_.expect(TokType::RPAREN);
+            return low + "(" + inner + ")";
+        }
+        if (lexer_.peek().type == TokType::DOT) {
             lexer_.consume();
             field += "." + lexer_.expect(TokType::IDENT).text;
         }
-        cmd.fields.push_back(field);
+        return field;
+    };
+
+    if (cmd.type == CommandType::STATS) {
+        auto parse_metric = [&]() -> GroupCommand::StatMetric {
+            GroupCommand::StatMetric metric;
+            Token mt = lexer_.expect(TokType::IDENT);
+            std::string mk = mt.text;
+            std::transform(mk.begin(), mk.end(), mk.begin(), ::tolower);
+            if (mk == "avg") metric.kind = GroupCommand::StatMetric::Kind::AVG;
+            else if (mk == "median") metric.kind = GroupCommand::StatMetric::Kind::MEDIAN;
+            else throw std::runtime_error("stats supports only avg(...) and median(...)");
+            lexer_.expect(TokType::LPAREN);
+            metric.expr = parse_field_expr();
+            lexer_.expect(TokType::RPAREN);
+            return metric;
+        };
+
+        cmd.stats_metrics.push_back(parse_metric());
+        while (lexer_.peek().type == TokType::COMMA) {
+            lexer_.consume();
+            cmd.stats_metrics.push_back(parse_metric());
+        }
+        if (cmd.stats_metrics.empty())
+            throw std::runtime_error("stats requires at least one metric");
+        if (lexer_.peek().type == TokType::IDENT && lexer_.peek().text == "by") {
+            lexer_.consume();
+            cmd.fields.push_back(parse_field_expr());
+            while (lexer_.peek().type == TokType::COMMA) {
+                lexer_.consume();
+                cmd.fields.push_back(parse_field_expr());
+            }
+        }
+        return cmd;
+    }
+
+    // "by" field_list
+    if (lexer_.peek().type == TokType::IDENT && lexer_.peek().text == "by") {
+        lexer_.consume();
+        cmd.fields.push_back(parse_field_expr());
 
         while (lexer_.peek().type == TokType::COMMA) {
             lexer_.consume();
-            ft = lexer_.next();
-            field = ft.text;
-            std::string lowf = field;
-            std::transform(lowf.begin(), lowf.end(), lowf.begin(), ::tolower);
-            if ((lowf == "tcnt" || lowf == "forms" || lowf == "spellout")
-                && lexer_.peek().type == TokType::LPAREN) {
-                lexer_.consume();
-                std::string inner = lexer_.expect(TokType::IDENT).text;
-                if (lowf == "spellout") {
-                    lexer_.expect(TokType::COMMA);
-                    std::string attr = lexer_.expect(TokType::IDENT).text;
-                    lexer_.expect(TokType::RPAREN);
-                    field = "spellout(" + inner + "," + attr + ")";
-                } else {
-                    lexer_.expect(TokType::RPAREN);
-                    field = lowf + "(" + inner + ")";
-                }
-            } else if (lexer_.peek().type == TokType::DOT) {
-                lexer_.consume();
-                field += "." + lexer_.expect(TokType::IDENT).text;
-            }
-            cmd.fields.push_back(field);
+            cmd.fields.push_back(parse_field_expr());
         }
     }
 
@@ -1223,6 +1272,12 @@ void Parser::parse_global_filters(TokenQuery& tq) {
                 else if (name == "distabs")      fc.func = GlobalFunctionType::DISTABS;
                 else if (name == "strlen")       fc.func = GlobalFunctionType::STRLEN;
                 else if (name == "f")            fc.func = GlobalFunctionType::FREQ;
+                else if (name == "year")         fc.func = GlobalFunctionType::YEAR;
+                else if (name == "century")      fc.func = GlobalFunctionType::CENTURY;
+                else if (name == "decade")       fc.func = GlobalFunctionType::DECADE;
+                else if (name == "month")        fc.func = GlobalFunctionType::MONTH;
+                else if (name == "week")         fc.func = GlobalFunctionType::WEEK;
+                else if (name == "day")          fc.func = GlobalFunctionType::DAY;
                 else if (name == "nchildren")    fc.func = GlobalFunctionType::NCHILDREN;
                 else if (name == "depth")        fc.func = GlobalFunctionType::DEPTH;
                 else if (name == "ndescendants") fc.func = GlobalFunctionType::NDESCENDANTS;

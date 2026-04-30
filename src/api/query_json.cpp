@@ -128,6 +128,7 @@ std::string to_query_result_json(const Corpus& corpus,
     out << "  \"ok\": true,\n";
     out << "  \"backend\": \"pando\",\n";
     out << "  \"operation\": \"query\",\n";
+    out << "  \"last_command\": \"query\",\n";
     out << "  \"result\": {\n";
     out << "    \"query\": {\"language\": \"clickcql\", \"text\": " << jstr(query_text) << "},\n";
     out << "    \"page\": {\"start\": " << start << ", \"size\": " << opts.limit

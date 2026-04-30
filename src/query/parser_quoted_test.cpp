@@ -19,5 +19,6 @@ int main() {
             {})
             .parse();
     Parser(R"(longbarenp = dep_subtree(barenoun) :: tcnt(longbarenp) > 2)", {}).parse();
+    Parser(R"(a:[]; stats avg(strlen(a.form)), median(strlen(a.form)) by a.text_id)", {}).parse();
     return 0;
 }

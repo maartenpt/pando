@@ -1,0 +1,6 @@
+# Injected into antirez/linenoise (upstream ships no CMakeLists.txt).
+cmake_minimum_required(VERSION 3.16)
+project(linenoise_fc LANGUAGES C)
+add_library(pando_linenoise STATIC linenoise.c)
+target_include_directories(pando_linenoise PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+set_target_properties(pando_linenoise PROPERTIES C_STANDARD 99)
