@@ -84,6 +84,7 @@ struct ProgramOptions {
     int coll_right = 5;
     size_t coll_min_freq = 5;
     size_t coll_max_items = 50;
+    size_t coll_stoplist = 0; // 0 = disabled; otherwise top-N most frequent words are excluded
     std::vector<std::string> coll_measures;
 };
 

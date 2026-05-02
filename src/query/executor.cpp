@@ -132,6 +132,14 @@ static void expect_token_label(const std::string& name, const std::string& ctx,
     throw std::runtime_error(ctx + ": unknown name '" + name + "'");
 }
 
+static void expect_alignment_operand_label(const std::string& name, const std::string& ctx,
+                                           const std::unordered_set<std::string>& token_labels,
+                                           const std::unordered_set<std::string>& region_labels) {
+    if (name.empty()) return;
+    if (token_labels.count(name) || region_labels.count(name)) return;
+    throw std::runtime_error(ctx + ": unknown name '" + name + "'");
+}
+
 static const char* struct_rel_keyword(StructRelType t) {
     switch (t) {
         case StructRelType::CHILD: return "child";
@@ -468,6 +476,126 @@ static void collect_mv_component_strings(const PositionalAttr& pa, CorpusPos pos
     }
 }
 
+static bool alignment_attr_is_supported(const Corpus& corpus, const std::string& attr) {
+    if (corpus.has_attr(attr)) return true;
+    RegionAttrParts parts;
+    if (!split_region_attr_name(attr, parts)) return false;
+    if (!corpus.has_structure(parts.struct_name)) return false;
+    const auto& sa = corpus.structure(parts.struct_name);
+    return static_cast<bool>(resolve_region_attr_key(sa, parts.struct_name, parts.attr_name));
+}
+
+static std::optional<std::string_view> alignment_attr_value_at(
+        const Corpus& corpus, const std::string& attr, CorpusPos pos) {
+    if (corpus.has_attr(attr))
+        return corpus.attr(attr).value_at(pos);
+
+    RegionAttrParts parts;
+    if (!split_region_attr_name(attr, parts) || !corpus.has_structure(parts.struct_name))
+        return std::nullopt;
+    const auto& sa = corpus.structure(parts.struct_name);
+    auto rkey = resolve_region_attr_key(sa, parts.struct_name, parts.attr_name);
+    if (!rkey) return std::nullopt;
+    int64_t rgn = sa.find_region(pos);
+    if (rgn < 0) return std::nullopt;
+    return sa.region_value(*rkey, static_cast<size_t>(rgn));
+}
+
+static std::optional<std::string_view> resolve_alignment_operand_value(
+        const Corpus& corpus, const Match& m, const NameIndexMap& name_map,
+        const std::string& name, const std::string& attr) {
+    if (CorpusPos p = resolve_name(m, name_map, name); p != NO_HEAD)
+        return alignment_attr_value_at(corpus, attr, p);
+
+    auto nr = m.named_regions.find(name);
+    if (nr == m.named_regions.end()) return std::nullopt;
+    if (!corpus.has_structure(nr->second.struct_name)) return std::nullopt;
+    const auto& anchor_sa = corpus.structure(nr->second.struct_name);
+    if (nr->second.region_idx >= anchor_sa.region_count()) return std::nullopt;
+
+    // Region-attribute lookup against the anchor structure itself first.
+    if (auto rkey = resolve_region_attr_key(anchor_sa, nr->second.struct_name, attr))
+        return anchor_sa.region_value(*rkey, nr->second.region_idx);
+
+    // Explicit struct attr form (e.g. s_tuid, text_id).
+    RegionAttrParts parts;
+    if (split_region_attr_name(attr, parts) && corpus.has_structure(parts.struct_name)) {
+        const auto& sa = corpus.structure(parts.struct_name);
+        auto rkey = resolve_region_attr_key(sa, parts.struct_name, parts.attr_name);
+        if (!rkey) return std::nullopt;
+        if (parts.struct_name == nr->second.struct_name)
+            return sa.region_value(*rkey, nr->second.region_idx);
+        Region rg = anchor_sa.get(nr->second.region_idx);
+        int64_t rgn = sa.find_region(rg.start);
+        if (rgn < 0) return std::nullopt;
+        return sa.region_value(*rkey, static_cast<size_t>(rgn));
+    }
+
+    // Positional fallback for region anchors: read at region start token.
+    if (corpus.has_attr(attr)) {
+        Region rg = anchor_sa.get(nr->second.region_idx);
+        return corpus.attr(attr).value_at(rg.start);
+    }
+
+    return std::nullopt;
+}
+
+static bool alignment_values_match(const Corpus& corpus,
+                                   const std::string& an1,
+                                   const std::string& an2,
+                                   std::optional<std::string_view> v1,
+                                   std::optional<std::string_view> v2) {
+    if (!v1 || !v2) return false;
+    bool mv1 = corpus.is_multivalue(an1);
+    bool mv2 = corpus.is_multivalue(an2);
+    if (!mv1 && !mv2)
+        return *v1 == *v2;
+
+    std::unordered_set<std::string> s1, s2;
+    auto split_components = [](std::string_view v, std::unordered_set<std::string>& out) {
+        size_t start = 0;
+        while (start <= v.size()) {
+            size_t p = v.find('|', start);
+            size_t end = (p == std::string_view::npos) ? v.size() : p;
+            if (end > start) out.insert(std::string(v.substr(start, end - start)));
+            if (p == std::string_view::npos) break;
+            start = p + 1;
+        }
+    };
+    if (mv1 || v1->find('|') != std::string_view::npos) split_components(*v1, s1);
+    else s1.insert(std::string(*v1));
+    if (mv2 || v2->find('|') != std::string_view::npos) split_components(*v2, s2);
+    else s2.insert(std::string(*v2));
+    for (const auto& a : s1)
+        if (s2.count(a)) return true;
+    return false;
+}
+
+static void collect_alignment_component_strings(const Corpus& corpus,
+                                                const std::string& attr,
+                                                CorpusPos pos,
+                                                std::unordered_set<std::string>& out) {
+    if (corpus.has_attr(attr)) {
+        collect_mv_component_strings(corpus.attr(attr), pos, corpus.is_multivalue(attr), out);
+        return;
+    }
+    auto val = alignment_attr_value_at(corpus, attr, pos);
+    if (!val || val->empty() || *val == "_")
+        return;
+    if (corpus.is_multivalue(attr) || val->find('|') != std::string_view::npos) {
+        size_t start = 0;
+        while (start <= val->size()) {
+            size_t p = val->find('|', start);
+            size_t end = (p == std::string_view::npos) ? val->size() : p;
+            if (end > start) out.insert(std::string(val->substr(start, end - start)));
+            if (p == std::string_view::npos) break;
+            start = p + 1;
+        }
+    } else {
+        out.insert(std::string(*val));
+    }
+}
+
 struct ParallelPairHash {
     size_t operator()(const std::pair<size_t, size_t>& p) const noexcept {
         return p.first ^ (p.second + 0x9e3779b97f4a7c15ULL + (p.first << 6) + (p.first >> 2));
@@ -559,15 +687,19 @@ static bool global_alignment_attrs_match(const Corpus& corpus,
                                          const std::string& an1,
                                          const std::string& an2,
                                          CorpusPos p1, CorpusPos p2) {
-    const auto& pa1 = corpus.attr(an1);
-    const auto& pa2 = corpus.attr(an2);
+    if (!alignment_attr_is_supported(corpus, an1) || !alignment_attr_is_supported(corpus, an2))
+        return false;
+
+    bool pos1 = corpus.has_attr(an1);
+    bool pos2 = corpus.has_attr(an2);
     bool mv1 = corpus.is_multivalue(an1);
     bool mv2 = corpus.is_multivalue(an2);
-    if (!mv1 && !mv2)
-        return pa1.value_at(p1) == pa2.value_at(p2);
+    if (pos1 && pos2 && !mv1 && !mv2) {
+        return corpus.attr(an1).value_at(p1) == corpus.attr(an2).value_at(p2);
+    }
     std::unordered_set<std::string> s1, s2;
-    collect_mv_component_strings(pa1, p1, mv1, s1);
-    collect_mv_component_strings(pa2, p2, mv2, s2);
+    collect_alignment_component_strings(corpus, an1, p1, s1);
+    collect_alignment_component_strings(corpus, an2, p2, s2);
     for (const std::string& a : s1)
         if (s2.count(a)) return true;
     return false;
@@ -801,8 +933,8 @@ void QueryExecutor::validate_query_name_bindings(const TokenQuery& query,
         validate_conditions_token_labels(cc.subtree_cond, token_labels, region_labels);
 
     for (const auto& af : query.global_alignment_filters) {
-        expect_token_label(af.name1, ":: alignment filter", token_labels, region_labels);
-        expect_token_label(af.name2, ":: alignment filter", token_labels, region_labels);
+        expect_alignment_operand_label(af.name1, ":: alignment filter", token_labels, region_labels);
+        expect_alignment_operand_label(af.name2, ":: alignment filter", token_labels, region_labels);
     }
     for (const auto& po : query.position_orders) {
         expect_token_label(po.name1, ":: position order", token_labels, region_labels);
@@ -3457,11 +3589,18 @@ MatchSet QueryExecutor::execute_parallel(const TokenQuery& source_query,
     apply_region_filters(target_query, tgt_names, target_set);
 
     const auto& filters = merged_alignment;
+    auto is_anchor_label = [](const TokenQuery& q, const std::string& name) {
+        for (const auto& tok : q.tokens)
+            if (tok.name == name) return tok.is_anchor();
+        return false;
+    };
     if (filters.size() == 1) {
         const auto& af = filters[0];
         std::string an1 = normalize_attr(af.attr1);
         std::string an2 = normalize_attr(af.attr2);
-        if (corpus_.has_attr(an1) && corpus_.has_attr(an2)) {
+        if (corpus_.has_attr(an1) && corpus_.has_attr(an2)
+            && !is_anchor_label(source_query, af.name1)
+            && !is_anchor_label(target_query, af.name2)) {
             parallel_alignment_overlap_join_single(
                     corpus_, an1, an2, af, source_set.matches, target_set.matches,
                     src_names, tgt_names, result.parallel_matches, result.total_count,
@@ -3474,19 +3613,16 @@ MatchSet QueryExecutor::execute_parallel(const TokenQuery& source_query,
         for (const auto& t : target_set.matches) {
             bool aligned = true;
             for (const auto& af : filters) {
-                CorpusPos p1 = resolve_name(s, src_names, af.name1);
-                CorpusPos p2 = resolve_name(t, tgt_names, af.name2);
-                if (p1 == NO_HEAD || p2 == NO_HEAD) {
-                    aligned = false;
-                    break;
-                }
                 std::string an1 = normalize_attr(af.attr1);
                 std::string an2 = normalize_attr(af.attr2);
-                if (!corpus_.has_attr(an1) || !corpus_.has_attr(an2)) {
+                if (!alignment_attr_is_supported(corpus_, an1)
+                    || !alignment_attr_is_supported(corpus_, an2)) {
                     aligned = false;
                     break;
                 }
-                if (!global_alignment_attrs_match(corpus_, an1, an2, p1, p2)) {
+                auto v1 = resolve_alignment_operand_value(corpus_, s, src_names, af.name1, an1);
+                auto v2 = resolve_alignment_operand_value(corpus_, t, tgt_names, af.name2, an2);
+                if (!alignment_values_match(corpus_, an1, an2, v1, v2)) {
                     aligned = false;
                     break;
                 }
@@ -3515,14 +3651,49 @@ void QueryExecutor::apply_region_filters(const TokenQuery& query, const NameInde
         bool pass = true;
 
         for (const auto& gf : query.global_region_filters) {
+            std::string struct_name;
+            std::string attr_name;
+            const StructuralAttr* sa_ptr = nullptr;
+            std::optional<std::string> rkey;
+
             size_t us = gf.region_attr.find('_');
-            if (us == std::string::npos || us + 1 >= gf.region_attr.size()) continue;
-            std::string struct_name = gf.region_attr.substr(0, us);
-            std::string attr_name = gf.region_attr.substr(us + 1);
-            if (!corpus_.has_structure(struct_name)) { pass = false; break; }
-            const auto& sa = corpus_.structure(struct_name);
-            auto rkey = resolve_region_attr_key(sa, struct_name, attr_name);
-            if (!rkey) { pass = false; break; }
+            if (us != std::string::npos && us + 1 < gf.region_attr.size()) {
+                struct_name = gf.region_attr.substr(0, us);
+                attr_name = gf.region_attr.substr(us + 1);
+                if (!corpus_.has_structure(struct_name)) { pass = false; break; }
+                sa_ptr = &corpus_.structure(struct_name);
+                rkey = resolve_region_attr_key(*sa_ptr, struct_name, attr_name);
+            } else if (!gf.anchor_name.empty()) {
+                auto nr = m.named_regions.find(gf.anchor_name);
+                if (nr != m.named_regions.end() && corpus_.has_structure(nr->second.struct_name)) {
+                    struct_name = nr->second.struct_name;
+                    attr_name = gf.region_attr;
+                    sa_ptr = &corpus_.structure(struct_name);
+                    rkey = resolve_region_attr_key(*sa_ptr, struct_name, attr_name);
+                } else {
+                    CorpusPos pos = m.first_pos();
+                    CorpusPos ap = resolve_name(m, name_map, gf.anchor_name);
+                    if (ap != NO_HEAD) pos = ap;
+                    // If anchor name is a token label, infer its containing structure by probing.
+                    for (const auto& sn : corpus_.structure_names()) {
+                        const auto& probe_sa = corpus_.structure(sn);
+                        auto probe_key = resolve_region_attr_key(probe_sa, sn, gf.region_attr);
+                        if (!probe_key) continue;
+                        if (probe_sa.find_region(pos) >= 0) {
+                            struct_name = sn;
+                            attr_name = gf.region_attr;
+                            sa_ptr = &probe_sa;
+                            rkey = std::move(probe_key);
+                            break;
+                        }
+                    }
+                }
+            } else {
+                pass = false;
+                break;
+            }
+            if (!sa_ptr || !rkey) { pass = false; break; }
+            const auto& sa = *sa_ptr;
 
             int64_t rgn = -1;
             if (!gf.anchor_name.empty()) {
@@ -3578,14 +3749,14 @@ void QueryExecutor::apply_global_filters(const TokenQuery& query, const NameInde
 
         // Alignment filters: :: a.attr = b.attr
         for (const auto& af : query.global_alignment_filters) {
-            CorpusPos p1 = resolve_name(m, name_map, af.name1);
-            CorpusPos p2 = resolve_name(m, name_map, af.name2);
-            if (p1 == NO_HEAD || p2 == NO_HEAD) { pass = false; break; }
             std::string an1 = normalize_attr(af.attr1);
             std::string an2 = normalize_attr(af.attr2);
-            if (!corpus_.has_attr(an1) || !corpus_.has_attr(an2))
+            if (!alignment_attr_is_supported(corpus_, an1)
+                || !alignment_attr_is_supported(corpus_, an2))
                 { pass = false; break; }
-            if (!global_alignment_attrs_match(corpus_, an1, an2, p1, p2)) {
+            auto v1 = resolve_alignment_operand_value(corpus_, m, name_map, af.name1, an1);
+            auto v2 = resolve_alignment_operand_value(corpus_, m, name_map, af.name2, an2);
+            if (!alignment_values_match(corpus_, an1, an2, v1, v2)) {
                 pass = false;
                 break;
             }
@@ -3970,14 +4141,47 @@ TokenQuery QueryExecutor::strip_anchors(const TokenQuery& query,
 bool QueryExecutor::match_passes_inline_region_filters(const Match& m, const TokenQuery& q,
                                                        const NameIndexMap& name_map) const {
     for (const auto& gf : q.global_region_filters) {
+        std::string struct_name;
+        std::string attr_name;
+        const StructuralAttr* sa_ptr = nullptr;
+        std::optional<std::string> rkey;
+
         size_t us = gf.region_attr.find('_');
-        if (us == std::string::npos || us + 1 >= gf.region_attr.size()) return false;
-        std::string struct_name = gf.region_attr.substr(0, us);
-        std::string attr_name = gf.region_attr.substr(us + 1);
-        if (!corpus_.has_structure(struct_name)) return false;
-        const auto& sa = corpus_.structure(struct_name);
-        auto rkey = resolve_region_attr_key(sa, struct_name, attr_name);
-        if (!rkey) return false;
+        if (us != std::string::npos && us + 1 < gf.region_attr.size()) {
+            struct_name = gf.region_attr.substr(0, us);
+            attr_name = gf.region_attr.substr(us + 1);
+            if (!corpus_.has_structure(struct_name)) return false;
+            sa_ptr = &corpus_.structure(struct_name);
+            rkey = resolve_region_attr_key(*sa_ptr, struct_name, attr_name);
+        } else if (!gf.anchor_name.empty()) {
+            auto nr = m.named_regions.find(gf.anchor_name);
+            if (nr != m.named_regions.end() && corpus_.has_structure(nr->second.struct_name)) {
+                struct_name = nr->second.struct_name;
+                attr_name = gf.region_attr;
+                sa_ptr = &corpus_.structure(struct_name);
+                rkey = resolve_region_attr_key(*sa_ptr, struct_name, attr_name);
+            } else {
+                CorpusPos pos = m.first_pos();
+                CorpusPos ap = resolve_name(m, name_map, gf.anchor_name);
+                if (ap != NO_HEAD) pos = ap;
+                for (const auto& sn : corpus_.structure_names()) {
+                    const auto& probe_sa = corpus_.structure(sn);
+                    auto probe_key = resolve_region_attr_key(probe_sa, sn, gf.region_attr);
+                    if (!probe_key) continue;
+                    if (probe_sa.find_region(pos) >= 0) {
+                        struct_name = sn;
+                        attr_name = gf.region_attr;
+                        sa_ptr = &probe_sa;
+                        rkey = std::move(probe_key);
+                        break;
+                    }
+                }
+            }
+        } else {
+            return false;
+        }
+        if (!sa_ptr || !rkey) return false;
+        const auto& sa = *sa_ptr;
 
         int64_t rgn = -1;
         if (!gf.anchor_name.empty()) {
@@ -4049,8 +4253,44 @@ MatchSet QueryExecutor::execute_region_enumeration(const std::vector<AnchorConst
 
         bool attr_ok = true;
         for (const auto& [key, val] : enum_ac->attrs) {
+            const std::string wanted_val = val;
             auto rk = resolve_region_attr_key(sa, enum_ac->region, key);
-            if (!rk || std::string(sa.region_value(*rk, ri)) != val) {
+            if (rk) {
+                if (std::string(sa.region_value(*rk, ri)) != wanted_val) {
+                    attr_ok = false;
+                    break;
+                }
+                continue;
+            }
+
+            // Super-region fallback for region-only anchor enumeration
+            // (e.g. b:<s text_lang="Dutch"> where language lives on text).
+            bool matched_super = false;
+            Region reg = sa.get(ri);
+            for (const auto& super_name : corpus_.structure_names()) {
+                if (super_name == enum_ac->region) continue;
+                if (!corpus_.has_structure(super_name)) continue;
+                const auto& super_sa = corpus_.structure(super_name);
+                auto super_key = resolve_region_attr_key(super_sa, super_name, key);
+                if (!super_key) {
+                    RegionAttrParts parts;
+                    if (split_region_attr_name(key, parts) && parts.struct_name == super_name) {
+                        super_key = resolve_region_attr_key(super_sa, super_name, parts.attr_name);
+                    }
+                }
+                if (!super_key) continue;
+                super_sa.for_each_region_at(reg.start, [&](size_t sidx) -> bool {
+                    Region sr = super_sa.get(sidx);
+                    if (sr.start <= reg.start && reg.end <= sr.end
+                        && super_sa.region_value(*super_key, sidx) == wanted_val) {
+                        matched_super = true;
+                        return false;
+                    }
+                    return true;
+                });
+                if (matched_super) break;
+            }
+            if (!matched_super) {
                 attr_ok = false;
                 break;
             }
@@ -4109,10 +4349,42 @@ struct AnchorRowCheck {
     const std::vector<AnchorRegionClause>& anchor_region_clauses;
     const Match& m;
     bool attrs_match(size_t ri) const {
+        Region cur = sa.get(ri);
         for (const auto& [key, val] : attrs) {
+            const std::string wanted_val = val;
             auto rk = resolve_region_attr_key(sa, region_name, key);
-            if (!rk) return false;
-            if (sa.region_value(*rk, ri) != val) return false;
+            if (rk) {
+                if (sa.region_value(*rk, ri) != wanted_val) return false;
+                continue;
+            }
+
+            // Super-region fallback (e.g. <s text_lang="Dutch"> resolves via
+            // containing text.text_lang when s itself has no lang attr).
+            bool matched_super = false;
+            for (const auto& super_name : corpus.structure_names()) {
+                if (super_name == region_name) continue;
+                if (!corpus.has_structure(super_name)) continue;
+                const auto& super_sa = corpus.structure(super_name);
+                auto super_key = resolve_region_attr_key(super_sa, super_name, key);
+                if (!super_key) {
+                    RegionAttrParts parts;
+                    if (split_region_attr_name(key, parts) && parts.struct_name == super_name) {
+                        super_key = resolve_region_attr_key(super_sa, super_name, parts.attr_name);
+                    }
+                }
+                if (!super_key) continue;
+                super_sa.for_each_region_at(cur.start, [&](size_t sidx) -> bool {
+                    Region sr = super_sa.get(sidx);
+                    if (sr.start <= cur.start && cur.end <= sr.end
+                        && super_sa.region_value(*super_key, sidx) == wanted_val) {
+                        matched_super = true;
+                        return false;
+                    }
+                    return true;
+                });
+                if (matched_super) break;
+            }
+            if (!matched_super) return false;
         }
         return true;
     }

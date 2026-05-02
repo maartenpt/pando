@@ -130,7 +130,7 @@ std::string to_query_result_json(const Corpus& corpus,
     out << "  \"operation\": \"query\",\n";
     out << "  \"last_command\": \"query\",\n";
     out << "  \"result\": {\n";
-    out << "    \"query\": {\"language\": \"clickcql\", \"text\": " << jstr(query_text) << "},\n";
+    out << "    \"query\": {\"language\": \"pando-cql\", \"text\": " << jstr(query_text) << "},\n";
     out << "    \"page\": {\"start\": " << start << ", \"size\": " << opts.limit
         << ", \"returned\": " << returned << ", \"total\": " << ms.total_count
         << ", \"total_exact\": " << (ms.total_exact ? "true" : "false") << "},\n";

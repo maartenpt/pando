@@ -18,6 +18,7 @@
 #include <cstring>
 #include <map>
 #include <unordered_map>
+#include <unordered_set>
 #include <set>
 #include <cmath>
 #include <iomanip>
@@ -30,8 +31,10 @@ namespace pando {
 struct ProgramSession::Impl {
     std::map<std::string, MatchSet> named_results;
     std::map<std::string, NameIndexMap> named_name_maps;
+    std::map<std::string, NameIndexMap> named_target_name_maps;
     MatchSet last_ms;
     NameIndexMap last_name_map;
+    NameIndexMap last_target_name_map;
     bool has_last = false;
 };
 
@@ -52,6 +55,98 @@ static std::string make_key(const Corpus& corpus, const Match& m,
         key += read_tabulate_field(corpus, m, name_map, fields[i]);
     }
     return key;
+}
+
+static bool parse_i64_strict(std::string_view s, int64_t& out) {
+    if (s.empty()) return false;
+    size_t i = 0;
+    bool neg = false;
+    if (s[i] == '+' || s[i] == '-') {
+        neg = (s[i] == '-');
+        ++i;
+    }
+    if (i >= s.size()) return false;
+    int64_t v = 0;
+    for (; i < s.size(); ++i) {
+        const unsigned char c = static_cast<unsigned char>(s[i]);
+        if (!std::isdigit(c)) return false;
+        int d = c - '0';
+        if (v > (INT64_MAX - d) / 10) return false;
+        v = v * 10 + d;
+    }
+    out = neg ? -v : v;
+    return true;
+}
+
+static bool parse_roman_numeral(std::string_view s, int64_t& out) {
+    if (s.empty()) return false;
+    auto val = [](char c) -> int {
+        switch (c) {
+            case 'I': return 1; case 'V': return 5; case 'X': return 10; case 'L': return 50;
+            case 'C': return 100; case 'D': return 500; case 'M': return 1000;
+            default: return 0;
+        }
+    };
+    int64_t total = 0;
+    for (size_t i = 0; i < s.size(); ++i) {
+        char c = static_cast<char>(std::toupper(static_cast<unsigned char>(s[i])));
+        int cur = val(c);
+        if (cur == 0) return false;
+        int next = 0;
+        if (i + 1 < s.size()) {
+            char n = static_cast<char>(std::toupper(static_cast<unsigned char>(s[i + 1])));
+            next = val(n);
+            if (next == 0) return false;
+        }
+        if (next > cur) total -= cur;
+        else total += cur;
+    }
+    out = total;
+    return total > 0;
+}
+
+static bool compare_sort_values(std::string_view a, std::string_view b) {
+    int64_t ai = 0, bi = 0;
+    bool an = parse_i64_strict(a, ai) || parse_roman_numeral(a, ai);
+    bool bn = parse_i64_strict(b, bi) || parse_roman_numeral(b, bi);
+    if (an && bn && ai != bi) return ai < bi;
+    return a < b;
+}
+
+static bool compare_group_keys(std::string_view a, std::string_view b) {
+    size_t sa = 0, sb = 0;
+    while (true) {
+        size_t ea = a.find('\t', sa);
+        size_t eb = b.find('\t', sb);
+        if (ea == std::string_view::npos) ea = a.size();
+        if (eb == std::string_view::npos) eb = b.size();
+        std::string_view pa = a.substr(sa, ea - sa);
+        std::string_view pb = b.substr(sb, eb - sb);
+        if (pa != pb) return compare_sort_values(pa, pb);
+        if (ea == a.size() && eb == b.size()) return false;
+        sa = (ea < a.size()) ? ea + 1 : a.size();
+        sb = (eb < b.size()) ? eb + 1 : b.size();
+    }
+}
+
+static std::unordered_set<LexiconId> build_stoplist_ids(const PositionalAttr& pa, size_t top_n) {
+    std::unordered_set<LexiconId> out;
+    if (top_n == 0) return out;
+    std::vector<std::pair<LexiconId, size_t>> items;
+    const auto& lex = pa.lexicon();
+    items.reserve(lex.size());
+    for (LexiconId id = 0; id < lex.size(); ++id) {
+        size_t c = pa.count_of_id(id);
+        if (c == 0) continue;
+        items.push_back({id, c});
+    }
+    std::sort(items.begin(), items.end(), [&](const auto& a, const auto& b) {
+        if (a.second != b.second) return a.second > b.second;
+        return std::string(lex.get(a.first)) < std::string(lex.get(b.first));
+    });
+    size_t keep = std::min(top_n, items.size());
+    for (size_t i = 0; i < keep; ++i) out.insert(items[i].first);
+    return out;
 }
 
 enum class FreqDateTransform { None, Year, Century, Decade, Month, Week, Day };
@@ -383,7 +478,10 @@ static void emit_count_json(std::ostream& out, const Corpus& corpus, const Match
         counts = std::move(exploded);
     }
     std::vector<std::pair<std::string, size_t>> sorted(counts.begin(), counts.end());
-    std::sort(sorted.begin(), sorted.end(), [](const auto& a, const auto& b) { return a.second > b.second; });
+    std::sort(sorted.begin(), sorted.end(), [](const auto& a, const auto& b) {
+        if (a.second != b.second) return a.second > b.second;
+        return compare_group_keys(a.first, b.first);
+    });
     size_t total = ms.aggregate_buckets ? ms.aggregate_buckets->total_hits : ms.matches.size();
     size_t g_end = (group_limit > 0 && group_limit < sorted.size()) ? group_limit : sorted.size();
 
@@ -560,7 +658,7 @@ static void emit_freq_compare_json(std::ostream& out, const Corpus& corpus, Prog
                       if (ib != m.end()) sb += ib->second;
                   }
                   if (sa != sb) return sa > sb;
-                  return a < b;
+                  return compare_group_keys(a, b);
               });
 
     double corpus_size = static_cast<double>(corpus.size());
@@ -642,7 +740,10 @@ static void emit_freq_json(std::ostream& out, const Corpus& corpus, const MatchS
     size_t total_matches = 0;
     freq_build_counts(corpus, ms, cmd, opts, name_map, counts, total_matches);
     std::vector<std::pair<std::string, size_t>> sorted(counts.begin(), counts.end());
-    std::sort(sorted.begin(), sorted.end(), [](const auto& a, const auto& b) { return a.second > b.second; });
+    std::sort(sorted.begin(), sorted.end(), [](const auto& a, const auto& b) {
+        if (a.second != b.second) return a.second > b.second;
+        return compare_group_keys(a.first, b.first);
+    });
     double corpus_size = static_cast<double>(corpus.size());
 
     // Per-subcorpus IPM: when grouping by a single region attribute, use per-group
@@ -807,11 +908,13 @@ static void emit_raw_json(std::ostream& out, const Corpus& corpus, const MatchSe
 }
 
 static void emit_coll_json(std::ostream& out, const Corpus& corpus, const MatchSet& ms,
-                           const GroupCommand& cmd, const ProgramOptions& opts) {
+                           const GroupCommand& cmd, const ProgramOptions& opts,
+                           const NameIndexMap& name_map, const NameIndexMap* target_name_map) {
     std::string coll_attr = "lemma";
     if (!cmd.fields.empty()) coll_attr = cmd.fields[0];
     if (!corpus.has_attr(coll_attr)) coll_attr = "form";
     const auto& pa = corpus.attr(coll_attr);
+    const auto stop_ids = build_stoplist_ids(pa, opts.coll_stoplist);
 
     std::vector<std::string> measures = opts.coll_measures;
     if (measures.empty()) measures = {"logdice"};
@@ -819,49 +922,107 @@ static void emit_coll_json(std::ostream& out, const Corpus& corpus, const MatchS
     std::unordered_map<LexiconId, size_t> obs_counts;
     size_t total_window_positions = 0;
 
-    for (const auto& m : ms.matches) {
+    auto count_coll_token = [&](CorpusPos p) {
+        if (pa.value_at(p).empty()) return;
+        ++obs_counts[pa.id_at(p)];
+        ++total_window_positions;
+    };
+
+    auto add_envelope = [&](const Match& m) {
         auto matched = m.matched_positions();
         std::set<CorpusPos> matched_set(matched.begin(), matched.end());
         CorpusPos first = m.first_pos();
         CorpusPos last = m.last_pos();
-
         CorpusPos left_start = (first > static_cast<CorpusPos>(opts.coll_left)) ? first - opts.coll_left : 0;
         for (CorpusPos p = left_start; p < first; ++p) {
             if (matched_set.count(p)) continue;
-            ++obs_counts[pa.id_at(p)]; ++total_window_positions;
+            count_coll_token(p);
         }
         CorpusPos right_end = std::min(last + static_cast<CorpusPos>(opts.coll_right) + 1,
                                         static_cast<CorpusPos>(corpus.size()));
         for (CorpusPos p = last + 1; p < right_end; ++p) {
             if (matched_set.count(p)) continue;
-            ++obs_counts[pa.id_at(p)]; ++total_window_positions;
+            count_coll_token(p);
+        }
+    };
+    auto add_hub = [&](const std::set<CorpusPos>& matched_set, CorpusPos hub) {
+        CorpusPos left_start = (hub > static_cast<CorpusPos>(opts.coll_left)) ? hub - opts.coll_left : 0;
+        for (CorpusPos p = left_start; p < hub; ++p) {
+            if (matched_set.count(p)) continue;
+            count_coll_token(p);
+        }
+        CorpusPos right_end = std::min(hub + static_cast<CorpusPos>(opts.coll_right) + 1,
+                                        static_cast<CorpusPos>(corpus.size()));
+        for (CorpusPos p = hub + 1; p < right_end; ++p) {
+            if (matched_set.count(p)) continue;
+            count_coll_token(p);
+        }
+    };
+
+    if (!ms.parallel_matches.empty()) {
+        for (const auto& [s, t] : ms.parallel_matches) {
+            if (cmd.coll_on_label.empty()) {
+                add_envelope(s);
+            } else {
+                CorpusPos hub =
+                        resolve_token_label_pair(s, name_map, t, target_name_map, cmd.coll_on_label);
+                if (hub == NO_HEAD) continue;
+                std::set<CorpusPos> excl;
+                for (CorpusPos p : s.matched_positions()) excl.insert(p);
+                for (CorpusPos p : t.matched_positions()) excl.insert(p);
+                add_hub(excl, hub);
+            }
+        }
+    } else {
+        for (const auto& m : ms.matches) {
+            if (cmd.coll_on_label.empty()) {
+                add_envelope(m);
+            } else {
+                CorpusPos hub = resolve_name(m, name_map, cmd.coll_on_label);
+                if (hub == NO_HEAD) continue;
+                auto matched = m.matched_positions();
+                std::set<CorpusPos> matched_set(matched.begin(), matched.end());
+                add_hub(matched_set, hub);
+            }
         }
     }
 
     std::vector<CollEntry> entries;
     size_t N = corpus.size();
     for (const auto& [id, obs] : obs_counts) {
+        if (stop_ids.count(id)) continue;
         if (obs < opts.coll_min_freq) continue;
-        entries.push_back({id, std::string(pa.lexicon().get(id)), obs, pa.count_of_id(id), total_window_positions, N});
+        std::string w = std::string(pa.lexicon().get(id));
+        if (w.empty()) continue;
+        entries.push_back({id, std::move(w), obs, pa.count_of_id(id), total_window_positions, N});
     }
     std::sort(entries.begin(), entries.end(), [&](const CollEntry& a, const CollEntry& b) {
         return compute_measure(measures[0], a) > compute_measure(measures[0], b);
     });
     size_t show = std::min(entries.size(), opts.coll_max_items);
+    const size_t coll_match_n =
+            !ms.parallel_matches.empty() ? ms.parallel_matches.size() : ms.matches.size();
 
     out << "{\"ok\": true, \"operation\": \"coll\", \"last_command\": \"coll\", \"result\": {\n";
     out << "  \"attribute\": " << jstr(coll_attr) << ",\n";
     out << "  \"window\": [" << opts.coll_left << ", " << opts.coll_right << "],\n";
-    out << "  \"matches\": " << ms.matches.size() << ",\n";
+    if (!cmd.coll_on_label.empty())
+        out << "  \"on\": " << jstr(cmd.coll_on_label) << ",\n";
+    out << "  \"matches\": " << coll_match_n << ",\n";
+    out << "  \"stoplist\": " << opts.coll_stoplist << ",\n";
     out << "  \"measures\": [";
-    for (size_t i = 0; i < measures.size(); ++i) { if (i > 0) out << ", "; out << jstr(measures[i]); }
+    for (size_t i = 0; i < measures.size(); ++i) {
+        if (i > 0) out << ", ";
+        out << jstr(measures[i]);
+    }
     out << "],\n  \"collocates\": [\n";
     for (size_t i = 0; i < show; ++i) {
         if (i > 0) out << ",\n";
         out << "    {\"word\": " << jstr(entries[i].form) << ", \"obs\": " << entries[i].obs
             << ", \"freq\": " << entries[i].f_coll;
         for (const auto& meas : measures)
-            out << ", " << jstr(meas) << ": " << std::fixed << std::setprecision(3) << compute_measure(meas, entries[i]);
+            out << ", " << jstr(meas) << ": " << std::fixed << std::setprecision(3)
+                << compute_measure(meas, entries[i]);
         out << "}";
     }
     out << "\n  ]\n}}\n";
@@ -869,6 +1030,7 @@ static void emit_coll_json(std::ostream& out, const Corpus& corpus, const MatchS
 
 static void emit_dcoll_json(std::ostream& out, const Corpus& corpus, const MatchSet& ms,
                             const GroupCommand& cmd, const NameIndexMap& name_map,
+                            const NameIndexMap* target_name_map,
                             const ProgramOptions& opts) {
     if (!corpus.has_deps()) {
         out << "{\"ok\": false, \"error\": \"dcoll requires dependency index\"}\n";
@@ -878,6 +1040,7 @@ static void emit_dcoll_json(std::ostream& out, const Corpus& corpus, const Match
     if (!cmd.fields.empty()) coll_attr = cmd.fields[0];
     if (!corpus.has_attr(coll_attr)) coll_attr = "form";
     const auto& pa = corpus.attr(coll_attr);
+    const auto stop_ids = build_stoplist_ids(pa, opts.coll_stoplist);
     const auto& deps = corpus.deps();
     bool has_deprel_attr = corpus.has_attr("deprel");
     const PositionalAttr* deprel_pa = has_deprel_attr ? &corpus.attr("deprel") : nullptr;
@@ -901,10 +1064,11 @@ static void emit_dcoll_json(std::ostream& out, const Corpus& corpus, const Match
     std::unordered_map<LexiconId, size_t> obs_counts;
     size_t total_related = 0;
 
-    for (const auto& m : ms.matches) {
+    auto emit_one = [&](const Match& m, const Match* tgt) {
         CorpusPos node_pos = m.first_pos();
         if (!cmd.dcoll_anchor.empty()) {
-            CorpusPos ap = resolve_name(m, name_map, cmd.dcoll_anchor);
+            CorpusPos ap = tgt ? resolve_token_label_pair(m, name_map, *tgt, target_name_map, cmd.dcoll_anchor)
+                               : resolve_name(m, name_map, cmd.dcoll_anchor);
             if (ap != NO_HEAD) node_pos = ap;
         }
         auto count_token = [&](CorpusPos rp) {
@@ -919,11 +1083,19 @@ static void emit_dcoll_json(std::ostream& out, const Corpus& corpus, const Match
                 if (deprel_pa) { std::string dr(deprel_pa->value_at(rp)); if (deprel_filter.count(dr)) count_token(rp); }
             }
         }
+    };
+    if (!ms.parallel_matches.empty()) {
+        for (const auto& [s, t] : ms.parallel_matches)
+            emit_one(s, &t);
+    } else {
+        for (const auto& m : ms.matches)
+            emit_one(m, nullptr);
     }
 
     std::vector<CollEntry> entries;
     size_t N = corpus.size();
     for (const auto& [id, obs] : obs_counts) {
+        if (stop_ids.count(id)) continue;
         if (obs < opts.coll_min_freq) continue;
         entries.push_back({id, std::string(pa.lexicon().get(id)), obs, pa.count_of_id(id), total_related, N});
     }
@@ -938,7 +1110,12 @@ static void emit_dcoll_json(std::ostream& out, const Corpus& corpus, const Match
     for (size_t i = 0; i < cmd.relations.size(); ++i) { if (i > 0) out << ", "; out << jstr(cmd.relations[i]); }
     out << "],\n";
     if (!cmd.dcoll_anchor.empty()) out << "  \"anchor\": " << jstr(cmd.dcoll_anchor) << ",\n";
-    out << "  \"matches\": " << ms.matches.size() << ",\n";
+    {
+        const size_t dcoll_match_n =
+                !ms.parallel_matches.empty() ? ms.parallel_matches.size() : ms.matches.size();
+        out << "  \"matches\": " << dcoll_match_n << ",\n";
+    }
+    out << "  \"stoplist\": " << opts.coll_stoplist << ",\n";
     out << "  \"measures\": [";
     for (size_t i = 0; i < measures.size(); ++i) { if (i > 0) out << ", "; out << jstr(measures[i]); }
     out << "],\n  \"collocates\": [\n";
@@ -964,6 +1141,7 @@ static void emit_keyness_json(std::ostream& out, const Corpus& corpus, const Mat
     if (!cmd.fields.empty()) attr = cmd.fields[0];
     if (!corpus.has_attr(attr)) attr = "form";
     const auto& pa = corpus.attr(attr);
+    const auto stop_ids = build_stoplist_ids(pa, opts.coll_stoplist);
 
     std::unordered_map<LexiconId, size_t> focus_counts;
     size_t focus_size = 0;
@@ -999,8 +1177,11 @@ static void emit_keyness_json(std::ostream& out, const Corpus& corpus, const Mat
 
     // Collect all word types
     std::set<LexiconId> all_ids;
-    for (const auto& [id, _] : focus_counts) all_ids.insert(id);
-    if (ref_ms) { for (const auto& [id, _] : ref_counts) all_ids.insert(id); }
+    for (const auto& [id, _] : focus_counts) if (!stop_ids.count(id)) all_ids.insert(id);
+    if (ref_ms) {
+        for (const auto& [id, _] : ref_counts)
+            if (!stop_ids.count(id)) all_ids.insert(id);
+    }
 
     struct KE { std::string form; size_t ff; size_t rf; double g2; };
     std::vector<KE> entries;
@@ -1043,6 +1224,7 @@ static void emit_keyness_json(std::ostream& out, const Corpus& corpus, const Mat
     out << "  \"focus_size\": " << focus_size << ",\n";
     out << "  \"ref_size\": " << ref_size << ",\n";
     out << "  \"corpus_size\": " << corpus.size() << ",\n";
+    out << "  \"stoplist\": " << opts.coll_stoplist << ",\n";
     out << "  \"rows\": [\n";
     for (size_t i = 0; i < show; ++i) {
         if (i > 0) out << ",\n";
@@ -1181,11 +1363,15 @@ std::string run_program_json(Corpus& corpus, ProgramSession& ps,
             S.last_name_map = stmt.is_parallel
                 ? build_name_map(stmt.query)
                 : QueryExecutor::build_name_map_for_stripped_query(stmt.query);
+            S.last_target_name_map =
+                    stmt.is_parallel ? build_name_map(stmt.target_query) : NameIndexMap{};
             S.named_results["Last"] = S.last_ms;
             S.named_name_maps["Last"] = S.last_name_map;
+            S.named_target_name_maps["Last"] = S.last_target_name_map;
             if (!stmt.name.empty()) {
                 S.named_results[stmt.name] = S.last_ms;
                 S.named_name_maps[stmt.name] = S.last_name_map;
+                S.named_target_name_maps[stmt.name] = S.last_target_name_map;
             }
 
             if (!next_is_command) {
@@ -1198,10 +1384,13 @@ std::string run_program_json(Corpus& corpus, ProgramSession& ps,
             // Commands that don't need a MatchSet
             if (stmt.command.type == CommandType::DROP) {
                 if (stmt.command.query_name == "all") {
-                    S.named_results.clear(); S.named_name_maps.clear();
+                    S.named_results.clear();
+                    S.named_name_maps.clear();
+                    S.named_target_name_maps.clear();
                 }  else {
                     S.named_results.erase(stmt.command.query_name);
                     S.named_name_maps.erase(stmt.command.query_name);
+                    S.named_target_name_maps.erase(stmt.command.query_name);
                 }
                 out.str(""); out.clear();
                 out << "{\"ok\": true, \"operation\": \"drop\"}\n";
@@ -1254,6 +1443,7 @@ std::string run_program_json(Corpus& corpus, ProgramSession& ps,
                 else if (name == "max-total" || name == "max_total")  to_size(opts.max_total);
                 else if (name == "max-items" || name == "max_items")  to_size(opts.coll_max_items);
                 else if (name == "min-freq" || name == "min_freq")    to_size(opts.coll_min_freq);
+                else if (name == "stoplist") to_size(opts.coll_stoplist);
                 else if (name == "group-limit" || name == "group_limit") to_size(opts.group_limit);
                 else if (name == "measures")  opts.coll_measures = split_csv(val);
                 else if (name == "attrs") {
@@ -1283,6 +1473,7 @@ std::string run_program_json(Corpus& corpus, ProgramSession& ps,
                 out << "  \"max_total\": " << opts.max_total << ",\n";
                 out << "  \"max_items\": " << opts.coll_max_items << ",\n";
                 out << "  \"min_freq\": " << opts.coll_min_freq << ",\n";
+                out << "  \"stoplist\": " << opts.coll_stoplist << ",\n";
                 out << "  \"group_limit\": " << opts.group_limit << ",\n";
                 out << "  \"total\": " << (opts.total ? "true" : "false") << ",\n";
                 out << "  \"measures\": " << jstr(join(opts.coll_measures.empty()
@@ -1317,6 +1508,17 @@ std::string run_program_json(Corpus& corpus, ProgramSession& ps,
                 continue;
             }
 
+            const NameIndexMap* nm_tgt_parallel = nullptr;
+            if (!ms_to_use->parallel_matches.empty()) {
+                if (!stmt.command.query_name.empty()) {
+                    auto tit = S.named_target_name_maps.find(stmt.command.query_name);
+                    nm_tgt_parallel =
+                            (tit != S.named_target_name_maps.end()) ? &tit->second : nullptr;
+                } else {
+                    nm_tgt_parallel = &S.last_target_name_map;
+                }
+            }
+
             out.str(""); out.clear();
             switch (stmt.command.type) {
                 case CommandType::COUNT:
@@ -1345,10 +1547,12 @@ std::string run_program_json(Corpus& corpus, ProgramSession& ps,
                     emit_raw_json(out, corpus, *ms_to_use);
                     break;
                 case CommandType::COLL:
-                    emit_coll_json(out, corpus, *ms_to_use, stmt.command, opts);
+                    emit_coll_json(out, corpus, *ms_to_use, stmt.command, opts, *nm_to_use,
+                                   nm_tgt_parallel);
                     break;
                 case CommandType::DCOLL:
-                    emit_dcoll_json(out, corpus, *ms_to_use, stmt.command, *nm_to_use, opts);
+                    emit_dcoll_json(out, corpus, *ms_to_use, stmt.command, *nm_to_use,
+                                    nm_tgt_parallel, opts);
                     break;
                 case CommandType::KEYNESS: {
                     const MatchSet* ref_ms = nullptr;
@@ -1370,8 +1574,9 @@ std::string run_program_json(Corpus& corpus, ProgramSession& ps,
                         if (!stmt.command.fields.empty()) {
                             std::sort(ms_to_use->matches.begin(), ms_to_use->matches.end(),
                                       [&](const Match& a, const Match& b) {
-                                          return make_key(corpus, a, *nm_to_use, stmt.command.fields)
-                                               < make_key(corpus, b, *nm_to_use, stmt.command.fields);
+                                          return compare_group_keys(
+                                              make_key(corpus, a, *nm_to_use, stmt.command.fields),
+                                              make_key(corpus, b, *nm_to_use, stmt.command.fields));
                                       });
                         }
                         emit_query_json(out, corpus, "(sorted)", *ms_to_use, opts, 0);

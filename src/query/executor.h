@@ -102,6 +102,16 @@ inline CorpusPos resolve_name(const Match& m, const NameIndexMap& names,
     return m.positions[it->second];
 }
 
+/// Parallel `with` queries: resolve a label on the source match, then the target.
+inline CorpusPos resolve_token_label_pair(const Match& src, const NameIndexMap& src_nm,
+                                          const Match& tgt, const NameIndexMap* tgt_nm,
+                                          const std::string& label) {
+    CorpusPos p = resolve_name(src, src_nm, label);
+    if (p != NO_HEAD) return p;
+    if (tgt_nm) return resolve_name(tgt, *tgt_nm, label);
+    return NO_HEAD;
+}
+
 /// Normalize attribute names from queries: `namespace/key` → `namespace.key` (except
 /// `feats/Feature`, which stays slash-separated or maps to `feats#Feature` / `feats_Feature`
 /// when a split column exists — same rules as QueryExecutor::normalize_attr).

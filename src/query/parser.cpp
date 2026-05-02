@@ -203,6 +203,28 @@ GroupCommand Parser::parse_command() {
     else if (kw == "stats") cmd.type = CommandType::STATS;
     else if (kw == "dcoll") {
         cmd.type = CommandType::DCOLL;
+        // Optional leading groups: (QueryName), (on hubLabel) — before anchor.relation / relations / by
+        while (lexer_.peek().type == TokType::LPAREN) {
+            lexer_.consume();
+            if (lexer_.peek().type != TokType::IDENT)
+                throw std::runtime_error("dcoll: expected query name, `on`, or anchor.relation after `(`");
+            std::string open = lexer_.peek().text;
+            std::string open_low = open;
+            std::transform(open_low.begin(), open_low.end(), open_low.begin(), ::tolower);
+            if (open_low == "on") {
+                lexer_.consume();
+                std::string lab = lexer_.expect(TokType::IDENT).text;
+                if (!cmd.dcoll_anchor.empty())
+                    throw std::runtime_error("dcoll: duplicate `(on <label>)` / anchor already set");
+                cmd.dcoll_anchor = std::move(lab);
+            } else {
+                std::string qn = lexer_.next().text;
+                if (!cmd.query_name.empty())
+                    throw std::runtime_error("dcoll: duplicate parenthesized match-set name");
+                cmd.query_name = std::move(qn);
+            }
+            lexer_.expect(TokType::RPAREN);
+        }
         // Syntax: dcoll [QueryName] [anchor.] rel1[, rel2, ...] by field[, field, ...]
         // Relations: "head" (go up), "descendants" (subtree), any other = deprel on children
         // Empty relations = all children (default)
@@ -478,6 +500,31 @@ GroupCommand Parser::parse_command() {
     }
     else throw std::runtime_error("Unknown command: " + kw);
 
+    // coll: optional (QueryName) / (on hubLabel) before optional bare QueryName
+    if (cmd.type == CommandType::COLL) {
+        while (lexer_.peek().type == TokType::LPAREN) {
+            lexer_.consume();
+            if (lexer_.peek().type != TokType::IDENT)
+                throw std::runtime_error("coll: expected query name or `on` after `(`");
+            std::string open = lexer_.peek().text;
+            std::string open_low = open;
+            std::transform(open_low.begin(), open_low.end(), open_low.begin(), ::tolower);
+            if (open_low == "on") {
+                lexer_.consume();
+                std::string lab = lexer_.expect(TokType::IDENT).text;
+                if (!cmd.coll_on_label.empty())
+                    throw std::runtime_error("coll: duplicate `(on <label>)`");
+                cmd.coll_on_label = std::move(lab);
+            } else {
+                std::string qn = lexer_.next().text;
+                if (!cmd.query_name.empty())
+                    throw std::runtime_error("coll: duplicate parenthesized match-set name");
+                cmd.query_name = std::move(qn);
+            }
+            lexer_.expect(TokType::RPAREN);
+        }
+    }
+
     // Optional query target(s). For `freq`, allow comma-separated names: freq Q1, Q2 by field
     if (cmd.type == CommandType::FREQ && lexer_.peek().type == TokType::IDENT
         && lexer_.peek().text != "by" && lexer_.peek().text != "vs") {
@@ -488,8 +535,30 @@ GroupCommand Parser::parse_command() {
         }
     } else if (cmd.type != CommandType::STATS
                && lexer_.peek().type == TokType::IDENT && lexer_.peek().text != "by"
-               && lexer_.peek().text != "vs") {
-        cmd.query_name = lexer_.next().text;
+               && lexer_.peek().text != "vs"
+               && !(cmd.type == CommandType::COLL && !cmd.query_name.empty())) {
+        if (cmd.type == CommandType::COLL) {
+            // `coll on b by …` — `on` starts the hub clause, not a named match set
+            std::string plow = lexer_.peek().text;
+            std::transform(plow.begin(), plow.end(), plow.begin(), ::tolower);
+            if (plow != "on")
+                cmd.query_name = lexer_.next().text;
+        } else {
+            cmd.query_name = lexer_.next().text;
+        }
+    }
+
+    // coll: optional unparenthesized `on <label>` after optional query name (same meaning as `(on label)`)
+    if (cmd.type == CommandType::COLL && lexer_.peek().type == TokType::IDENT) {
+        std::string plow = lexer_.peek().text;
+        std::transform(plow.begin(), plow.end(), plow.begin(), ::tolower);
+        if (plow == "on") {
+            lexer_.consume();
+            std::string lab = lexer_.expect(TokType::IDENT).text;
+            if (!cmd.coll_on_label.empty())
+                throw std::runtime_error("coll: duplicate hub label (`on` / parentheses)");
+            cmd.coll_on_label = std::move(lab);
+        }
     }
 
     // `count Q1, Q2 by ...` leaves a comma after the first name; `by` is never parsed (fields empty).

@@ -333,6 +333,9 @@ struct GroupCommand {
     // dcoll anchor: named token to start from (empty = first_pos)
     std::string dcoll_anchor;
 
+    // coll: optional named token to centre the left/right window on (empty = span envelope)
+    std::string coll_on_label;
+
     // keyness: optional reference query name for "keyness M vs N by attr"
     // When empty, reference = rest of corpus (default).
     std::string ref_query_name;

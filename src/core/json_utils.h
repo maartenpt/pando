@@ -44,6 +44,17 @@ struct KwicContext {
     std::string right;
 };
 
+inline bool match_is_full_sentence_span(const Corpus& corpus, const Match& m) {
+    if (!corpus.has_structure("s")) return false;
+    const auto& s = corpus.structure("s");
+    CorpusPos first = m.first_pos();
+    CorpusPos last = m.last_pos();
+    int64_t ri = s.find_region(first);
+    if (ri < 0) return false;
+    Region sr = s.get(static_cast<size_t>(ri));
+    return sr.start == first && sr.end == last;
+}
+
 inline KwicContext build_context(const Corpus& corpus, const Match& m, int ctx_width) {
     const auto& form = corpus.attr("form");
     KwicContext ctx;
@@ -77,10 +88,26 @@ inline KwicContext build_context(const Corpus& corpus, const Match& m, int ctx_w
 inline std::string_view lookup_doc_id(const Corpus& corpus, CorpusPos pos) {
     if (!corpus.has_structure("text")) return {};
     const auto& text = corpus.structure("text");
-    if (!text.has_values()) return {};
     int64_t ri = text.find_region(pos);
     if (ri < 0) return {};
-    return text.region_value(static_cast<size_t>(ri));
+    const size_t region_idx = static_cast<size_t>(ri);
+    auto present = [](std::string_view v) {
+        return !v.empty() && v != "_";
+    };
+
+    // Prefer the default text value when present.
+    if (text.has_values()) {
+        std::string_view v = text.region_value(region_idx);
+        if (present(v)) return v;
+    }
+
+    // Fallback to common named text-region identifiers used by TEITOK indexes.
+    for (const auto& attr : {"id", "text_id", "tuid", "text_tuid"}) {
+        if (!text.has_region_attr(attr)) continue;
+        std::string_view v = text.region_value(attr, region_idx);
+        if (present(v)) return v;
+    }
+    return {};
 }
 
 } // namespace pando

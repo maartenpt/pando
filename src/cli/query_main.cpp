@@ -100,6 +100,7 @@ struct Options {
     int coll_right = 5;
     size_t coll_min_freq = 5;
     size_t coll_max_items = 50;
+    size_t coll_stoplist = 0; // 0 = disabled; otherwise top-N most frequent coll_attr forms are excluded
     std::vector<std::string> coll_measures;  // empty = default {"logdice"}
     // RG-REG-5: named-region binding policy when an anchor position is contained in
     // multiple candidate rows (nested/overlapping/zero-width). "fanout" (default)
@@ -118,30 +119,114 @@ struct QueryTiming {
 static void emit_json(const Corpus& corpus, const std::string& query_text,
                       const MatchSet& ms, const Options& opts,
                       double elapsed_ms) {
+    auto emit_match_tokens_json = [&](std::ostream& out, const Match& m) {
+        out << ", \"tokens\": [";
+        const auto& attr_names = opts.attrs.empty()
+            ? corpus.attr_names() : opts.attrs;
+        bool first_tok = true;
+        for (size_t t = 0; t < m.positions.size(); ++t) {
+            if (m.positions[t] == NO_HEAD) continue;
+            CorpusPos span_end = (!m.span_ends.empty()) ? m.span_ends[t] : m.positions[t];
+            for (CorpusPos p = m.positions[t]; p <= span_end; ++p) {
+                if (!first_tok) out << ", ";
+                first_tok = false;
+                out << "{\"pos\": " << p;
+                for (const auto& attr_name : attr_names) {
+                    if (!corpus.has_attr(attr_name)) continue;
+                    auto val = corpus.attr(attr_name).value_at(p);
+                    if (val == "_") continue;
+                    out << ", " << jstr(attr_name) << ": " << jstr(val);
+                }
+                out << "}";
+            }
+        }
+        out << "]";
+    };
+
     // #16: Parallel (Source | Target) result
     if (!ms.parallel_matches.empty()) {
-        size_t stored = ms.parallel_matches.size();
-        size_t start = std::min(opts.offset, stored);
-        size_t end   = std::min(start + opts.limit, stored);
+        auto source_match_key = [](const Match& m) {
+            std::string key;
+            key.reserve(m.positions.size() * 16 + m.span_ends.size() * 16 + 8);
+            key += "p:";
+            for (CorpusPos p : m.positions) {
+                key += std::to_string(p);
+                key += ',';
+            }
+            key += "|e:";
+            for (CorpusPos e : m.span_ends) {
+                key += std::to_string(e);
+                key += ',';
+            }
+            return key;
+        };
+        std::vector<std::vector<size_t>> groups;
+        std::unordered_map<std::string, size_t> group_by_key;
+        for (size_t i = 0; i < ms.parallel_matches.size(); ++i) {
+            const auto& src = ms.parallel_matches[i].first;
+            std::string key = source_match_key(src);
+            auto it = group_by_key.find(key);
+            if (it == group_by_key.end()) {
+                size_t gid = groups.size();
+                group_by_key.emplace(std::move(key), gid);
+                groups.push_back({i});
+            } else {
+                groups[it->second].push_back(i);
+            }
+        }
+
+        size_t total_groups = groups.size();
+        size_t gstart = std::min(opts.offset, total_groups);
+        size_t gend   = std::min(gstart + opts.limit, total_groups);
+        size_t returned_pairs = 0;
+        for (size_t g = gstart; g < gend; ++g) returned_pairs += groups[g].size();
         std::cout << "{\n  \"ok\": true,\n  \"backend\": \"pando\",\n  \"operation\": \"query\",\n";
         std::cout << "  \"result\": {\n    \"parallel\": true,\n";
-        std::cout << "    \"page\": {\"start\": " << start << ", \"size\": " << opts.limit
-                  << ", \"returned\": " << (end - start) << ", \"total\": " << ms.total_count
+        std::cout << "    \"query\": {\"language\": \"pando-cql\", \"text\": "
+                  << jstr(query_text) << "},\n";
+        std::cout << "    \"page\": {\"start\": " << gstart << ", \"size\": " << opts.limit
+                  << ", \"returned\": " << (gend - gstart) << ", \"total\": " << total_groups
+                  << ", \"returned_pairs\": " << returned_pairs
+                  << ", \"total_pairs\": " << ms.total_count
                   << ", \"total_exact\": " << (ms.total_exact ? "true" : "false") << "},\n";
         std::cout << "    \"pairs\": [\n";
-        for (size_t i = start; i < end; ++i) {
-            const auto& [s, t] = ms.parallel_matches[i];
+        bool first_pair = true;
+        for (size_t g = gstart; g < gend; ++g) {
+            for (size_t idx : groups[g]) {
+            const auto& [s, t] = ms.parallel_matches[idx];
             auto doc_s = lookup_doc_id(corpus, s.first_pos());
             auto doc_t = lookup_doc_id(corpus, t.first_pos());
             CorpusPos ms_s = s.first_pos();
             CorpusPos me_s = s.last_pos();
             CorpusPos ms_t = t.first_pos();
             CorpusPos me_t = t.last_pos();
-            if (i > start) std::cout << ",\n";
-            std::cout << "      {\"source\": {\"doc_id\": " << (doc_s.empty() ? "null" : jstr(doc_s))
-                      << ", \"match_start\": " << ms_s << ", \"match_end\": " << me_s << "}"
-                      << ", \"target\": {\"doc_id\": " << (doc_t.empty() ? "null" : jstr(doc_t))
-                      << ", \"match_start\": " << ms_t << ", \"match_end\": " << me_t << "}}";
+            int ctx_w_s = match_is_full_sentence_span(corpus, s) ? 0 : opts.context;
+            int ctx_w_t = match_is_full_sentence_span(corpus, t) ? 0 : opts.context;
+            auto ctx_s = build_context(corpus, s, ctx_w_s);
+            auto ctx_t = build_context(corpus, t, ctx_w_t);
+            if (!first_pair) std::cout << ",\n";
+            first_pair = false;
+            std::cout << "      {\"aligned\": true, \"alignment\": {\"kind\": \"with\", "
+                      << "\"pair_index\": " << idx << "}, "
+                      << "\"source\": {\"doc_id\": " << (doc_s.empty() ? "null" : jstr(doc_s))
+                      << ", \"text_id\": " << (doc_s.empty() ? "null" : jstr(doc_s))
+                      << ", \"match_start\": " << ms_s << ", \"match_end\": " << me_s
+                      << ", \"context\": {\"left\": " << jstr(ctx_s.left)
+                      << ", \"match\": " << jstr(ctx_s.match)
+                      << ", \"right\": " << jstr(ctx_s.right) << "}";
+            emit_match_tokens_json(std::cout, s);
+            std::cout << ", \"aligned_to\": {\"side\": \"target\", \"text_id\": "
+                      << (doc_t.empty() ? "null" : jstr(doc_t)) << "}"
+                      << "}, \"target\": {\"doc_id\": " << (doc_t.empty() ? "null" : jstr(doc_t))
+                      << ", \"text_id\": " << (doc_t.empty() ? "null" : jstr(doc_t))
+                      << ", \"match_start\": " << ms_t << ", \"match_end\": " << me_t
+                      << ", \"context\": {\"left\": " << jstr(ctx_t.left)
+                      << ", \"match\": " << jstr(ctx_t.match)
+                      << ", \"right\": " << jstr(ctx_t.right) << "}";
+            emit_match_tokens_json(std::cout, t);
+            std::cout << ", \"aligned_to\": {\"side\": \"source\", \"text_id\": "
+                      << (doc_s.empty() ? "null" : jstr(doc_s)) << "}" << "}}";
+            }
         }
         std::cout << "\n    ]\n  }\n}\n";
         return;
@@ -157,7 +242,7 @@ static void emit_json(const Corpus& corpus, const std::string& query_text,
     std::cout << "  \"backend\": \"pando\",\n";
     std::cout << "  \"operation\": \"query\",\n";
     std::cout << "  \"result\": {\n";
-    std::cout << "    \"query\": {\"language\": \"clickcql\", \"text\": "
+    std::cout << "    \"query\": {\"language\": \"pando-cql\", \"text\": "
               << jstr(query_text) << "},\n";
     std::cout << "    \"page\": {\"start\": " << start
               << ", \"size\": " << opts.limit
@@ -184,27 +269,7 @@ static void emit_json(const Corpus& corpus, const std::string& query_text,
                   << ", \"match\": " << jstr(ctx.match)
                   << ", \"right\": " << jstr(ctx.right) << "}";
 
-        std::cout << ", \"tokens\": [";
-        const auto& attr_names = opts.attrs.empty()
-            ? corpus.attr_names() : opts.attrs;
-        bool first_tok = true;
-        for (size_t t = 0; t < m.positions.size(); ++t) {
-            if (m.positions[t] == NO_HEAD) continue;
-            CorpusPos span_end = (!m.span_ends.empty()) ? m.span_ends[t] : m.positions[t];
-            for (CorpusPos p = m.positions[t]; p <= span_end; ++p) {
-                if (!first_tok) std::cout << ", ";
-                first_tok = false;
-                std::cout << "{\"pos\": " << p;
-                for (const auto& attr_name : attr_names) {
-                    if (!corpus.has_attr(attr_name)) continue;
-                    auto val = corpus.attr(attr_name).value_at(p);
-                    if (val == "_") continue;
-                    std::cout << ", " << jstr(attr_name) << ": " << jstr(val);
-                }
-                std::cout << "}";
-            }
-        }
-        std::cout << "]";
+        emit_match_tokens_json(std::cout, m);
 
         std::cout << "}";
     }
@@ -611,19 +676,67 @@ static void emit_kwic(const Corpus& corpus, const std::string& query_text,
     static constexpr int KWIC_COL_WIDTH = 40;
 
     if (!ms.parallel_matches.empty()) {
-        size_t start = std::min(opts.offset, ms.parallel_matches.size());
-        size_t end   = std::min(start + opts.limit, ms.parallel_matches.size());
-        const auto& form = corpus.attr("form");
-        for (size_t i = start; i < end; ++i) {
-            const auto& [s, t] = ms.parallel_matches[i];
-            std::string src_str, tgt_str;
-            for (CorpusPos p : s.positions) src_str += (src_str.empty() ? "" : " ") + std::string(form.value_at(p));
-            for (CorpusPos p : t.positions) tgt_str += (tgt_str.empty() ? "" : " ") + std::string(form.value_at(p));
-            std::cout << src_str << " | " << tgt_str << "\n";
+        auto source_match_key = [](const Match& m) {
+            std::string key;
+            key.reserve(m.positions.size() * 16 + m.span_ends.size() * 16 + 8);
+            key += "p:";
+            for (CorpusPos p : m.positions) {
+                key += std::to_string(p);
+                key += ',';
+            }
+            key += "|e:";
+            for (CorpusPos e : m.span_ends) {
+                key += std::to_string(e);
+                key += ',';
+            }
+            return key;
+        };
+        std::vector<std::vector<size_t>> groups;
+        std::unordered_map<std::string, size_t> group_by_key;
+        for (size_t i = 0; i < ms.parallel_matches.size(); ++i) {
+            const auto& src = ms.parallel_matches[i].first;
+            std::string key = source_match_key(src);
+            auto it = group_by_key.find(key);
+            if (it == group_by_key.end()) {
+                size_t gid = groups.size();
+                group_by_key.emplace(std::move(key), gid);
+                groups.push_back({i});
+            } else {
+                groups[it->second].push_back(i);
+            }
         }
-        if (end < ms.parallel_matches.size())
-            std::cout << "(" << ms.total_count << " aligned pairs, "
-                      << (ms.parallel_matches.size() - end) << " more)\n";
+        size_t gstart = std::min(opts.offset, groups.size());
+        size_t gend   = std::min(gstart + opts.limit, groups.size());
+        size_t shown_pairs = 0;
+        for (size_t g = gstart; g < gend; ++g) {
+            for (size_t idx : groups[g]) {
+            const auto& [s, t] = ms.parallel_matches[idx];
+            auto src_doc = lookup_doc_id(corpus, s.first_pos());
+            auto tgt_doc = lookup_doc_id(corpus, t.first_pos());
+            std::string left_s  = build_left_chars(corpus, s.first_pos(), KWIC_COL_WIDTH);
+            std::string span_s  = build_match_span(corpus, s, opts.attrs);
+            std::string right_s = build_right_chars(corpus, s.last_pos(), KWIC_COL_WIDTH);
+            std::string left_t  = build_left_chars(corpus, t.first_pos(), KWIC_COL_WIDTH);
+            std::string span_t  = build_match_span(corpus, t, opts.attrs);
+            std::string right_t = build_right_chars(corpus, t.last_pos(), KWIC_COL_WIDTH);
+            ++shown_pairs;
+
+            std::cout << "[pair " << (idx + 1) << "] aligned\n";
+            std::cout << "  source(text_id="
+                      << (src_doc.empty() ? "null" : std::string(src_doc))
+                      << "): " << left_s << span_s << " " << right_s << "\n";
+            std::cout << "  target(text_id="
+                      << (tgt_doc.empty() ? "null" : std::string(tgt_doc))
+                      << "): " << left_t << span_t << " " << right_t << "\n\n";
+            }
+        }
+        if (gend < groups.size()) {
+            size_t more_pairs = ms.parallel_matches.size() > shown_pairs
+                                ? (ms.parallel_matches.size() - shown_pairs) : 0;
+            std::cout << "(" << groups.size() << " source hits, "
+                      << ms.total_count << " aligned pairs, "
+                      << more_pairs << " pairs in later source hits)\n";
+        }
         return;
     }
 
@@ -741,6 +854,78 @@ static std::string make_key(const Corpus& corpus, const Match& m,
     return key;
 }
 
+static bool parse_i64_strict(std::string_view s, int64_t& out) {
+    if (s.empty()) return false;
+    size_t i = 0;
+    bool neg = false;
+    if (s[i] == '+' || s[i] == '-') {
+        neg = (s[i] == '-');
+        ++i;
+    }
+    if (i >= s.size()) return false;
+    int64_t v = 0;
+    for (; i < s.size(); ++i) {
+        const unsigned char c = static_cast<unsigned char>(s[i]);
+        if (!std::isdigit(c)) return false;
+        int d = c - '0';
+        if (v > (INT64_MAX - d) / 10) return false;
+        v = v * 10 + d;
+    }
+    out = neg ? -v : v;
+    return true;
+}
+
+static bool parse_roman_numeral(std::string_view s, int64_t& out) {
+    if (s.empty()) return false;
+    auto val = [](char c) -> int {
+        switch (c) {
+            case 'I': return 1; case 'V': return 5; case 'X': return 10; case 'L': return 50;
+            case 'C': return 100; case 'D': return 500; case 'M': return 1000;
+            default: return 0;
+        }
+    };
+    int64_t total = 0;
+    for (size_t i = 0; i < s.size(); ++i) {
+        char c = static_cast<char>(std::toupper(static_cast<unsigned char>(s[i])));
+        int cur = val(c);
+        if (cur == 0) return false;
+        int next = 0;
+        if (i + 1 < s.size()) {
+            char n = static_cast<char>(std::toupper(static_cast<unsigned char>(s[i + 1])));
+            next = val(n);
+            if (next == 0) return false;
+        }
+        if (next > cur) total -= cur;
+        else total += cur;
+    }
+    out = total;
+    return total > 0;
+}
+
+static bool compare_sort_values(std::string_view a, std::string_view b) {
+    int64_t ai = 0, bi = 0;
+    bool an = parse_i64_strict(a, ai) || parse_roman_numeral(a, ai);
+    bool bn = parse_i64_strict(b, bi) || parse_roman_numeral(b, bi);
+    if (an && bn && ai != bi) return ai < bi;
+    return a < b;
+}
+
+static bool compare_group_keys(std::string_view a, std::string_view b) {
+    size_t sa = 0, sb = 0;
+    while (true) {
+        size_t ea = a.find('\t', sa);
+        size_t eb = b.find('\t', sb);
+        if (ea == std::string_view::npos) ea = a.size();
+        if (eb == std::string_view::npos) eb = b.size();
+        std::string_view pa = a.substr(sa, ea - sa);
+        std::string_view pb = b.substr(sb, eb - sb);
+        if (pa != pb) return compare_sort_values(pa, pb);
+        if (ea == a.size() && eb == b.size()) return false;
+        sa = (ea < a.size()) ? ea + 1 : a.size();
+        sb = (eb < b.size()) ? eb + 1 : b.size();
+    }
+}
+
 static bool aggregate_command_targets_stmt(const Statement& stmt, const GroupCommand& ncmd) {
     if (!ncmd.freq_query_names.empty()) {
         if (ncmd.freq_query_names.size() > 1)
@@ -761,8 +946,11 @@ static bool aggregate_command_targets_stmt(const Statement& stmt, const GroupCom
 struct Session {
     std::map<std::string, MatchSet> named_results;
     std::map<std::string, NameIndexMap> named_name_maps;
+    /// Token labels for the target side of the last / named parallel query (`with`).
+    std::map<std::string, NameIndexMap> named_target_name_maps;
     MatchSet last_ms;
     NameIndexMap last_name_map;
+    NameIndexMap last_target_name_map;
     bool has_last = false;
 };
 
@@ -808,7 +996,10 @@ static void emit_count(const Corpus& corpus, const MatchSet& ms,
     // Sort by count descending
     std::vector<std::pair<std::string, size_t>> sorted(counts.begin(), counts.end());
     std::sort(sorted.begin(), sorted.end(),
-              [](const auto& a, const auto& b) { return a.second > b.second; });
+              [](const auto& a, const auto& b) {
+                  if (a.second != b.second) return a.second > b.second;
+                  return compare_group_keys(a.first, b.first);
+              });
 
     size_t total = ms.aggregate_buckets ? ms.aggregate_buckets->total_hits : ms.matches.size();
 
@@ -875,7 +1066,8 @@ static void emit_sort(const Corpus& corpus, MatchSet& ms,
 
     std::sort(ms.matches.begin(), ms.matches.end(),
               [&](const Match& a, const Match& b) {
-                  return make_key(corpus, a, name_map, cmd.fields) < make_key(corpus, b, name_map, cmd.fields);
+                  return compare_group_keys(make_key(corpus, a, name_map, cmd.fields),
+                                            make_key(corpus, b, name_map, cmd.fields));
               });
 
     emit_hits_text(corpus, "(sorted)", ms, opts, 0);
@@ -1366,7 +1558,7 @@ static void emit_freq_compare(const Corpus& corpus, Session& session,
                       if (ib != m.end()) sb += ib->second;
                   }
                   if (sa != sb) return sa > sb;
-                  return a < b;
+                  return compare_group_keys(a, b);
               });
 
     double corpus_size = static_cast<double>(corpus.size());
@@ -1685,16 +1877,38 @@ static double compute_measure(const std::string& name, const CollEntry& e) {
     return compute_logdice(e);  // fallback
 }
 
+static std::unordered_set<LexiconId> build_stoplist_ids(const PositionalAttr& pa, size_t top_n) {
+    std::unordered_set<LexiconId> out;
+    if (top_n == 0) return out;
+    std::vector<std::pair<LexiconId, size_t>> items;
+    const auto& lex = pa.lexicon();
+    items.reserve(lex.size());
+    for (LexiconId id = 0; id < lex.size(); ++id) {
+        size_t c = pa.count_of_id(id);
+        if (c == 0) continue;
+        items.push_back({id, c});
+    }
+    std::sort(items.begin(), items.end(), [&](const auto& a, const auto& b) {
+        if (a.second != b.second) return a.second > b.second;
+        return std::string(lex.get(a.first)) < std::string(lex.get(b.first));
+    });
+    size_t keep = std::min(top_n, items.size());
+    for (size_t i = 0; i < keep; ++i) out.insert(items[i].first);
+    return out;
+}
+
 // ── coll: window-based collocation ─────────────────────────────────────
 
 static void emit_coll(const Corpus& corpus, const MatchSet& ms,
                       const GroupCommand& cmd, const Options& opts,
-                      const NameIndexMap& name_map) {
+                      const NameIndexMap& name_map,
+                      const NameIndexMap* target_name_map) {
     // Determine which attribute to group collocates by (default: lemma, fallback form)
     std::string coll_attr = "lemma";
     if (!cmd.fields.empty()) coll_attr = cmd.fields[0];
     if (!corpus.has_attr(coll_attr)) coll_attr = "form";
     const auto& pa = corpus.attr(coll_attr);
+    const auto stop_ids = build_stoplist_ids(pa, opts.coll_stoplist);
 
     std::vector<std::string> measures = opts.coll_measures;
     if (measures.empty()) measures = {"logdice"};
@@ -1703,27 +1917,74 @@ static void emit_coll(const Corpus& corpus, const MatchSet& ms,
     std::unordered_map<LexiconId, size_t> obs_counts;
     size_t total_window_positions = 0;
 
-    // Set of matched positions to exclude from collocate counting
-    for (const auto& m : ms.matches) {
+    auto count_coll_token = [&](CorpusPos p) {
+        // Parallel tiers often leave lemma (etc.) empty; counting those positions collapses into
+        // one high-frequency "" bucket and hides real collocates.
+        if (pa.value_at(p).empty()) return;
+        ++obs_counts[pa.id_at(p)];
+        ++total_window_positions;
+    };
+
+    auto add_coll_envelope = [&](const Match& m) {
         auto matched = m.matched_positions();
         std::set<CorpusPos> matched_set(matched.begin(), matched.end());
         CorpusPos first = m.first_pos();
         CorpusPos last = m.last_pos();
 
-        // Left window
-        CorpusPos left_start = (first > static_cast<CorpusPos>(opts.coll_left)) ? first - opts.coll_left : 0;
+        CorpusPos left_start =
+                (first > static_cast<CorpusPos>(opts.coll_left)) ? first - opts.coll_left : 0;
         for (CorpusPos p = left_start; p < first; ++p) {
             if (matched_set.count(p)) continue;
-            ++obs_counts[pa.id_at(p)];
-            ++total_window_positions;
+            count_coll_token(p);
         }
-        // Right window
         CorpusPos right_end = std::min(last + static_cast<CorpusPos>(opts.coll_right) + 1,
-                                        static_cast<CorpusPos>(corpus.size()));
+                                         static_cast<CorpusPos>(corpus.size()));
         for (CorpusPos p = last + 1; p < right_end; ++p) {
             if (matched_set.count(p)) continue;
-            ++obs_counts[pa.id_at(p)];
-            ++total_window_positions;
+            count_coll_token(p);
+        }
+    };
+
+    auto add_coll_hub = [&](const std::set<CorpusPos>& matched_set, CorpusPos hub) {
+        CorpusPos left_start =
+                (hub > static_cast<CorpusPos>(opts.coll_left)) ? hub - opts.coll_left : 0;
+        for (CorpusPos p = left_start; p < hub; ++p) {
+            if (matched_set.count(p)) continue;
+            count_coll_token(p);
+        }
+        CorpusPos right_end = std::min(hub + static_cast<CorpusPos>(opts.coll_right) + 1,
+                                         static_cast<CorpusPos>(corpus.size()));
+        for (CorpusPos p = hub + 1; p < right_end; ++p) {
+            if (matched_set.count(p)) continue;
+            count_coll_token(p);
+        }
+    };
+
+    if (!ms.parallel_matches.empty()) {
+        for (const auto& [s, t] : ms.parallel_matches) {
+            if (cmd.coll_on_label.empty()) {
+                add_coll_envelope(s);
+            } else {
+                CorpusPos hub =
+                        resolve_token_label_pair(s, name_map, t, target_name_map, cmd.coll_on_label);
+                if (hub == NO_HEAD) continue;
+                std::set<CorpusPos> excl;
+                for (CorpusPos p : s.matched_positions()) excl.insert(p);
+                for (CorpusPos p : t.matched_positions()) excl.insert(p);
+                add_coll_hub(excl, hub);
+            }
+        }
+    } else {
+        for (const auto& m : ms.matches) {
+            if (cmd.coll_on_label.empty()) {
+                add_coll_envelope(m);
+            } else {
+                CorpusPos hub = resolve_name(m, name_map, cmd.coll_on_label);
+                if (hub == NO_HEAD) continue;
+                auto matched = m.matched_positions();
+                std::set<CorpusPos> matched_set(matched.begin(), matched.end());
+                add_coll_hub(matched_set, hub);
+            }
         }
     }
 
@@ -1731,9 +1992,12 @@ static void emit_coll(const Corpus& corpus, const MatchSet& ms,
     std::vector<CollEntry> entries;
     size_t N = corpus.size();
     for (const auto& [id, obs] : obs_counts) {
+        if (stop_ids.count(id)) continue;
         if (obs < opts.coll_min_freq) continue;
+        std::string w = std::string(pa.lexicon().get(id));
+        if (w.empty()) continue;
         size_t f_coll = pa.count_of_id(id);
-        entries.push_back({id, std::string(pa.lexicon().get(id)), obs, f_coll, total_window_positions, N});
+        entries.push_back({id, std::move(w), obs, f_coll, total_window_positions, N});
     }
 
     // Sort by primary measure descending
@@ -1743,11 +2007,17 @@ static void emit_coll(const Corpus& corpus, const MatchSet& ms,
 
     size_t show = std::min(entries.size(), opts.coll_max_items);
 
+    const size_t coll_match_n =
+            !ms.parallel_matches.empty() ? ms.parallel_matches.size() : ms.matches.size();
+
     if (opts.json) {
         std::cout << "{\"ok\": true, \"operation\": \"coll\", \"last_command\": \"coll\", \"result\": {\n";
         std::cout << "  \"attribute\": " << jstr(coll_attr) << ",\n";
         std::cout << "  \"window\": [" << opts.coll_left << ", " << opts.coll_right << "],\n";
-        std::cout << "  \"matches\": " << ms.matches.size() << ",\n";
+        if (!cmd.coll_on_label.empty())
+            std::cout << "  \"on\": " << jstr(cmd.coll_on_label) << ",\n";
+        std::cout << "  \"matches\": " << coll_match_n << ",\n";
+        std::cout << "  \"stoplist\": " << opts.coll_stoplist << ",\n";
         std::cout << "  \"measures\": [";
         for (size_t i = 0; i < measures.size(); ++i) {
             if (i > 0) std::cout << ", ";
@@ -1782,7 +2052,8 @@ static void emit_coll(const Corpus& corpus, const MatchSet& ms,
 
 static void emit_dcoll(const Corpus& corpus, const MatchSet& ms,
                        const GroupCommand& cmd, const Options& opts,
-                       const NameIndexMap& name_map) {
+                       const NameIndexMap& name_map,
+                       const NameIndexMap* target_name_map) {
     if (!corpus.has_deps()) {
         std::cerr << "Error: dcoll requires dependency index\n";
         return;
@@ -1792,6 +2063,7 @@ static void emit_dcoll(const Corpus& corpus, const MatchSet& ms,
     if (!cmd.fields.empty()) coll_attr = cmd.fields[0];
     if (!corpus.has_attr(coll_attr)) coll_attr = "form";
     const auto& pa = corpus.attr(coll_attr);
+    const auto stop_ids = build_stoplist_ids(pa, opts.coll_stoplist);
     const auto& deps = corpus.deps();
 
     // Deprel attribute for filtering child relations
@@ -1824,11 +2096,13 @@ static void emit_dcoll(const Corpus& corpus, const MatchSet& ms,
     std::unordered_map<LexiconId, size_t> obs_counts;
     size_t total_related = 0;
 
-    for (const auto& m : ms.matches) {
-        // Resolve anchor token, or fall back to first_pos
+    auto emit_one_dcoll = [&](const Match& m, const Match* tgt_parallel) {
         CorpusPos node_pos = m.first_pos();
         if (!cmd.dcoll_anchor.empty()) {
-            CorpusPos ap = resolve_name(m, name_map, cmd.dcoll_anchor);
+            CorpusPos ap =
+                    tgt_parallel ? resolve_token_label_pair(m, name_map, *tgt_parallel,
+                                                             target_name_map, cmd.dcoll_anchor)
+                                 : resolve_name(m, name_map, cmd.dcoll_anchor);
             if (ap != NO_HEAD) node_pos = ap;
         }
 
@@ -1838,25 +2112,21 @@ static void emit_dcoll(const Corpus& corpus, const MatchSet& ms,
             ++total_related;
         };
 
-        // Collect head
         if (want_head) {
             auto h = deps.head(node_pos);
             if (h != NO_HEAD) count_token(h);
         }
 
-        // Collect descendants (full subtree)
         if (want_descendants) {
             for (CorpusPos rp : deps.subtree(node_pos))
                 count_token(rp);
         }
 
-        // Collect all children (no deprel filter)
         if (want_all_children) {
             for (CorpusPos rp : deps.children(node_pos))
                 count_token(rp);
         }
 
-        // Collect children filtered by deprel
         if (want_filtered_children) {
             for (CorpusPos rp : deps.children(node_pos)) {
                 if (deprel_pa) {
@@ -1865,12 +2135,21 @@ static void emit_dcoll(const Corpus& corpus, const MatchSet& ms,
                 }
             }
         }
+    };
+
+    if (!ms.parallel_matches.empty()) {
+        for (const auto& [s, t] : ms.parallel_matches)
+            emit_one_dcoll(s, &t);
+    } else {
+        for (const auto& m : ms.matches)
+            emit_one_dcoll(m, nullptr);
     }
 
     // Build entries
     std::vector<CollEntry> entries;
     size_t N = corpus.size();
     for (const auto& [id, obs] : obs_counts) {
+        if (stop_ids.count(id)) continue;
         if (obs < opts.coll_min_freq) continue;
         size_t f_coll = pa.count_of_id(id);
         entries.push_back({id, std::string(pa.lexicon().get(id)), obs, f_coll, total_related, N});
@@ -1903,7 +2182,12 @@ static void emit_dcoll(const Corpus& corpus, const MatchSet& ms,
         std::cout << "],\n";
         if (!cmd.dcoll_anchor.empty())
             std::cout << "  \"anchor\": " << jstr(cmd.dcoll_anchor) << ",\n";
-        std::cout << "  \"matches\": " << ms.matches.size() << ",\n";
+        {
+            const size_t dcoll_match_n =
+                    !ms.parallel_matches.empty() ? ms.parallel_matches.size() : ms.matches.size();
+            std::cout << "  \"matches\": " << dcoll_match_n << ",\n";
+        }
+        std::cout << "  \"stoplist\": " << opts.coll_stoplist << ",\n";
         std::cout << "  \"measures\": [";
         for (size_t i = 0; i < measures.size(); ++i) {
             if (i > 0) std::cout << ", ";
@@ -1972,6 +2256,7 @@ static void emit_keyness(const Corpus& corpus, const MatchSet& ms,
     if (!cmd.fields.empty()) attr = cmd.fields[0];
     if (!corpus.has_attr(attr)) attr = "form";
     const auto& pa = corpus.attr(attr);
+    const auto stop_ids = build_stoplist_ids(pa, opts.coll_stoplist);
 
     // Count occurrences in focus (all matched positions)
     std::unordered_map<LexiconId, size_t> focus_counts;
@@ -2015,9 +2300,11 @@ static void emit_keyness(const Corpus& corpus, const MatchSet& ms,
     std::vector<KeynessEntry> entries;
     // Collect all word types from both focus and ref
     std::set<LexiconId> all_ids;
-    for (const auto& [id, _] : focus_counts) all_ids.insert(id);
+    for (const auto& [id, _] : focus_counts)
+        if (!stop_ids.count(id)) all_ids.insert(id);
     if (ref_ms) {
-        for (const auto& [id, _] : ref_counts) all_ids.insert(id);
+        for (const auto& [id, _] : ref_counts)
+            if (!stop_ids.count(id)) all_ids.insert(id);
     }
 
     for (LexiconId id : all_ids) {
@@ -2059,6 +2346,7 @@ static void emit_keyness(const Corpus& corpus, const MatchSet& ms,
         std::cout << "  \"focus_size\": " << focus_size << ",\n";
         std::cout << "  \"ref_size\": " << ref_size << ",\n";
         std::cout << "  \"corpus_size\": " << corpus.size() << ",\n";
+        std::cout << "  \"stoplist\": " << opts.coll_stoplist << ",\n";
         std::cout << "  \"rows\": [\n";
         for (size_t i = 0; i < show; ++i) {
             if (i > 0) std::cout << ",\n";
@@ -2226,7 +2514,10 @@ static void run_query(const Corpus& corpus, const std::string& input,
                     count_t = opts.total;
                     max_total_cap = (opts.total && opts.max_total > 0) ? opts.max_total : 0;
                 } else {
-                    max_m = opts.offset + opts.limit;
+                    // Parallel queries fan out source hits into many aligned pairs.
+                    // Pair-based pre-truncation skews pages toward the first source hit(s),
+                    // so keep full pair sets and page by source-hit groups at render time.
+                    max_m = stmt.is_parallel ? 0 : (opts.offset + opts.limit);
                     count_t = opts.total;
                     max_total_cap = (opts.total && opts.max_total > 0) ? opts.max_total : 0;
                 }
@@ -2307,15 +2598,19 @@ static void run_query(const Corpus& corpus, const std::string& input,
             session.last_name_map = stmt.is_parallel
                 ? build_name_map(stmt.query)
                 : QueryExecutor::build_name_map_for_stripped_query(stmt.query);
+            session.last_target_name_map =
+                    stmt.is_parallel ? build_name_map(stmt.target_query) : NameIndexMap{};
 
             // Always store as "Last" (CQP convention)
             session.named_results["Last"] = session.last_ms;
             session.named_name_maps["Last"] = session.last_name_map;
+            session.named_target_name_maps["Last"] = session.last_target_name_map;
 
             // If this statement has a name, also store under that name
             if (!stmt.name.empty()) {
                 session.named_results[stmt.name] = session.last_ms;
                 session.named_name_maps[stmt.name] = session.last_name_map;
+                session.named_target_name_maps[stmt.name] = session.last_target_name_map;
             }
             auto t1 = std::chrono::high_resolution_clock::now();
             double query_ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
@@ -2367,12 +2662,14 @@ static void run_query(const Corpus& corpus, const std::string& input,
                     size_t n = session.named_results.size();
                     session.named_results.clear();
                     session.named_name_maps.clear();
+                    session.named_target_name_maps.clear();
                     std::cout << "Dropped all " << n << " named queries\n";
                 } else {
                     auto it = session.named_results.find(stmt.command.query_name);
                     if (it != session.named_results.end()) {
                         session.named_results.erase(it);
                         session.named_name_maps.erase(stmt.command.query_name);
+                        session.named_target_name_maps.erase(stmt.command.query_name);
                         std::cout << "Dropped '" << stmt.command.query_name << "'\n";
                     } else {
                         std::cerr << "Named query '" << stmt.command.query_name << "' not found\n";
@@ -2412,6 +2709,7 @@ static void run_query(const Corpus& corpus, const std::string& input,
                 else if (name == "max-total" || name == "max_total")  to_size(opts.max_total);
                 else if (name == "max-items" || name == "max_items")  to_size(opts.coll_max_items);
                 else if (name == "min-freq" || name == "min_freq")    to_size(opts.coll_min_freq);
+                else if (name == "stoplist") to_size(opts.coll_stoplist);
                 else if (name == "group-limit" || name == "group_limit") to_size(opts.group_limit);
                 else if (name == "no-mv-explode" || name == "no_mv_explode")
                     opts.no_mv_explode = (val == "true" || val == "1" || val == "on");
@@ -2462,6 +2760,7 @@ static void run_query(const Corpus& corpus, const std::string& input,
                     std::cout << "  \"max_total\": " << opts.max_total << ",\n";
                     std::cout << "  \"max_items\": " << opts.coll_max_items << ",\n";
                     std::cout << "  \"min_freq\": " << opts.coll_min_freq << ",\n";
+                    std::cout << "  \"stoplist\": " << opts.coll_stoplist << ",\n";
                     std::cout << "  \"group_limit\": " << opts.group_limit << ",\n";
                     std::cout << "  \"no_mv_explode\": " << (opts.no_mv_explode ? "true" : "false") << ",\n";
                     std::cout << "  \"max_gap\": " << opts.max_gap << ",\n";
@@ -2483,6 +2782,7 @@ static void run_query(const Corpus& corpus, const std::string& input,
                     std::cout << "max-total   = " << opts.max_total << "\n";
                     std::cout << "max-items   = " << opts.coll_max_items << "\n";
                     std::cout << "min-freq    = " << opts.coll_min_freq << "\n";
+                    std::cout << "stoplist    = " << opts.coll_stoplist << "\n";
                     std::cout << "group-limit = " << opts.group_limit << "\n";
                     std::cout << "no-mv-explode = " << (opts.no_mv_explode ? "on" : "off") << "\n";
                     std::cout << "max-gap     = " << opts.max_gap << "\n";
@@ -2823,6 +3123,17 @@ static void run_query(const Corpus& corpus, const std::string& input,
                 nm_to_use = &session.last_name_map;
             }
 
+            const NameIndexMap* nm_tgt_parallel = nullptr;
+            if (!ms_to_use->parallel_matches.empty()) {
+                if (!cmd_to_run.query_name.empty()) {
+                    auto tit = session.named_target_name_maps.find(cmd_to_run.query_name);
+                    nm_tgt_parallel = (tit != session.named_target_name_maps.end()) ? &tit->second
+                                                                                    : nullptr;
+                } else {
+                    nm_tgt_parallel = &session.last_target_name_map;
+                }
+            }
+
             switch (cmd_to_run.type) {
                 case CommandType::COUNT:
                 case CommandType::GROUP:
@@ -2871,11 +3182,13 @@ static void run_query(const Corpus& corpus, const std::string& input,
                     break;
 
                 case CommandType::COLL:
-                    if (should_emit_output) emit_coll(corpus, *ms_to_use, cmd_to_run, opts, *nm_to_use);
+                    if (should_emit_output)
+                        emit_coll(corpus, *ms_to_use, cmd_to_run, opts, *nm_to_use, nm_tgt_parallel);
                     break;
 
                 case CommandType::DCOLL:
-                    if (should_emit_output) emit_dcoll(corpus, *ms_to_use, cmd_to_run, opts, *nm_to_use);
+                    if (should_emit_output)
+                        emit_dcoll(corpus, *ms_to_use, cmd_to_run, opts, *nm_to_use, nm_tgt_parallel);
                     break;
 
                 case CommandType::KEYNESS: {
@@ -3108,6 +3421,7 @@ static Options parse_args(int argc, char* argv[]) {
         else if (arg == "--right" && i + 1 < argc) { opts.coll_right = std::stoi(argv[++i]); }
         else if (arg == "--min-freq" && i + 1 < argc) { opts.coll_min_freq = std::stoul(argv[++i]); }
         else if (arg == "--max-items" && i + 1 < argc) { opts.coll_max_items = std::stoul(argv[++i]); }
+        else if (arg == "--stoplist" && i + 1 < argc) { opts.coll_stoplist = std::stoul(argv[++i]); }
         else if (arg == "--measures" && i + 1 < argc) {
             std::string list = argv[++i];
             opts.coll_measures.clear();
@@ -3199,6 +3513,7 @@ static Options parse_args(int argc, char* argv[]) {
                   << "  --right N        Right window size (overrides --window)\n"
                   << "  --min-freq N     Minimum co-occurrence frequency (default: 5)\n"
                   << "  --max-items N    Maximum collocates to display (default: 50)\n"
+                  << "  --stoplist N     Exclude N most frequent words for coll/dcoll/keyness (default: 0)\n"
                   << "  --measures M,... Association measures: logdice,mi,mi3,tscore,ll,dice (default: logdice)\n";
         std::exit(1);
     }

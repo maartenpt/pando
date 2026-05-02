@@ -126,7 +126,17 @@ For **sentence-aligned** search without naming tokens, you can write:
 
 The parser builds a **parallel** query; the engine runs **source** and **target** subqueries and **pairs** matches subject to **`::`** alignment constraints (typically equality on `tuid` / `s_tuid` or other attrs — see [PANDO-CQL.md](PANDO-CQL.md) and `pando --help`).
 
-Use **`with`** for straightforward sentence-aligned search. For **n:n** graphs, **named tokens** and explicit `::` conditions over `s_tuid` / `tuid` (multivalue intersection as usual) express the alignment you need.
+Use **`with`** for straightforward sentence-aligned search. For **n:n** graphs, **named tokens** and explicit `::` conditions over `s_tuid` / `tuid` (multivalue intersection as usual) express the alignment you need. 
+
+```text
+a:[form="property"] > [deprel="amod"] with b:[form="bezit"] :: a.tuid = b.tuid
+```
+
+When selecting for aligned sentences only, we do not want to select any token. Therefore, the following syntax is allowed as well, selecting the entire sentence:
+
+```text
+a:[form="property"] with b:<s text_lang="Dutch"> :: a.s_tuid = b.s_tuid
+```
 
 **JSON:** parallel results use **source/target** spans (`parallel` in JSON output) alongside or instead of a single KWIC row.
 
