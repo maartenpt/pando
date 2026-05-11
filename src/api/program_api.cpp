@@ -1317,6 +1317,7 @@ std::string run_program_json(Corpus& corpus, ProgramSession& ps,
     Program prog = parser.parse();
 
     QueryExecutor executor(corpus);
+    executor.set_include_empty_alignment_values(opts.allow_empty_alignment);
     std::ostringstream out;
 
     for (size_t si = 0; si < prog.size(); ++si) {

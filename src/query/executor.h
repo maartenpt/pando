@@ -513,6 +513,10 @@ struct QueryPlan {
 class QueryExecutor {
 public:
     explicit QueryExecutor(const Corpus& corpus);
+    /// Alignment filters (`:: a.attr = b.attr`): by default, missing values
+    /// (empty string or `_`) do not match. Set true to restore legacy behavior.
+    void set_include_empty_alignment_values(bool v) { include_empty_alignment_values_ = v; }
+    bool include_empty_alignment_values() const { return include_empty_alignment_values_; }
 
     // max_total_cap: when count_total and cap > 0, stop counting at cap and set total_exact=false
     // sample_size > 0: reservoir sample this many random matches (ignores max_matches for output).
@@ -561,6 +565,7 @@ public:
     AnchorBindingMode anchor_binding_mode() const { return anchor_binding_mode_; }
 
 private:
+    bool include_empty_alignment_values_ = false;
     AnchorBindingMode anchor_binding_mode_ = AnchorBindingMode::Fanout;
     // ── Cardinality estimation (O(1) per EQ condition via rev.idx) ──────
 

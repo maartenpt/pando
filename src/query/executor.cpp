@@ -540,12 +540,23 @@ static std::optional<std::string_view> resolve_alignment_operand_value(
     return std::nullopt;
 }
 
+static bool alignment_value_is_missing(std::string_view v) {
+    if (v.empty() || v == "_") return true;
+    for (char c : v)
+        if (c != '|') return false;
+    return true;
+}
+
 static bool alignment_values_match(const Corpus& corpus,
                                    const std::string& an1,
                                    const std::string& an2,
                                    std::optional<std::string_view> v1,
-                                   std::optional<std::string_view> v2) {
+                                   std::optional<std::string_view> v2,
+                                   bool include_empty_alignment_values) {
     if (!v1 || !v2) return false;
+    if (!include_empty_alignment_values
+        && (alignment_value_is_missing(*v1) || alignment_value_is_missing(*v2)))
+        return false;
     bool mv1 = corpus.is_multivalue(an1);
     bool mv2 = corpus.is_multivalue(an2);
     if (!mv1 && !mv2)
@@ -566,6 +577,8 @@ static bool alignment_values_match(const Corpus& corpus,
     else s1.insert(std::string(*v1));
     if (mv2 || v2->find('|') != std::string_view::npos) split_components(*v2, s2);
     else s2.insert(std::string(*v2));
+    if (!include_empty_alignment_values && (s1.empty() || s2.empty()))
+        return false;
     for (const auto& a : s1)
         if (s2.count(a)) return true;
     return false;
@@ -614,6 +627,7 @@ static bool parallel_alignment_overlap_join_single(
         const std::vector<Match>& tgt,
         const NameIndexMap& src_names,
         const NameIndexMap& tgt_names,
+        bool include_empty_alignment_values,
         std::vector<std::pair<Match, Match>>& out,
         size_t& total_count,
         size_t max_matches,
@@ -636,14 +650,18 @@ static bool parallel_alignment_overlap_join_single(
         for (size_t i = 0; i < src.size(); ++i) {
             CorpusPos p1 = resolve_name(src[i], src_names, af.name1);
             if (p1 == NO_HEAD) continue;
-            src_by_val[std::string(pa1.value_at(p1))].push_back(i);
+            std::string_view v = pa1.value_at(p1);
+            if (!include_empty_alignment_values && alignment_value_is_missing(v)) continue;
+            src_by_val[std::string(v)].push_back(i);
         }
         std::unordered_set<std::pair<size_t, size_t>, ParallelPairHash> seen;
         seen.reserve(std::min(src.size() * tgt.size(), size_t{1024}));
         for (size_t j = 0; j < tgt.size(); ++j) {
             CorpusPos p2 = resolve_name(tgt[j], tgt_names, af.name2);
             if (p2 == NO_HEAD) continue;
-            std::string v(pa2.value_at(p2));
+            std::string_view v_sv = pa2.value_at(p2);
+            if (!include_empty_alignment_values && alignment_value_is_missing(v_sv)) continue;
+            std::string v(v_sv);
             auto it = src_by_val.find(v);
             if (it == src_by_val.end()) continue;
             for (size_t i : it->second) {
@@ -660,6 +678,7 @@ static bool parallel_alignment_overlap_join_single(
         if (p1 == NO_HEAD) continue;
         std::unordered_set<std::string> comps;
         collect_mv_component_strings(pa1, p1, mv1, comps);
+        if (!include_empty_alignment_values && comps.empty()) continue;
         for (const auto& c : comps) src_by_comp[c].push_back(i);
     }
     std::unordered_set<std::pair<size_t, size_t>, ParallelPairHash> seen;
@@ -669,6 +688,7 @@ static bool parallel_alignment_overlap_join_single(
         if (p2 == NO_HEAD) continue;
         std::unordered_set<std::string> comps;
         collect_mv_component_strings(pa2, p2, mv2, comps);
+        if (!include_empty_alignment_values && comps.empty()) continue;
         for (const auto& c : comps) {
             auto it = src_by_comp.find(c);
             if (it == src_by_comp.end()) continue;
@@ -1834,6 +1854,30 @@ static bool compare_value(CompOp op, const std::string& a, const std::string& b)
     }
 }
 
+static bool compare_value_maybe_mv(CompOp op,
+                                   std::string_view stored,
+                                   const std::string& query_value,
+                                   bool is_multivalue_attr) {
+    const bool treat_as_mv = is_multivalue_attr || stored.find('|') != std::string_view::npos;
+    if (op == CompOp::EQ && treat_as_mv)
+        return multivalue_eq(stored, query_value);
+    if (op == CompOp::NEQ && treat_as_mv)
+        return !multivalue_eq(stored, query_value);
+    return compare_value(op, std::string(stored), query_value);
+}
+
+static bool region_attr_is_multivalue(const Corpus& corpus,
+                                      const StructuralAttr* sa_ptr,
+                                      const std::string& attr_name) {
+    if (!sa_ptr) return false;
+    for (const auto& sn : corpus.structure_names()) {
+        const auto& sa = corpus.structure(sn);
+        if (&sa == sa_ptr)
+            return corpus.is_multivalue(sn + "_" + attr_name);
+    }
+    return false;
+}
+
 // ── Pre-resolved region filters ──────────────────────────────────────────
 
 std::vector<ResolvedRegionFilter> QueryExecutor::resolve_region_filters(
@@ -2136,24 +2180,15 @@ bool QueryExecutor::try_fast_aggregate(
             int64_t rgn = fc.cursor.find(pos);
             if (rgn < 0) return false;
             const auto& rf = *fc.rf;
-            if (rf.op == CompOp::EQ && rf.has_reverse) {
-                if (!rf.sa->region_matches_attr_eq_rev(rf.attr_name,
+            const bool is_mv = region_attr_is_multivalue(corpus_, rf.sa, rf.attr_name);
+            if (rf.op == CompOp::EQ && rf.has_reverse && !is_mv) {
+                if (rf.sa->region_matches_attr_eq_rev(rf.attr_name,
                         static_cast<size_t>(rgn), rf.value))
-                    return false;
-                continue;
+                    continue;
             }
             std::string_view rval = rf.sa->region_value(rf.attr_name,
                                                          static_cast<size_t>(rgn));
-            std::string rval_s(rval);
-            switch (rf.op) {
-                case CompOp::EQ:  if (rval_s != rf.value) return false; break;
-                case CompOp::NEQ: if (rval_s == rf.value) return false; break;
-                case CompOp::LT:  if (!(rval_s < rf.value)) return false; break;
-                case CompOp::GT:  if (!(rval_s > rf.value)) return false; break;
-                case CompOp::LTE: if (!(rval_s <= rf.value)) return false; break;
-                case CompOp::GTE: if (!(rval_s >= rf.value)) return false; break;
-                default: return false;
-            }
+            if (!compare_value_maybe_mv(rf.op, rval, rf.value, is_mv)) return false;
         }
         return true;
     };
@@ -2542,15 +2577,16 @@ static bool global_region_eq_unsatisfiable(const Corpus& corpus,
         const auto& sa = corpus.structure(struct_name);
         auto rkey = resolve_region_attr_key(sa, struct_name, attr_name);
         if (!rkey) return true;
-        if (sa.has_region_value_reverse(*rkey)) {
-            if (sa.count_regions_with_attr_eq(*rkey, gf.value) == 0)
-                return true;
-            continue;
+        const std::string composite = struct_name + "_" + *rkey;
+        const bool is_mv = corpus.is_multivalue(composite);
+        if (sa.has_region_value_reverse(*rkey) && !is_mv) {
+            if (sa.count_regions_with_attr_eq(*rkey, gf.value) > 0)
+                continue;
         }
         bool any = false;
         for (size_t ri = 0; ri < sa.region_count(); ++ri) {
-            std::string rval(sa.region_value(*rkey, ri));
-            if (rval == gf.value) {
+            std::string_view rval = sa.region_value(*rkey, ri);
+            if (compare_value_maybe_mv(CompOp::EQ, rval, gf.value, is_mv)) {
                 any = true;
                 break;
             }
@@ -3579,14 +3615,11 @@ MatchSet QueryExecutor::execute_parallel(const TokenQuery& source_query,
     result.num_tokens = source_query.tokens.size() + target_query.tokens.size();
 
     MatchSet source_set = execute(src_exec, 0, true, 0, 0, 0, 1, nullptr, true);
-    MatchSet target_set = execute(tgt_exec, 0, true, 0, 0, 0, 1, nullptr, true);
-
     NameIndexMap src_names = build_name_map(source_query);
     NameIndexMap tgt_names = build_name_map(target_query);
 
-    // Apply region filters (e.g. :: match.text_lang="en") to source/target before joining.
+    // Apply region filters (e.g. :: match.text_lang="en") before joining.
     apply_region_filters(source_query, src_names, source_set);
-    apply_region_filters(target_query, tgt_names, target_set);
 
     const auto& filters = merged_alignment;
     auto is_anchor_label = [](const TokenQuery& q, const std::string& name) {
@@ -3594,6 +3627,69 @@ MatchSet QueryExecutor::execute_parallel(const TokenQuery& source_query,
             if (tok.name == name) return tok.is_anchor();
         return false;
     };
+
+    // Fast path: single alignment filter with positional attrs, simple one-token target.
+    // Instead of materializing the full target query set, pull only target positions whose
+    // alignment value appears on the (already computed) source side.
+    if (filters.size() == 1 && !include_empty_alignment_values_) {
+        const auto& af = filters[0];
+        std::string an1 = normalize_attr(af.attr1);
+        std::string an2 = normalize_attr(af.attr2);
+        const bool target_simple =
+            target_query.tokens.size() == 1 &&
+            target_query.relations.empty() &&
+            !target_query.tokens[0].has_repetition() &&
+            !target_query.tokens[0].is_anchor() &&
+            target_query.within.empty() &&
+            !target_query.not_within &&
+            !target_query.within_having &&
+            target_query.containing_clauses.empty() &&
+            target_query.global_function_filters.empty();
+        if (target_simple
+            && corpus_.has_attr(an1) && corpus_.has_attr(an2)
+            && !is_anchor_label(source_query, af.name1)
+            && !is_anchor_label(target_query, af.name2)) {
+            const auto& pa2 = corpus_.attr(an2);
+            std::unordered_set<std::string> wanted_components;
+            wanted_components.reserve(std::max<size_t>(source_set.matches.size(), 16));
+            for (const auto& s : source_set.matches) {
+                CorpusPos p1 = resolve_name(s, src_names, af.name1);
+                if (p1 == NO_HEAD) continue;
+                collect_alignment_component_strings(corpus_, an1, p1, wanted_components);
+            }
+
+            MatchSet target_set;
+            target_set.num_tokens = target_query.tokens.size();
+            std::unordered_set<CorpusPos> seen_positions;
+            seen_positions.reserve(wanted_components.size() * 4 + 16);
+            for (const auto& comp : wanted_components) {
+                LexiconId id = pa2.lexicon().lookup(comp);
+                if (id == UNKNOWN_LEX) continue;
+                pa2.for_each_position_id(id, [&](CorpusPos p) {
+                    if (!seen_positions.insert(p).second) return true;
+                    if (!check_conditions(p, target_query.tokens[0].conditions)) return true;
+                    Match m;
+                    m.positions.push_back(p);
+                    m.span_ends.push_back(p);
+                    target_set.matches.push_back(std::move(m));
+                    return true;
+                });
+            }
+            apply_region_filters(target_query, tgt_names, target_set);
+
+            parallel_alignment_overlap_join_single(
+                    corpus_, an1, an2, af, source_set.matches, target_set.matches,
+                    src_names, tgt_names, include_empty_alignment_values_,
+                    result.parallel_matches, result.total_count,
+                    max_matches, count_total);
+            result.total_exact = true;
+            return result;
+        }
+    }
+
+    MatchSet target_set = execute(tgt_exec, 0, true, 0, 0, 0, 1, nullptr, true);
+    apply_region_filters(target_query, tgt_names, target_set);
+
     if (filters.size() == 1) {
         const auto& af = filters[0];
         std::string an1 = normalize_attr(af.attr1);
@@ -3603,7 +3699,8 @@ MatchSet QueryExecutor::execute_parallel(const TokenQuery& source_query,
             && !is_anchor_label(target_query, af.name2)) {
             parallel_alignment_overlap_join_single(
                     corpus_, an1, an2, af, source_set.matches, target_set.matches,
-                    src_names, tgt_names, result.parallel_matches, result.total_count,
+                    src_names, tgt_names, include_empty_alignment_values_,
+                    result.parallel_matches, result.total_count,
                     max_matches, count_total);
             result.total_exact = true;
             return result;
@@ -3622,7 +3719,8 @@ MatchSet QueryExecutor::execute_parallel(const TokenQuery& source_query,
                 }
                 auto v1 = resolve_alignment_operand_value(corpus_, s, src_names, af.name1, an1);
                 auto v2 = resolve_alignment_operand_value(corpus_, t, tgt_names, af.name2, an2);
-                if (!alignment_values_match(corpus_, an1, an2, v1, v2)) {
+                if (!alignment_values_match(corpus_, an1, an2, v1, v2,
+                                            include_empty_alignment_values_)) {
                     aligned = false;
                     break;
                 }
@@ -3712,15 +3810,14 @@ void QueryExecutor::apply_region_filters(const TokenQuery& query, const NameInde
                 rgn = sa.find_region(pos);
                 if (rgn < 0) { pass = false; break; }
             }
-            if (gf.op == CompOp::EQ && sa.has_region_value_reverse(*rkey)) {
-                if (!sa.region_matches_attr_eq_rev(*rkey, static_cast<size_t>(rgn), gf.value)) {
-                    pass = false;
-                    break;
-                }
-                continue;
+            const std::string composite = struct_name + "_" + *rkey;
+            const bool is_mv = corpus_.is_multivalue(composite);
+            if (gf.op == CompOp::EQ && sa.has_region_value_reverse(*rkey) && !is_mv) {
+                if (sa.region_matches_attr_eq_rev(*rkey, static_cast<size_t>(rgn), gf.value))
+                    continue;
             }
-            std::string rval(sa.region_value(*rkey, static_cast<size_t>(rgn)));
-            if (!compare_value(gf.op, rval, gf.value)) { pass = false; break; }
+            std::string_view rval = sa.region_value(*rkey, static_cast<size_t>(rgn));
+            if (!compare_value_maybe_mv(gf.op, rval, gf.value, is_mv)) { pass = false; break; }
         }
 
         if (pass) kept.push_back(m);
@@ -3756,7 +3853,8 @@ void QueryExecutor::apply_global_filters(const TokenQuery& query, const NameInde
                 { pass = false; break; }
             auto v1 = resolve_alignment_operand_value(corpus_, m, name_map, af.name1, an1);
             auto v2 = resolve_alignment_operand_value(corpus_, m, name_map, af.name2, an2);
-            if (!alignment_values_match(corpus_, an1, an2, v1, v2)) {
+            if (!alignment_values_match(corpus_, an1, an2, v1, v2,
+                                        include_empty_alignment_values_)) {
                 pass = false;
                 break;
             }
@@ -4200,13 +4298,14 @@ bool QueryExecutor::match_passes_inline_region_filters(const Match& m, const Tok
             rgn = sa.find_region(pos);
             if (rgn < 0) return false;
         }
-        if (gf.op == CompOp::EQ && sa.has_region_value_reverse(*rkey)) {
-            if (!sa.region_matches_attr_eq_rev(*rkey, static_cast<size_t>(rgn), gf.value))
-                return false;
-            continue;
+        const std::string composite = struct_name + "_" + *rkey;
+        const bool is_mv = corpus_.is_multivalue(composite);
+        if (gf.op == CompOp::EQ && sa.has_region_value_reverse(*rkey) && !is_mv) {
+            if (sa.region_matches_attr_eq_rev(*rkey, static_cast<size_t>(rgn), gf.value))
+                continue;
         }
-        std::string rval(sa.region_value(*rkey, static_cast<size_t>(rgn)));
-        if (!compare_value(gf.op, rval, gf.value)) return false;
+        std::string_view rval = sa.region_value(*rkey, static_cast<size_t>(rgn));
+        if (!compare_value_maybe_mv(gf.op, rval, gf.value, is_mv)) return false;
     }
     return true;
 }

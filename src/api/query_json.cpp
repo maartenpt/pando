@@ -102,6 +102,7 @@ std::pair<MatchSet, double> run_single_query(const Corpus& corpus,
         return {MatchSet{}, 0.0};
 
     QueryExecutor executor(corpus);
+    executor.set_include_empty_alignment_values(opts.allow_empty_alignment);
     size_t max_m = opts.offset + opts.limit;
     bool count_t = opts.total;
     size_t max_total_cap = (opts.total && opts.max_total > 0) ? opts.max_total : 0;

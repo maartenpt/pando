@@ -107,6 +107,8 @@ struct Options {
     // emits one match per candidate row (Cartesian across multiple anchors);
     // "innermost" picks the tightest-enclosing row only. Flat types are unaffected.
     std::string anchor_binding = "fanout";  // "fanout" | "innermost"
+    // Alignment filters (`:: a.attr = b.attr`): default ignores empty/"_" values.
+    bool allow_empty_alignment = false;
 };
 
 struct QueryTiming {
@@ -2441,6 +2443,7 @@ static void run_query(const Corpus& corpus, const std::string& input,
     executor.set_anchor_binding_mode(opts.anchor_binding == "innermost"
                                      ? QueryExecutor::AnchorBindingMode::Innermost
                                      : QueryExecutor::AnchorBindingMode::Fanout);
+    executor.set_include_empty_alignment_values(opts.allow_empty_alignment);
 
     // In `--api` mode we must emit a single JSON object for the whole CQL program.
     // We therefore determine the last statement that would produce JSON output, and
@@ -2559,6 +2562,7 @@ static void run_query(const Corpus& corpus, const std::string& input,
             executor.set_anchor_binding_mode(opts.anchor_binding == "innermost"
                                              ? QueryExecutor::AnchorBindingMode::Innermost
                                              : QueryExecutor::AnchorBindingMode::Fanout);
+            executor.set_include_empty_alignment_values(opts.allow_empty_alignment);
             auto t0 = std::chrono::high_resolution_clock::now();
             if (stmt.is_parallel) {
                 session.last_ms = executor.execute_parallel(stmt.query, stmt.target_query, max_m, count_t);
@@ -2734,6 +2738,8 @@ static void run_query(const Corpus& corpus, const std::string& input,
                     }
                     opts.anchor_binding = val;
                 }
+                else if (name == "allow-empty-alignment" || name == "allow_empty_alignment")
+                    opts.allow_empty_alignment = (val == "true" || val == "1" || val == "on");
                 else {
                     std::cerr << "Unknown setting: " << name << "\n";
                     continue;
@@ -2769,6 +2775,8 @@ static void run_query(const Corpus& corpus, const std::string& input,
                     std::cout << "  \"debug\": " << opts.debug_level << ",\n";
                     std::cout << "  \"threads\": " << opts.threads << ",\n";
                     std::cout << "  \"sample\": " << opts.sample << ",\n";
+                    std::cout << "  \"allow_empty_alignment\": "
+                              << (opts.allow_empty_alignment ? "true" : "false") << ",\n";
                     std::cout << "  \"measures\": " << jstr(join(opts.coll_measures.empty()
                         ? std::vector<std::string>{"logdice"} : opts.coll_measures)) << ",\n";
                     std::cout << "  \"attrs\": " << jstr(join(opts.attrs)) << "\n";
@@ -2791,6 +2799,8 @@ static void run_query(const Corpus& corpus, const std::string& input,
                     std::cout << "debug       = " << opts.debug_level << "\n";
                     std::cout << "threads     = " << opts.threads << "\n";
                     std::cout << "sample      = " << opts.sample << "\n";
+                    std::cout << "allow-empty-alignment = "
+                              << (opts.allow_empty_alignment ? "on" : "off") << "\n";
                     std::cout << "measures    = " << join(opts.coll_measures.empty()
                         ? std::vector<std::string>{"logdice"} : opts.coll_measures) << "\n";
                     std::cout << "attrs       = " << join(opts.attrs) << "\n";
@@ -3411,6 +3421,7 @@ static Options parse_args(int argc, char* argv[]) {
             }
             opts.anchor_binding = std::move(v);
         }
+        else if (arg == "--allow-empty-alignment") { opts.allow_empty_alignment = true; }
         else if (arg == "--max-gap" && i + 1 < argc) { opts.max_gap = std::stoi(argv[++i]); }
         else if (arg == "--strict-quoted-strings") { opts.strict_quoted_strings = true; }
         else if (arg == "--window" && i + 1 < argc) {
@@ -3504,6 +3515,7 @@ static Options parse_args(int argc, char* argv[]) {
                   << "  --seed N         RNG seed for --sample (reproducible runs)\n"
                   << "  --threads N      Parallel seed processing for multi-token queries (default: 1)\n"
                   << "  --overlay DIR    Merge stand-off overlay index (repeatable); attrs are overlay-<layer>-…\n"
+                  << "  --allow-empty-alignment  Alignment join (`:: a.attr=b.attr`) may match empty/_ values (legacy)\n"
                   << "  --max-gap N      Cap for + and * quantifiers (default: " << REPEAT_UNBOUNDED << ")\n"
                   << "  --strict-quoted-strings  Only /pattern/ is regex; quoted strings are always literal\n"
                   << "  --no-mv-explode  count/freq: keep pipe-joined multivalue keys (no per-component buckets)\n"

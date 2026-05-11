@@ -19,6 +19,8 @@ struct QueryOptions {
     std::vector<std::string> attrs;  // empty = all token attributes in JSON; else only these
     /// When true: only `/pattern/` is regex; quoted strings are literal (matches `--strict-quoted-strings` on CLI).
     bool strict_quoted_strings = false;
+    /// Alignment filters (`:: a.attr = b.attr`): include empty/"_" values (legacy behavior).
+    bool allow_empty_alignment = false;
 };
 
 // Run a single query (one statement, no trailing command). Returns (MatchSet, elapsed_ms).
@@ -77,6 +79,7 @@ struct ProgramOptions {
     int context    = 5;
     bool total     = false;
     bool strict_quoted_strings = false;
+    bool allow_empty_alignment = false;
     size_t group_limit = 1000;
     std::vector<std::string> attrs;
     // Collocation settings
